@@ -1,5 +1,8 @@
 <?php
-
+// Start session for CSRF and other session-based features
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 // Configuration and helper functions only
 
 // Database connection

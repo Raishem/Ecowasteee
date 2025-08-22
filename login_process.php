@@ -24,7 +24,7 @@ if (!$email || empty($password)) {
 try {
     error_log("Trying to log in with email: $email");
     $conn = getDBConnection();
-    $stmt = $conn->prepare("SELECT user_id, email, password_hash, verified, first_name FROM users WHERE email = ?");
+    $stmt = $conn->prepare("SELECT user_id, email, password_hash, first_name FROM users WHERE email = ?");
     if (!$stmt) {
         error_log("Prepare failed: " . $conn->error);
         $_SESSION['login_error'] = 'Database error.';
@@ -53,11 +53,11 @@ try {
     }
 
     // Check if email is verified
-    if (!$user['verified']) {
-        $_SESSION['login_error'] = 'Please verify your email first';
-        header('Location: login.php');
-        exit();
-    }
+    //if (!$user['verified']) {
+    ///    $_SESSION['login_error'] = 'Please verify your email first';
+    ///    header('Location: login.php');
+    ///    exit();
+    ///}
 
     // Set session variables
     $_SESSION['logged_in'] = true;
