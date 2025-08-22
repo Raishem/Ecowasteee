@@ -46,8 +46,7 @@ while ($row = $result->fetch_assoc()) $receivedDonations[] = $row;
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
-<div class="container">
-    <header>
+        <header>
         <div class="logo-container">
             <div class="logo">
                 <img src="assets/img/ecowaste_logo.png" alt="EcoWaste Logo">
@@ -68,6 +67,9 @@ while ($row = $result->fetch_assoc()) $receivedDonations[] = $row;
             </div>
         </div>
     </header>
+    
+<div class="container">
+
     <aside class="sidebar">
         <nav>
             <ul>
@@ -75,7 +77,7 @@ while ($row = $result->fetch_assoc()) $receivedDonations[] = $row;
                 <li><a href="browse.php"><i class="fas fa-search"></i>Browse</a></li>
                 <li><a href="achievements.php"><i class="fas fa-star"></i>Achievements</a></li>
                 <li><a href="leaderboard.php"><i class="fas fa-trophy"></i>Leaderboard</a></li>
-                <li><a href="start_project.php"><i class="fas fa-recycle"></i>Projects</a></li>
+                <li><a href="projects.php"><i class="fas fa-recycle"></i>Projects</a></li>
                 <li><a href="donations.php" style="color: #2e8b57;"><i class="fas fa-box"></i>Donations</a></li>
             </ul>
         </nav>

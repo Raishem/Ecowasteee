@@ -25,10 +25,11 @@ if (!$user) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Learn More | EcoWaste</title>
+    <title>Projects | EcoWaste</title>
     <link rel="stylesheet" href="assets/css/projects.css">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&family=Open+Sans&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
 </head>
 <body>
     <header>
@@ -61,7 +62,7 @@ if (!$user) {
                     <li><a href="browse.php"><i class="fas fa-search"></i>Browse</a></li>
                     <li><a href="achievements.php"><i class="fas fa-star"></i>Achievements</a></li>
                     <li><a href="leaderboard.php"><i class="fas fa-trophy"></i>Leaderboard</a></li>
-                    <li><a href="projects.php"><i class="fas fa-recycle"></i>Projects</a></li>
+                    <li><a href="projects.php" style="color: #2e8b57;"><i class="fas fa-recycle"></i>Projects</a></li>
                     <li><a href="donations.php"><i class="fas fa-box"></i>Donations</a></li>
                 </ul>
             </nav>
@@ -69,39 +70,26 @@ if (!$user) {
 
         <main class="main-content">
             <div class="page-header">
-                <h2 class="page-title">Learn More About EcoWaste</h2>
+                <h2 class="page-title">My Recycling Projects</h2>
+                <a href="start_project.php" class="start-recycling-btn">Start Recycling</a>
+            </div>
+            
+            <div class="projects-filter">
+                <div class="filter-tab active" data-filter="all">All Projects</div>
+                <div class="filter-tab" data-filter="in-progress">In Progress</div>
+                <div class="filter-tab" data-filter="completed">Completed</div>
             </div>
             
             <div class="projects-container">
-                <div class="info-section">
-                    <h3>What is EcoWaste?</h3>
-                    <p>EcoWaste is a platform dedicated to promoting recycling and waste reduction through community engagement, education, and practical initiatives.</p>
-                    
-                    <h3>Our Mission</h3>
-                    <p>To create a sustainable future by reducing waste, promoting recycling practices, and building a community of environmentally conscious individuals.</p>
-                    
-                    <h3>How It Works</h3>
-                    <ol>
-                        <li>Start recycling projects to track your environmental impact</li>
-                        <li>Donate items you no longer need instead of throwing them away</li>
-                        <li>Browse available donations from other community members</li>
-                        <li>Earn achievements and climb the leaderboard as you contribute</li>
-                    </ol>
-                    
-                    <h3>Benefits of Using EcoWaste</h3>
-                    <ul>
-                        <li>Reduce your environmental footprint</li>
-                        <li>Connect with like-minded individuals</li>
-                        <li>Track your recycling progress and impact</li>
-                        <li>Find new homes for items you no longer need</li>
-                        <li>Earn recognition for your environmental efforts</li>
-                    </ul>
-                    
-                    <div class="action-buttons">
-                        <a href="start_project.php" class="start-recycling-btn">Start Your First Project</a>
-                        <a href="browse.php" class="action-btn">Browse Donations</a>
-                    </div>
+                <div class="empty-state">
+                    <i class="fas fa-recycle"></i>
+                    <p>No projects yet</p>
                 </div>
+            </div>
+            
+            <div class="action-buttons">
+                <button class="action-btn">View Details</button>
+                <button class="action-btn">Share</button>
             </div>
         </main>
     </div>
@@ -172,6 +160,20 @@ if (!$user) {
             if (!userProfile.contains(event.target)) {
                 userProfile.classList.remove('active');
             }
+        });
+
+        // Projects filter tabs
+        const filterTabs = document.querySelectorAll('.filter-tab');
+        filterTabs.forEach(tab => {
+            tab.addEventListener('click', function() {
+                filterTabs.forEach(t => t.classList.remove('active'));
+                this.classList.add('active');
+                
+                // Here you would filter projects based on the data-filter attribute
+                const filter = this.getAttribute('data-filter');
+                console.log(`Filtering by: ${filter}`);
+                // Implement your actual filtering logic here
+            });
         });
 
         // Feedback system
