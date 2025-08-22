@@ -1,0 +1,218 @@
+/* Base Styles */
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+
+    
+body {
+    font-family: 'Montserrat', sans-serif;
+    background-color: #FBFFF5;
+    color: #2c2c2c;
+    background-image: url(../img/bg1.png);
+    background-size: cover;
+    background-position: center;
+}
+
+
+    /* Header Styles */
+    .main-header {
+        position: fixed;
+        top: 0;
+        width: 100%;
+        padding: 20px;
+        z-index: 100;
+    }
+
+    .logo-image {
+        display: flex;
+        align-items: center;
+    }
+
+    .logo-img {
+        width: 100px;
+        height: 100px;
+        object-fit: contain;
+        transition: transform 0.3s ease;
+    }
+
+    .logo-img:hover {
+        transform: scale(1.05);
+    }
+
+    .signup-container {
+        display: flex;
+        height: 100vh;
+        width: 100%;
+        padding-top: 120px; /* Give space for fixed header */
+    }
+
+    .left-section {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        padding: 2rem;
+        justify-content: center;
+    }
+
+    .right-section {
+        width: 300px;
+        display: flex;
+        align-items: flex-start;
+        justify-content: flex-end;
+        padding: 2rem;
+    }
+
+    /* Content Styles */
+    .logo {
+        text-align: left;
+        margin-bottom: 15px;
+    }
+
+    .logo i {
+        font-size: 2.5rem;
+        color: #2ecc71;
+    }
+
+    .content-container {
+        max-width: 600px;
+    }
+
+    .trash-text, .treasure-text {
+        font-size: 3.5rem;
+        font-weight: 900;
+        line-height: 1.2;
+        text-transform: uppercase;
+    }
+
+    .treasure-text {
+        margin-top: 1rem;
+    }
+
+    .highlight {
+        color: #2ecc71;
+        position: relative;
+        display: inline-block;
+    }
+
+    .highlight::after {
+        content: '';
+        position: absolute;
+        bottom: 5px;
+        left: 0;
+        width: 100%;
+        height: 15px;
+        background-color: rgba(46, 204, 113, 0.3);
+        z-index: -1;
+    }
+
+    /* Button Styles */
+    .start-section {
+        margin-top: 3rem;
+        margin-bottom: 2rem;
+    }
+
+    .start-button {
+        display: inline-block;
+        background-color: #2ecc71;
+        color: white;
+        border: none;
+        padding: 1rem 3rem;
+        font-size: 1.5rem;
+        font-weight: bold;
+        border-radius: 50px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(46, 204, 113, 0.4);
+        text-transform: uppercase;
+        text-decoration: none;
+    }
+
+    .start-button:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 6px 20px rgba(46, 204, 113, 0.6);
+    }
+
+    .auth-buttons {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        margin-top: 20px;
+    }
+
+    .auth-btn {
+        display: inline-block;
+        background: transparent;
+        border: 2px solid #2ecc71;
+        color: #2ecc71;
+        padding: 0.8rem 2rem;
+        font-size: 1rem;
+        font-weight: bold;
+        border-radius: 50px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        text-align: center;
+        text-decoration: none;
+    }
+
+    .auth-btn:hover {
+        background-color: #2ecc71;
+        color: white;
+    }
+
+    /* Responsive Design */
+    @media (max-width: 768px) {
+        .signup-container {
+            flex-direction: column;
+            padding-top: 100px;
+        }
+        
+    
+        
+        .auth-buttons {
+            flex-direction: row;
+            margin-top: 0;
+        }
+        
+        .trash-text, .treasure-text {
+            font-size: 2.5rem;
+        }
+        
+        .highlight::after {
+            height: 10px;
+            bottom: 3px;
+        }
+        
+        .start-button {
+            padding: 0.8rem 2rem;
+            font-size: 1.2rem;
+        }
+        
+        .auth-btn {
+            padding: 0.6rem 1.5rem;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .main-header {
+            padding: 15px;
+        }
+        
+        .logo-img {
+            width: 60px;
+            height: 60px;
+        }
+        
+        .trash-text, .treasure-text {
+            font-size: 2rem;
+        }
+        
+        .auth-buttons {
+            flex-direction: column;
+        }
+        
+        .auth-btn {
+            width: 100%;
+        }
+    }

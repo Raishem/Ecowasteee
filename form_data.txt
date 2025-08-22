@@ -1,0 +1,15 @@
+Array
+(
+    [full-name] => 
+    [first-name] => hello
+    [middle-name] => hi
+    [last-name] => haur
+    [contact-number] => 09876543210
+    [email] => haur@gmail.com
+    [address] => haurhaur
+    [password] => qwerty123
+    [city] => haurcity
+    [confirm-password] => qwerty123
+    [zip-code] => 6000
+    [terms] => on
+)

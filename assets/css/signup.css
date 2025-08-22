@@ -1,0 +1,492 @@
+:root {
+            --main-green: #228B22;
+            --dark-green: #006400;
+            --light-green: #90EE90;
+            --cream: #FBFFF5;
+            --required-red: #FF0000;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Montserrat', sans-serif;
+        }
+
+        body {
+            background-color: var(--cream);
+            display: flex;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Animation Keyframes */
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-20px); }
+        }
+
+        @keyframes floatReverse {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(20px); }
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.05); opacity: 0.8; }
+        }
+
+        /* Header Styles */
+        .main-header {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            padding: 20px;
+            z-index: 100;
+            background-color: transparent;
+        }
+
+        .logo-image {
+            display: flex;
+            align-items: center;
+        }
+
+        .logo-img {
+            width: 100px;
+            height: 100px;
+            object-fit: contain;
+            transition: transform 0.3s ease;
+        }
+
+        .logo-img:hover {
+            transform: scale(1.05);
+        }
+
+        /* Main Container */
+        .signup-container {
+            display: flex;
+            width: 100%;
+            min-height: 100vh;
+        }
+
+        /* Left Section - Form */
+        .left-section {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 40px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Animated Curved Design Elements */
+        .curved-design {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            z-index: 0;
+        }
+
+        .curve {
+            position: absolute;
+            border-radius: 50%;
+            background: rgba(46, 204, 113, 0.1);
+        }
+
+        .curve-large {
+            width: 600px;
+            height: 600px;
+            top: 10px;
+            left: -300px;
+            animation: float 8s ease-in-out infinite, 
+                       pulse 12s ease infinite;
+        }
+
+        .curve-medium {
+            width: 400px;
+            height: 400px;
+            bottom: -200px;
+            right: -100px;
+            background: rgba(46, 204, 113, 0.08);
+            animation: floatReverse 10s ease-in-out infinite;
+        }
+
+        .curve-small {
+            width: 200px;
+            height: 200px;
+            top: 50%;
+            right: 50px;
+            background: rgba(46, 204, 113, 0.05);
+            animation: float 7s ease-in-out infinite, 
+                       pulse 15s ease infinite;
+        }
+
+        /* Form Content */
+        .content-container {
+            width: 100%;
+            max-width: 500px;
+            z-index: 2;
+        }
+
+        h1 {
+            font-size: 2.2rem;
+            color: #333;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1rem;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            color: #555;
+            font-size: 0.9rem;
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+
+        label.required::after {
+            content: " *";
+            color: var(--required-red);
+            font-size: 1.1em;
+        }
+
+        input {
+            width: 100%;
+            padding: 14px 16px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 1rem;
+            transition: all 0.3s;
+        }
+
+        input:focus {
+            border-color: var(--main-green);
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(34, 139, 34, 0.1);
+        }
+
+        /* Full Name Expansion Styles */
+        .full-name-container {
+            position: relative;
+            grid-column: span 2;
+        }
+
+        .full-name-input {
+            cursor: pointer;
+        }
+
+        .name-details {
+            display: none;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 15px;
+            margin-top: 15px;
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        .name-details.active {
+            display: grid;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            margin: 20px 0;
+            font-size: 0.9rem;
+            grid-column: span 2;
+        }
+
+        .checkbox-group input {
+            width: auto;
+            margin-right: 8px;
+        }
+
+        .signup-btn {
+            width: 100%;
+            padding: 14px;
+            background-color: var(--main-green);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin: 10px 0 25px;
+            grid-column: span 2;
+        }
+
+        .signup-btn:hover {
+            background-color: var(--dark-green);
+            transform: translateY(-2px);
+        }
+
+        .divider {
+            display: flex;
+            align-items: center;
+            margin-bottom: 25px;
+            color: #999;
+            font-size: 0.9rem;
+            grid-column: span 2;
+        }
+
+        .divider::before,
+        .divider::after {
+            content: "";
+            flex: 1;
+            border-bottom: 1px solid #ddd;
+            margin: 0 10px;
+        }
+
+        /* Social Login Styles */
+        .social-login {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 25px;
+            grid-column: span 2;
+        }
+
+        .social-btn {
+            width: 100%;
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 0.95rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            border: 1px solid #ddd;
+            background: white;
+            text-decoration: none;
+        }
+
+        .social-btn.google {
+            color: #e85e4b;
+            border-color: #DB4437;
+        }
+
+        .social-btn.google:hover {
+            background: rgba(219, 68, 55, 0.1);
+        }
+
+        .social-btn.facebook {
+            color: #4267B2;
+            border-color: #4267B2;
+        }
+
+        .social-btn.facebook:hover {
+            background: rgba(66, 103, 178, 0.1);
+        }
+
+        .social-btn i {
+            font-size: 1.1rem;
+        }
+
+        .login-link {
+            color: #666;
+            text-align: center;
+            font-size: 0.95rem;
+            grid-column: span 2;
+        }
+
+        .login-link a {
+            color: var(--main-green);
+            font-weight: 600;
+            text-decoration: none;
+        }
+
+        .login-link a:hover {
+            text-decoration: underline;
+        }
+
+        /* Right Section - Green Background with Curves */
+        .right-section {
+            width: 40%;
+            position: relative;
+            background: linear-gradient(135deg, var(--main-green) 0%, var(--dark-green) 100%);
+            overflow: hidden;
+        }
+
+        .green-curves {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+        }
+
+        .green-curve {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+        }
+
+        .green-curve-1 {
+            width: 800px;
+            height: 800px;
+            top: -400px;
+            right: -400px;
+            animation: float 15s ease-in-out infinite;
+        }
+
+        .green-curve-2 {
+            width: 600px;
+            height: 600px;
+            bottom: -300px;
+            left: -200px;
+            animation: floatReverse 12s ease-in-out infinite;
+        }
+
+        .green-curve-3 {
+            width: 300px;
+            height: 300px;
+            top: 30%;
+            left: 20%;
+            animation: pulse 18s ease infinite;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 1024px) {
+            .right-section {
+                width: 45%;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .signup-container {
+                flex-direction: column;
+                padding-top: 120px;
+            }
+            
+            .right-section {
+                display: none;
+            }
+            
+            .left-section {
+                padding: 30px 20px;
+            }
+            
+            h1 {
+                font-size: 1.8rem;
+            }
+            
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .full-name-container,
+            .checkbox-group,
+            .signup-btn,
+            .divider,
+            .social-login,
+            .login-link {
+                grid-column: span 1;
+            }
+            
+            .name-details {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .main-header {
+                padding: 15px;
+            }
+        
+            .logo-img {
+                width: 80px;
+                height: 80px;
+            }
+            
+            .left-section {
+                padding: 20px 15px;
+            }
+            
+            h1 {
+                font-size: 1.5rem;
+            }
+            
+            input {
+                padding: 12px 14px;
+            }
+        }
+
+        /* Success Modal Styles */
+        .success-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+            max-width: 400px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            animation: modalFadeIn 0.3s ease-out;
+        }
+
+        @keyframes modalFadeIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .modal-content i {
+            color: #228B22;
+            font-size: 3rem;
+            margin-bottom: 15px;
+        }
+
+        .modal-content h2 {
+            color: #228B22;
+            margin-bottom: 15px;
+        }
+
+        .modal-content button {
+            background: #228B22;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-top: 15px;
+            font-size: 1rem;
+            transition: all 0.3s;
+        }
+
+        .modal-content button:hover {
+            background: #006400;
+            transform: translateY(-2px);
+        }
