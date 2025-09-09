@@ -2,18 +2,97 @@
 session_start();
 require_once 'config.php';
 
+if (!isset($_SESSION['user_id'])) {
+    header('Location: login.php');
+    exit();
+}
+
+$conn = getDBConnection();
+$donor_id = $_SESSION['user_id'];
+$image_paths_json = null; // Default to null if no images are uploaded
+
+// Handle form submission (POST request)
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Check if required fields are set
+    if (empty($_POST['wasteType']) || empty($_POST['quantity']) || empty($_POST['description'])) {
+        die('Error: All fields are required.');
+    }
+    
+    // Sanitize and assign form data
+    $item_name = htmlspecialchars($_POST['wasteType']);
+    $quantity = (int) $_POST['quantity'];
+    $category = htmlspecialchars($_POST['wasteType']);
+    $description = htmlspecialchars($_POST['description']);
+    $donor_id = $_SESSION['user_id'];
+    $donated_at = date('Y-m-d H:i:s');
+    $image_paths_json = null;
+
+    // Handle photo upload
+    $image_paths = array();
+    if (isset($_FILES['photos']) && count($_FILES['photos']['name']) > 0) {
+        $upload_dir = 'assets/uploads/';
+        if (!is_dir($upload_dir)) {
+            mkdir($upload_dir, 0777, true);
+        }
+
+        foreach ($_FILES['photos']['name'] as $key => $file_name) {
+            if ($_FILES['photos']['error'][$key] === UPLOAD_ERR_OK) {
+                $file_tmp = $_FILES['photos']['tmp_name'][$key];
+                $file_type = mime_content_type($file_tmp);
+                $allowed_types = ['image/jpeg', 'image/png', 'image/gif'];
+
+                if (!in_array($file_type, $allowed_types)) {
+                    die('Error: Only JPG, PNG, and GIF files are allowed.');
+                }
+
+                $unique_file_name = uniqid() . '_' . basename($file_name);
+                $target_file = $upload_dir . $unique_file_name;
+
+                if (move_uploaded_file($file_tmp, $target_file)) {
+                    $image_paths[] = $target_file; // Save the file path
+                } else {
+                    die('Failed to upload image: ' . $file_name);
+                }
+            }
+        }
+        
+        // Convert image paths array to JSON for storage
+        if (!empty($image_paths)) {
+            $image_paths_json = json_encode($image_paths);
+        }
+    }
+
+    // Insert donation into the database
+    $stmt = $conn->prepare("INSERT INTO donations (item_name, quantity, category, description, donor_id, donated_at, status, image_path) VALUES (?, ?, ?, ?, ?, ?, 'Available', ?)");
+    if (!$stmt) {
+        die('Error: Failed to prepare statement. ' . $conn->error);
+    }
+
+    if (!$stmt->bind_param("sisssss", $item_name, $quantity, $category, $description, $donor_id, $donated_at, $image_paths_json)) {
+        die('Error: Failed to bind parameters. ' . $stmt->error);
+    }
+
+    if (!$stmt->execute()) {
+        die('Error: Failed to execute statement. ' . $stmt->error);
+    }
+
+    // Refresh the page to show the new donation instead of redirecting
+    header('Location: ' . $_SERVER['PHP_SELF']);
+    exit();
+}
+
 // Check login status
 if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true || empty($_SESSION['user_id'])) {
     header('Location: login.php');
     exit();
 }
 
-// Get user data from database
-$conn = getDBConnection();
+// Fetch user data
 $stmt = $conn->prepare("SELECT * FROM users WHERE user_id = ?");
 $stmt->bind_param("i", $_SESSION['user_id']);
 $stmt->execute();
 $user = $stmt->get_result()->fetch_assoc();
+
 if (!$user) {
     session_destroy();
     header('Location: login.php');
@@ -52,6 +131,7 @@ while ($row = $result->fetch_assoc()) $leaders[] = $row;
     <link rel="stylesheet" href="assets/css/homepage.css">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&family=Open+Sans&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
 </head>
 <body>
         <header>
@@ -63,12 +143,12 @@ while ($row = $result->fetch_assoc()) $leaders[] = $row;
             </div>
             <div class="user-profile" id="userProfile">
                 <div class="profile-pic">
-                    <img src="assets/img/user-avatar.jpg" alt="User Profile">
+                    <?= strtoupper(substr(htmlspecialchars($user['first_name']), 0, 1)) ?>
                 </div>
                 <span class="profile-name"><?= htmlspecialchars($user['first_name']) ?></span>
                 <i class="fas fa-chevron-down dropdown-arrow"></i>
                 <div class="profile-dropdown">
-                    <a href="#" class="dropdown-item"><i class="fas fa-user"></i> My Profile</a>
+                    <a href="profile.php" class="dropdown-item"><i class="fas fa-user"></i> My Profile</a>
                     <a href="#" class="dropdown-item"><i class="fas fa-cog"></i> Settings</a>
                     <div class="dropdown-divider"></div>
                     <a href="logout.php" class="dropdown-item"><i class="fas fa-sign-out-alt"></i> Logout</a>
@@ -78,11 +158,11 @@ while ($row = $result->fetch_assoc()) $leaders[] = $row;
 
     <div class="container">
 
-        <aside class="sidebar">
+          <aside class="sidebar">
             <nav>
                 <ul>
                     <li><a href="homepage.php" style="color: rgb(4, 144, 4);"><i class="fas fa-home"></i>Home</a></li>
-                    <li><a href="browse.php"><i class="fas fa-search"></i>Browse</a></li>
+                    <li><a href="browse.php" ><i class="fas fa-search"></i>Browse</a></li>
                     <li><a href="achievements.php"><i class="fas fa-star"></i>Achievements</a></li>
                     <li><a href="leaderboard.php"><i class="fas fa-trophy"></i>Leaderboard</a></li>
                     <li><a href="projects.php"><i class="fas fa-recycle"></i>Projects</a></li>
@@ -97,7 +177,8 @@ while ($row = $result->fetch_assoc()) $leaders[] = $row;
                 <div class="divider"></div>
                 <p>Join our community in making the world a cleaner place</p>
                 <div class="btn-container">
-                    <a href="#" class="btn" id="donateWasteBtn">Donate Waste</a>
+                  <!-- Added role and tabindex for accessibility -->
+<button type="button" class="btn" id="donateWasteBtn" role="button" tabindex="0">Donate Waste</button>
                     <a href="start_project.php" class="btn">Start Recycling</a>
                     <a href="learn_more.php" class="btn" style="background-color: #666;">Learn More</a>
                 </div>
@@ -108,54 +189,98 @@ while ($row = $result->fetch_assoc()) $leaders[] = $row;
                 <button class="tab-btn" onclick="openTab('recycled-ideas')">Recycled Ideas</button>
             </div>
             <div class="divider"></div>
-            <!-- Donations Tab Content -->
-            <div id="donations" class="tab-content" style="display: block;">
-                <div class="section-card">
-                    <h3>Available</h3>
-                    <div id="availableDonationsContainer">
-                        <?php if (count($donations) === 0): ?>
-                            <p>No donations available.</p>
-                        <?php else: ?>
-                            <?php foreach ($donations as $donation): ?>
-                            <div class="donation-item">
-                                <div class="donation-info">
-                                    <h4><?= htmlspecialchars($donation['item_name']) ?></h4>
-                                    <p>Category: <?= htmlspecialchars($donation['category']) ?></p>
-                                    <p class="time-ago"><?= htmlspecialchars(date('M d, Y', strtotime($donation['donated_at']))) ?></p>
-                                </div>
-                                <div class="donation-action">
-                                    <div class="quantity">Quantity: <?= htmlspecialchars($donation['quantity']) ?></div>
-                                    <button class="action-btn">Request Donation</button>
-                                </div>
-                            </div>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
+
+<!-- Donations Tab Content -->
+<div id="donations" class="tab-content" style="display: block;">
+    <div class="section-card">
+        <h3>Available</h3>
+        <div id="availableDonationsContainer">
+            <?php if (count($donations) === 0): ?>
+                <p>No donations available.</p>
+            <?php else: ?>
+                <?php foreach ($donations as $donation): ?>
+<div class="donation-post">
+    <div class="donation-header">
+        <h4><?= htmlspecialchars($donation['item_name']) ?></h4>
+        <div class="donation-meta">
+            <span class="category">Category: <?= htmlspecialchars($donation['category']) ?></span>
+            <span class="quantity">Quantity: <?= htmlspecialchars($donation['quantity']) ?></span>
+            <span class="time-ago"><?= htmlspecialchars(date('M d, Y', strtotime($donation['donated_at']))) ?></span>
+        </div>
+    </div>
+                
+    <div class="donation-description">
+        <p><?= nl2br(htmlspecialchars($donation['description'] ?? '')) ?></p>
+    </div>
+
+<?php if (!empty($donation['image_path'])): ?>
+    <?php
+    $images = json_decode($donation['image_path'], true);
+    if (is_array($images) && !empty($images)): ?>
+        <div class="donation-images">
+            <?php foreach ($images as $image): ?>
+                <img src="<?= htmlspecialchars($image) ?>" alt="<?= htmlspecialchars($donation['item_name']) ?>" class="donation-image" onclick="openPhotoZoom('<?= htmlspecialchars($image) ?>')">
+            <?php endforeach; ?>
+        </div>
+    <?php endif; ?>
+<?php endif; ?>
+
+
+    
+    <div class="donation-actions">
+        <button class="request-btn">Request Donation</button>
+                        <div class="donation-stats">
+                            <a href="#" class="comments-toggle">0 Comments</a>
+                        </div>
+                    </div>
+                   
+                    <!-- Comments Section -->
+                    <div class="comments-section" style="display: none;">
+                        <div class="comments-list">
+                            <!-- Comments will be loaded here -->
+                            <p class="no-comments">No comments yet. Be the first to comment!</p>
+                        </div>
+                        <div class="add-comment">
+                            <textarea id="addComment1" name="addComment1" placeholder="Add a comment..." class="comment-text"></textarea>
+                            <button class="post-comment-btn">Post Comment</button>
+                        </div>
                     </div>
                 </div>
+                <?php endforeach; ?>
+            <?php endif; ?>
+        </div>
+    </div>
+</div>
+
+<!-- Recycled Ideas Tab Content -->
+<div id="recycled-ideas" class="tab-content" style="display:none;">
+    <?php if (count($ideas) === 0): ?>
+        <p>No recycled ideas yet.</p>
+    <?php else: ?>
+        <?php foreach ($ideas as $idea): ?>
+        <div class="idea-card">
+            <div class="idea-header">
+                <h3><?= htmlspecialchars($idea['title']) ?></h3>
+                <div class="idea-meta">
+                    <span class="author"><?= htmlspecialchars($idea['author']) ?></span>
+                    <span class="time-ago"><?= htmlspecialchars(date('M d, Y', strtotime($idea['posted_at']))) ?></span>
+                </div>
             </div>
-            <!-- Recycled Ideas Tab Content -->
-            <div id="recycled-ideas" class="tab-content" style="display:none;">
-                <?php if (count($ideas) === 0): ?>
-                    <p>No recycled ideas yet.</p>
-                <?php else: ?>
-                    <?php foreach ($ideas as $idea): ?>
-                    <div class="idea-card">
-                        <div class="idea-header">
-                            <h3><?= htmlspecialchars($idea['title']) ?></h3>
-                            <div class="idea-meta">
-                                <span class="author"><?= htmlspecialchars($idea['author']) ?></span>
-                                <span class="time-ago"><?= htmlspecialchars(date('M d, Y', strtotime($idea['posted_at']))) ?></span>
-                            </div>
-                        </div>
-                        <p class="idea-description"><?= htmlspecialchars($idea['description']) ?></p>
-                        <div class="idea-actions">
-                            <button class="action-btn">Try This Idea</button>
-                            <span class="comments">0 Comments</span>
-                        </div>
-                    </div>
-                    <?php endforeach; ?>
-                <?php endif; ?>
+            <?php if (!empty($idea['image_path'])): ?>
+            <div class="idea-image-container">
+                <img src="<?= htmlspecialchars($idea['image_path']) ?>" alt="<?= htmlspecialchars($idea['title']) ?>" class="idea-image">
             </div>
+            <?php endif; ?>
+            <p class="idea-description"><?= htmlspecialchars($idea['description']) ?></p>
+            <div class="idea-actions">
+                <button class="action-btn">Try This Idea</button>
+                <span class="comments">0 Comments</span>
+            </div>
+        </div>
+        <?php endforeach; ?>
+    <?php endif; ?>
+</div>
+
         </main>
         <div class="right-sidebar">
             <div class="card">
@@ -201,50 +326,67 @@ while ($row = $result->fetch_assoc()) $leaders[] = $row;
             </div>
         </div>
     </div>
-    <!-- Donation Popup Form -->
-    <div id="donationPopup" class="popup-container" style="display:none;">
-        <div class="popup-content" id="donationFormContainer">
-            <h2>Post Donation</h2>
-            <form id="donationForm" action="donate_process.php" method="POST" enctype="multipart/form-data">
-                <div class="form-group">
-                    <label for="wasteType">Type of Waste:</label>
-                    <select id="wasteType" name="wasteType" required>
-                        <option value="">Select waste type</option>
-                        <option value="Cans">Cans</option>
-                        <option value="Plastic Bottle">Plastic Bottle</option>
-                        <option value="Plastic">Plastic</option>
-                        <option value="Paper">Paper</option>
-                        <option value="Metal">Metal</option>
-                        <option value="Glass">Glass</option>
-                        <option value="Organic">Organic</option>
-                        <option value="Electronic">Electronic</option>
-                    </select>
+   <!-- Donation Popup Form -->
+<div id="donationPopup" class="popup-container" style="display:none;">
+    <div class="popup-content" id="donationFormContainer">
+        <h2>Post Donation</h2>
+        <form id="donationForm" action="homepage.php" method="POST" enctype="multipart/form-data">
+            <!-- FIXED: Added missing div for form-group -->
+            <div class="form-group">
+                <label for="wasteType">Type of Waste:</label>
+                <select id="wasteType" name="wasteType" required>
+                    <option value="">Select waste type</option>
+                    <option value="Cans">Cans</option>
+                    <option value="Plastic Bottle">Plastic Bottle</option>
+                    <option value="Plastic">Plastic</option>
+                    <option value="Paper">Paper</option>
+                    <option value="Metal">Metal</option>
+                    <option value="Glass">Glass</option>
+                    <option value="Organic">Organic</option>
+                    <option value="Electronic">Electronic</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="quantity">Quantity:</label>
+                <input type="text" id="quantity" name="quantity" placeholder="Enter quantity" required>
+            </div>
+            <div class="form-group">
+                <label for="description">Description:</label>
+                <textarea id="description" name="description" placeholder="Describe your donation..." rows="4" required></textarea>
+            </div>
+            <div class="form-group">
+                <label for="photos">Attach Photos (up to 5):</label>
+                <div class="file-upload">
+                    <input type="file" id="photos" name="photos[]" accept="image/*" multiple>
+                    <label for="photos" class="file-upload-label">Choose Files</label>
+                    <span id="file-chosen">No files chosen</span>
                 </div>
-                <div class="form-group">
-                    <label for="quantity">Quantity:</label>
-                    <input type="text" id="quantity" name="quantity" placeholder="Enter quantity" required>
+                <small class="form-hint">You can upload up to 5 photos.</small>
+                
+                <!-- Scrollable image preview container -->
+                <div id="photoPreviewContainer" class="photo-preview-container">
+                    <div id="photoPreview" class="photo-preview"></div>
                 </div>
-                <div class="divider"></div>
-                <div class="form-group">
-                    <label>Attach Photo:</label>
-                    <div class="file-upload">
-                        <input type="file" id="photo" name="photo" accept="image/*">
-                        <label for="photo" class="file-upload-label">Choose File</label>
-                        <span id="file-chosen">No file chosen</span>
-                    </div>
-                </div>
-                <div class="divider"></div>
-                <button type="submit" class="btn submit-btn">Post Donation</button>
-            </form>
-            <button class="close-btn">&times;</button>
-        </div>
-        <div class="popup-content success-popup" id="successPopup" style="display: none;">
-            <h2>Congratulations!</h2>
-            <p>You have<br>now donated your waste. Wait<br>for others to claim yours.</p>
-            <button class="continue-btn" id="continueBtn">Continue</button>
-            <button class="close-btn">&times;</button>
-        </div>
+            </div>
+            <button type="submit" class="btn submit-btn">Post Donation</button>
+        </form>
+        <button class="close-btn">&times;</button>
     </div>
+     <!-- Success Popup (inside the same container) -->
+    <div class="popup-content success-popup" id="successPopup" style="display: none;">
+        <h2>Congratulations!</h2>
+        <p>You have<br>now donated your waste. Wait<br>for others to claim yours.</p>
+        <button class="continue-btn" id="continueBtn">Continue</button>
+        <button class="close-btn">&times;</button>
+    </div>
+</div>
+
+<!-- Photo Zoom Modal -->
+<div id="photoZoomModal" class="photo-zoom-modal" style="display:none;">
+    <span class="close-modal">&times;</span>
+    <img id="zoomedPhoto" class="zoomed-photo" src="" alt="Zoomed Photo">
+</div>
+
     <!-- Feedback Button -->
     <div class="feedback-btn" id="feedbackBtn">💬</div>
     <!-- Feedback Modal -->
@@ -277,133 +419,396 @@ while ($row = $result->fetch_assoc()) $leaders[] = $row;
             </div>
         </div>
     </div>
-    <script>
-        // Tab Functionality
-        function openTab(tabName) {
-            document.getElementById('donations').style.display = tabName === 'donations' ? 'block' : 'none';
-            document.getElementById('recycled-ideas').style.display = tabName === 'recycled-ideas' ? 'block' : 'none';
-            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-            if (tabName === 'donations') document.querySelectorAll('.tab-btn')[0].classList.add('active');
-            else document.querySelectorAll('.tab-btn')[1].classList.add('active');
+<script>
+    // Tab Functionality
+    function openTab(tabName) {
+        document.getElementById('donations').style.display = tabName === 'donations' ? 'block' : 'none';
+        document.getElementById('recycled-ideas').style.display = tabName === 'recycled-ideas' ? 'block' : 'none';
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        if (tabName === 'donations') document.querySelectorAll('.tab-btn')[0].classList.add('active');
+        else document.querySelectorAll('.tab-btn')[1].classList.add('active');
+    }
+    
+    // User Profile Dropdown
+    document.getElementById('userProfile').addEventListener('click', function() {
+        this.classList.toggle('active');
+    });
+    document.addEventListener('click', function(event) {
+        const userProfile = document.getElementById('userProfile');
+        if (!userProfile.contains(event.target)) {
+            userProfile.classList.remove('active');
         }
-        // User Profile Dropdown
-        document.getElementById('userProfile').addEventListener('click', function() {
-            this.classList.toggle('active');
+    });
+    
+    // Donation Popup Functionality
+    document.addEventListener('DOMContentLoaded', function () {
+        const donateWasteBtn = document.getElementById('donateWasteBtn');
+        const donationPopup = document.getElementById('donationPopup');
+        const donationFormContainer = document.getElementById('donationFormContainer');
+        const successPopup = document.getElementById('successPopup');
+
+        if (!donateWasteBtn || !donationPopup) {
+            console.error('Required elements not found in the DOM');
+            return;
+        }
+
+        // Add event listener to the "Donate Waste" button
+        donateWasteBtn.addEventListener('click', function (e) {
+            e.preventDefault(); // Prevent default behavior
+            console.log('Donate Waste button clicked');
+            donationPopup.style.display = 'flex'; // Show the popup
+            donationFormContainer.style.display = 'block'; // Ensure the form is visible
+            successPopup.style.display = 'none'; // Hide the success popup
         });
-        document.addEventListener('click', function(event) {
-            const userProfile = document.getElementById('userProfile');
-            if (!userProfile.contains(event.target)) {
-                userProfile.classList.remove('active');
+
+        // Close the popup when clicking outside the form
+        donationPopup.addEventListener('click', function (e) {
+            if (e.target === donationPopup) {
+                donationPopup.style.display = 'none'; // Hide the popup
             }
         });
-        // Donation Popup Functionality
-        document.getElementById('donateWasteBtn').addEventListener('click', function(e) {
-            e.preventDefault();
-            document.getElementById('donationPopup').style.display = 'flex';
-            document.getElementById('donationFormContainer').style.display = 'block';
-            document.getElementById('successPopup').style.display = 'none';
-        });
+
+        // Close the popup when clicking the close button
         document.querySelectorAll('.close-btn').forEach(btn => {
-            btn.addEventListener('click', function() {
-                document.getElementById('donationPopup').style.display = 'none';
+            btn.addEventListener('click', function () {
+                donationPopup.style.display = 'none'; // Hide the popup
             });
         });
-        document.getElementById('donationPopup').addEventListener('click', function(e) {
-            if (e.target === this) {
-                this.style.display = 'none';
+
+        // Form submission handling
+        document.getElementById('donationForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            // Basic form validation
+            const wasteType = document.getElementById('wasteType').value;
+            const quantity = document.getElementById('quantity').value;
+            const description = document.getElementById('description').value;
+            
+            if (!wasteType || !quantity || !description) {
+                alert('Please fill in all required fields');
+                return;
             }
+            
+            // Submit the form programmatically
+            this.submit();
         });
-        document.getElementById('photo').addEventListener('change', function() {
-            const fileName = this.files[0] ? this.files[0].name : 'No file chosen';
-            document.getElementById('file-chosen').textContent = fileName;
+
+        // Continue button in success popup
+        const continueBtn = document.getElementById('continueBtn');
+        if (continueBtn) {
+            continueBtn.addEventListener('click', function() {
+                donationPopup.style.display = 'none';
+                document.getElementById('donationForm').reset();
+                document.getElementById('file-chosen').textContent = 'No files chosen';
+                document.getElementById('photoPreview').innerHTML = '';
+                selectedFiles = [];
+                donationFormContainer.style.display = 'block';
+                successPopup.style.display = 'none';
+            });
+        }
+
+        // Fix for multiple image upload - store selected files
+        let selectedFiles = [];
+        const photoInput = document.getElementById('photos');
+        
+        photoInput.addEventListener('change', function() {
+            const newFiles = Array.from(this.files);
+            
+            // Add new files to selectedFiles array
+            newFiles.forEach(file => {
+                // Check if file is already selected
+                const isDuplicate = selectedFiles.some(
+                    selectedFile => selectedFile.name === file.name && selectedFile.size === file.size
+                );
+                
+                if (!isDuplicate && selectedFiles.length < 5) {
+                    selectedFiles.push(file);
+                }
+            });
+            
+            // Update the file input with all selected files
+            const dataTransfer = new DataTransfer();
+            selectedFiles.forEach(file => dataTransfer.items.add(file));
+            photoInput.files = dataTransfer.files;
+            
+            // Update UI
+            updateFileDisplay();
         });
-      //  document.getElementById('donationForm').addEventListener('submit', function(e) {
-      //      e.preventDefault();
-       //     document.getElementById('donationFormContainer').style.display = 'none';
-       //     document.getElementById('successPopup').style.display = 'block';
-    //    });
-        document.getElementById('continueBtn').addEventListener('click', function() {
-            document.getElementById('donationPopup').style.display = 'none';
-            document.getElementById('donationForm').reset();
-            document.getElementById('file-chosen').textContent = 'No file chosen';
-        });
-        // Feedback system JavaScript
-        document.addEventListener('DOMContentLoaded', function() {
-            const feedbackBtn = document.getElementById('feedbackBtn');
-            const feedbackModal = document.getElementById('feedbackModal');
-            const feedbackCloseBtn = document.getElementById('feedbackCloseBtn');
-            const emojiOptions = document.querySelectorAll('.emoji-option');
-            const feedbackForm = document.getElementById('feedbackForm');
-            const thankYouMessage = document.getElementById('thankYouMessage');
-            const feedbackSubmitBtn = document.getElementById('feedbackSubmitBtn');
-            const spinner = document.getElementById('spinner');
-            const ratingError = document.getElementById('ratingError');
-            const textError = document.getElementById('textError');
-            const feedbackText = document.getElementById('feedbackText');
-            let selectedRating = 0;
-            emojiOptions.forEach(option => {
-                option.addEventListener('click', () => {
-                    emojiOptions.forEach(opt => opt.classList.remove('selected'));
-                    option.classList.add('selected');
-                    selectedRating = option.getAttribute('data-rating');
-                    ratingError.style.display = 'none';
+        
+        function updateFileDisplay() {
+            const fileNames = selectedFiles.length > 0 
+                ? selectedFiles.map(f => f.name).join(', ') 
+                : 'No files chosen';
+                
+            document.getElementById('file-chosen').textContent = fileNames;
+            
+            // Preview images
+            const photoPreview = document.getElementById('photoPreview');
+            photoPreview.innerHTML = '';
+            
+            if (selectedFiles.length > 0) {
+                // Show message about selected files
+                const fileCount = document.createElement('p');
+                fileCount.textContent = `Selected ${selectedFiles.length} file(s)`;
+                fileCount.style.marginBottom = '10px';
+                fileCount.style.fontSize = '14px';
+                fileCount.style.color = '#666';
+                fileCount.style.width = '100%';
+                photoPreview.appendChild(fileCount);
+                
+                selectedFiles.forEach((file, index) => {
+                    if (file.type.match('image.*')) {
+                        const reader = new FileReader();
+                        reader.onload = function(e) {
+                            const imageContainer = document.createElement('div');
+                            imageContainer.className = 'photo-preview-item';
+                            
+                            const img = document.createElement('img');
+                            img.src = e.target.result;
+                            img.alt = file.name;
+                            img.title = file.name;
+                            
+                            // Add hover effect
+                            img.addEventListener('mouseover', function() {
+                                this.style.opacity = '0.8';
+                            });
+                            img.addEventListener('mouseout', function() {
+                                this.style.opacity = '1';
+                            });
+                            
+                            img.addEventListener('click', function () {
+                                openPhotoZoom(e.target.result);
+                            });
+                            
+                            // Add remove button
+                            const removeBtn = document.createElement('button');
+                            removeBtn.className = 'remove-image-btn';
+                            removeBtn.innerHTML = '&times;';
+                            removeBtn.title = 'Remove image';
+                            
+                            removeBtn.addEventListener('click', function(e) {
+                                e.stopPropagation();
+                                // Remove file from selectedFiles
+                                selectedFiles.splice(index, 1);
+                                
+                                // Update the file input
+                                const dataTransfer = new DataTransfer();
+                                selectedFiles.forEach(file => dataTransfer.items.add(file));
+                                photoInput.files = dataTransfer.files;
+                                
+                                // Update UI
+                                updateFileDisplay();
+                            });
+                            
+                            imageContainer.appendChild(img);
+                            imageContainer.appendChild(removeBtn);
+                            photoPreview.appendChild(imageContainer);
+                        };
+                        reader.readAsDataURL(file);
+                    }
                 });
-            });
-            feedbackForm.addEventListener('submit', function(e) {
+            }
+            
+            // Show warning if more than 5 files selected
+            if (selectedFiles.length > 5) {
+                const warning = document.createElement('p');
+                warning.textContent = 'Maximum 5 files allowed. Only the first 5 will be uploaded.';
+                warning.style.color = 'red';
+                warning.style.fontSize = '12px';
+                warning.style.marginTop = '10px';
+                warning.style.width = '100%';
+                photoPreview.appendChild(warning);
+                
+                // Keep only first 5 files
+                selectedFiles = selectedFiles.slice(0, 5);
+                
+                // Update the file input
+                const dataTransfer = new DataTransfer();
+                selectedFiles.forEach(file => dataTransfer.items.add(file));
+                photoInput.files = dataTransfer.files;
+                
+                // Update UI again
+                updateFileDisplay();
+            }
+        }
+    });
+
+    // Comment functionality
+    document.addEventListener('DOMContentLoaded', function() {
+        // Toggle comments visibility
+        document.querySelectorAll('.comments-toggle').forEach(toggle => {
+            toggle.addEventListener('click', function(e) {
                 e.preventDefault();
-                let isValid = true;
-                if (selectedRating === 0) {
-                    ratingError.style.display = 'block';
-                    isValid = false;
-                } else {
-                    ratingError.style.display = 'none';
-                }
-                if (feedbackText.value.trim() === '') {
-                    textError.style.display = 'block';
-                    isValid = false;
-                } else {
-                    textError.style.display = 'none';
-                }
-                if (!isValid) return;
-                feedbackSubmitBtn.disabled = true;
-                spinner.style.display = 'block';
-                setTimeout(() => {
-                    spinner.style.display = 'none';
-                    feedbackForm.style.display = 'none';
-                    thankYouMessage.style.display = 'block';
-                    setTimeout(() => {
-                        feedbackModal.style.display = 'none';
-                        feedbackForm.style.display = 'block';
-                        thankYouMessage.style.display = 'none';
-                        feedbackText.value = '';
-                        emojiOptions.forEach(opt => opt.classList.remove('selected'));
-                        selectedRating = 0;
-                        feedbackSubmitBtn.disabled = false;
-                    }, 3000);
-                }, 1500);
-            });
-            feedbackBtn.addEventListener('click', () => {
-                feedbackModal.style.display = 'flex';
-            });
-            feedbackCloseBtn.addEventListener('click', closeFeedbackModal);
-            window.addEventListener('click', (event) => {
-                if (event.target === feedbackModal) {
-                    closeFeedbackModal();
+                const commentsSection = this.closest('.donation-post').querySelector('.comments-section');
+                const isVisible = commentsSection.style.display === 'block';
+                
+                commentsSection.style.display = isVisible ? 'none' : 'block';
+                
+                if (!isVisible) {
+                    // Load comments if not already loaded
+                    loadComments(this.closest('.donation-post'));
                 }
             });
-            function closeFeedbackModal() {
-                feedbackModal.style.display = 'none';
-                feedbackForm.style.display = 'block';
-                thankYouMessage.style.display = 'none';
-                feedbackText.value = '';
+        });
+        
+        // Post comment functionality
+        document.querySelectorAll('.post-comment-btn').forEach(btn => {
+            btn.addEventListener('click', function (e) {
+                e.preventDefault(); // Prevent the default form submission behavior
+                const commentText = this.closest('.add-comment').querySelector('.comment-text');
+                const comment = commentText.value.trim();
+
+                if (comment) {
+                    postComment(this.closest('.donation-post'), comment);
+                    commentText.value = ''; // Clear the comment input field
+                }
+            });
+        });
+        
+        // Allow pressing Enter to post comment (while holding Shift for new line)
+        document.querySelectorAll('.comment-text').forEach(textarea => {
+            textarea.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    this.closest('.add-comment').querySelector('.post-comment-btn').click();
+                }
+            });
+        });
+    });
+
+    function loadComments(donationPost) {
+        const commentsList = donationPost.querySelector('.comments-list');
+        const noComments = donationPost.querySelector('.no-comments');
+        
+        // Simulate loading comments (replace with actual API call)
+        setTimeout(() => {
+            // In a real application, you would fetch comments from your server
+            // For now, we'll just show the "no comments" message
+            noComments.style.display = 'block';
+        }, 500);
+    }
+
+    function postComment(donationPost, commentText) {
+        const commentsList = donationPost.querySelector('.comments-list');
+        const noComments = donationPost.querySelector('.no-comments');
+        const commentsToggle = donationPost.querySelector('.comments-toggle');
+
+        // Hide "no comments" message
+        noComments.style.display = 'none';
+
+        // Create new comment element
+        const commentDiv = document.createElement('div');
+        commentDiv.className = 'comment';
+        commentDiv.innerHTML = `
+            <div class="comment-author">You</div>
+            <p class="comment-text">${commentText}</p>
+        `;
+
+        // Add comment to list
+        commentsList.appendChild(commentDiv);
+
+        // Update comments count
+        const currentCount = parseInt(commentsToggle.textContent) || 0;
+        commentsToggle.textContent = `${currentCount + 1} Comments`;
+
+        // Scroll to the new comment
+        commentDiv.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    // Feedback system JavaScript
+    document.addEventListener('DOMContentLoaded', function() {
+        const feedbackBtn = document.getElementById('feedbackBtn');
+        const feedbackModal = document.getElementById('feedbackModal');
+        const feedbackCloseBtn = document.getElementById('feedbackCloseBtn');
+        const emojiOptions = document.querySelectorAll('.emoji-option');
+        const feedbackForm = document.getElementById('feedbackForm');
+        const thankYouMessage = document.getElementById('thankYouMessage');
+        const feedbackSubmitBtn = document.getElementById('feedbackSubmitBtn');
+        const spinner = document.getElementById('spinner');
+        const ratingError = document.getElementById('ratingError');
+        const textError = document.getElementById('textError');
+        const feedbackText = document.getElementById('feedbackText');
+        let selectedRating = 0;
+        
+        emojiOptions.forEach(option => {
+            option.addEventListener('click', () => {
                 emojiOptions.forEach(opt => opt.classList.remove('selected'));
-                selectedRating = 0;
+                option.classList.add('selected');
+                selectedRating = option.getAttribute('data-rating');
                 ratingError.style.display = 'none';
+            });
+        });
+        
+        feedbackForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            let isValid = true;
+            if (selectedRating === 0) {
+                ratingError.style.display = 'block';
+                isValid = false;
+            } else {
+                ratingError.style.display = 'none';
+            }
+            if (feedbackText.value.trim() === '') {
+                textError.style.display = 'block';
+                isValid = false;
+            } else {
                 textError.style.display = 'none';
-                feedbackSubmitBtn.disabled = false;
+            }
+            if (!isValid) return;
+            feedbackSubmitBtn.disabled = true;
+            spinner.style.display = 'block';
+            setTimeout(() => {
                 spinner.style.display = 'none';
+                feedbackForm.style.display = 'none';
+                thankYouMessage.style.display = 'block';
+                setTimeout(() => {
+                    feedbackModal.style.display = 'none';
+                    feedbackForm.style.display = 'block';
+                    thankYouMessage.style.display = 'none';
+                    feedbackText.value = '';
+                    emojiOptions.forEach(opt => opt.classList.remove('selected'));
+                    selectedRating = 0;
+                    feedbackSubmitBtn.disabled = false;
+                }, 3000);
+            }, 1500);
+        });
+        
+        feedbackBtn.addEventListener('click', () => {
+            feedbackModal.style.display = 'flex';
+        });
+        
+        feedbackCloseBtn.addEventListener('click', closeFeedbackModal);
+        
+        window.addEventListener('click', (event) => {
+            if (event.target === feedbackModal) {
+                closeFeedbackModal();
             }
         });
-    </script>
+        
+        function closeFeedbackModal() {
+            feedbackModal.style.display = 'none';
+            feedbackForm.style.display = 'block';
+            thankYouMessage.style.display = 'none';
+            feedbackText.value = '';
+            emojiOptions.forEach(opt => opt.classList.remove('selected'));
+            selectedRating = 0;
+            ratingError.style.display = 'none';
+            textError.style.display = 'none';
+            feedbackSubmitBtn.disabled = false;
+            spinner.style.display = 'none';
+        }
+    });
+
+    function openPhotoZoom(photoSrc) {
+        const modal = document.getElementById('photoZoomModal');
+        const zoomedPhoto = document.getElementById('zoomedPhoto');
+        zoomedPhoto.src = photoSrc;
+        modal.style.display = 'flex';
+    }
+
+    document.querySelector('.close-modal').addEventListener('click', function () {
+        document.getElementById('photoZoomModal').style.display = 'none';
+    });
+</script>
 </body>
 </html>

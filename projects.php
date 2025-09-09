@@ -31,6 +31,24 @@ if (!$user) {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
 </head>
+
+    <style>
+        .profile-pic {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 10px;
+            overflow: hidden;
+            background-color: #3d6a06ff;
+            color: white;
+            font-weight: bold;
+            font-size: 18px;
+        }
+    </style>
+    
 <body>
     <header>
         <div class="logo-container">
@@ -40,18 +58,18 @@ if (!$user) {
             <h1>EcoWaste</h1>
         </div>
         <div class="user-profile" id="userProfile">
-            <div class="profile-pic">
-                <img src="assets/img/user-avatar.jpg" alt="User Profile">
-            </div>
-            <span class="profile-name"><?= htmlspecialchars($user['first_name']) ?></span>
-            <i class="fas fa-chevron-down dropdown-arrow"></i>
-            <div class="profile-dropdown">
-                <a href="#" class="dropdown-item"><i class="fas fa-user"></i> My Profile</a>
-                <a href="#" class="dropdown-item"><i class="fas fa-cog"></i> Settings</a>
-                <div class="dropdown-divider"></div>
-                <a href="logout.php" class="dropdown-item"><i class="fas fa-sign-out-alt"></i> Logout</a>
-            </div>
-        </div>
+        <div class="profile-pic">
+        <?= strtoupper(substr(htmlspecialchars($_SESSION['first_name'] ?? 'User'), 0, 1)) ?>
+    </div>
+    <span class="profile-name"><?= htmlspecialchars($_SESSION['first_name'] ?? 'User') ?></span>
+    <i class="fas fa-chevron-down dropdown-arrow"></i>
+    <div class="profile-dropdown">
+        <a href="profile.php" class="dropdown-item"><i class="fas fa-user"></i> My Profile</a>
+        <a href="#" class="dropdown-item"><i class="fas fa-cog"></i> Settings</a>
+        <div class="dropdown-divider"></div>
+        <a href="logout.php" class="dropdown-item"><i class="fas fa-sign-out-alt"></i> Logout</a>
+    </div>
+</div>
     </header>
     
     <div class="container">

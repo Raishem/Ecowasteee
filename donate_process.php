@@ -7,19 +7,69 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
-$conn = getDBConnection();
-$item_name = $_POST['wasteType'];
-$quantity = $_POST['quantity'];
-$category = $_POST['wasteType'];
-$donor_id = $_SESSION['user_id'];
-$donated_at = date('Y-m-d H:i:s');
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (empty($_POST['wasteType']) || empty($_POST['quantity']) || empty($_POST['description'])) {
+        die('Error: All fields are required.');
+    }
 
-// Handle photo upload if needed
+    $conn = getDBConnection();
+    $item_name = htmlspecialchars($_POST['wasteType']);
+    $quantity = (int) $_POST['quantity'];
+    $category = htmlspecialchars($_POST['wasteType']);
+    $description = htmlspecialchars($_POST['description']);
+    $donor_id = $_SESSION['user_id'];
+    $donated_at = date('Y-m-d H:i:s');
+    $image_paths = []; // Array to store uploaded image paths
 
-$stmt = $conn->prepare("INSERT INTO donations (item_name, quantity, category, donor_id, donated_at, status) VALUES (?, ?, ?, ?, ?, 'Available')");
-$stmt->bind_param("sisds", $item_name, $quantity, $category, $donor_id, $donated_at);
-$stmt->execute();
+    // Handle multiple photo uploads
+    if (isset($_FILES['photos']) && count($_FILES['photos']['name']) > 0) {
+        $upload_dir = 'assets/uploads/';
+        if (!is_dir($upload_dir)) {
+            mkdir($upload_dir, 0777, true);
+        }
 
-header('Location: donations.php');
-exit();
+        foreach ($_FILES['photos']['name'] as $key => $file_name) {
+            if ($_FILES['photos']['error'][$key] === UPLOAD_ERR_OK) {
+                $file_type = mime_content_type($_FILES['photos']['tmp_name'][$key]);
+                $allowed_types = ['image/jpeg', 'image/png', 'image/gif'];
+
+                if (!in_array($file_type, $allowed_types)) {
+                    die('Error: Only JPG, PNG, and GIF files are allowed.');
+                }
+
+                $unique_file_name = uniqid() . '_' . basename($file_name);
+                $target_file = $upload_dir . $unique_file_name;
+
+                if (move_uploaded_file($_FILES['photos']['tmp_name'][$key], $target_file)) {
+                    $image_paths[] = $target_file; // Save the file path
+                } else {
+                    die('Failed to upload image: ' . $file_name);
+                }
+            }
+        }
+    }
+
+    // Convert image paths array to JSON for storage
+    $image_paths_json = json_encode($image_paths);
+
+    // Insert donation into the database
+    $stmt = $conn->prepare("INSERT INTO donations (item_name, quantity, category, donor_id, donated_at, status, image_path, description) VALUES (?, ?, ?, ?, ?, 'Available', ?, ?)");
+    if (!$stmt) {
+        die('Error: Failed to prepare statement. ' . $conn->error);
+    }
+
+    // Corrected bind_param() with 8 variables
+    if (!$stmt->bind_param("sisdsss", $item_name, $quantity, $category, $donor_id, $donated_at, $image_paths_json, $description)) {
+        die('Error: Failed to bind parameters. ' . $stmt->error);
+    }
+
+    if (!$stmt->execute()) {
+        die('Error: Failed to execute statement. ' . $stmt->error);
+    }
+
+    header('Location: donations.php');
+    exit();
+} else {
+    die('Invalid request method.');
+}
 ?>

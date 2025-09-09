@@ -55,12 +55,15 @@ header {
     width: 40px;
     height: 40px;
     border-radius: 50%;
-    background-color: #fff;
     display: flex;
     align-items: center;
     justify-content: center;
     margin-right: 10px;
     overflow: hidden;
+    background-color: #3d6a06ff;
+    color: white;
+    font-weight: bold;
+    font-size: 18px;
 }
 
 .profile-pic img {
@@ -251,13 +254,182 @@ header {
     font-size: 18px;
 }
 
-/* Donation Items */
-.donation-item {
+/* New donation item layout */
+/* Donation Post Styling */
+.donation-post {
+    padding: 20px;
+    border: 1px solid #eee;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    background-color: #fff;
+}
+
+.donation-header {
+    margin-bottom: 15px;
+}
+
+.donation-header h4 {
+    color: #2e8b57;
+    margin-bottom: 5px;
+    font-size: 18px;
+}
+
+.donation-meta {
+    display: flex;
+    justify-content: space-between;
+    color: #666;
+    font-size: 14px;
+}
+
+
+
+.donation-actions {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid #eee;
+}
+
+.request-btn {
+    padding: 10px 20px;
+    background-color: #2e8b57;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.request-btn:hover {
+    background-color: #3cb371;
+}
+
+.donation-stats {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.quantity {
+    font-weight: 600;
+    color: #333;
+}
+
+.comments-toggle {
+    color: #2e8b57;
+    text-decoration: none;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.comments-toggle:hover {
+    text-decoration: underline;
+}
+
+/* Comments Section */
+.comments-section {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid #eee;
+}
+
+.comments-list {
+    margin-bottom: 15px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.comment {
+    padding: 10px;
+    margin-bottom: 10px;
+    background-color: #f9f9f9;
+    border-radius: 4px;
+}
+
+.comment-author {
+    font-weight: 600;
+    color: #2e8b57;
+    margin-bottom: 5px;
+}
+
+.comment-text {
+    color: #333;
+    margin: 0;
+}
+
+.no-comments {
+    color: #999;
+    font-style: italic;
+    text-align: center;
+    padding: 10px;
+}
+
+.add-comment {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.comment-text {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    resize: vertical;
+    min-height: 60px;
+    font-family: 'Open Sans', sans-serif;
+}
+
+.post-comment-btn {
+    align-self: flex-end;
+    padding: 8px 16px;
+    background-color: #2e8b57;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.post-comment-btn:hover {
+    background-color: #3cb371;
+}
+
+.post-comment-btn:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+}
+
+.donation-item {
     padding: 15px 0;
     border-bottom: 1px solid #eee;
+    display: flex;
+    flex-direction: column;
+}
+
+.donation-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-top: 15px;
+}
+
+
+.donation-buttons {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 20px;
+    margin-top: 10px;
+}
+
+
+.comments {
+    font-size: 14px;
+    color: #666;
 }
 
 .donation-info h4 {
@@ -277,24 +449,6 @@ header {
     color: #999;
 }
 
-.donation-action {
-    text-align: right;
-}
-
-.quantity {
-    font-size: 14px;
-    color: #666;
-    margin-bottom: 8px;
-}
-
-.donation-image {
-            max-width: 100%;
-            height: auto;
-            border-radius: 8px;
-            margin-top: 10px;
-            max-height: 150px;
-            display: block;
-        }
 
 .action-btn {
     padding: 6px 12px;
@@ -376,6 +530,28 @@ header {
     margin-top: 15px;
 }
 
+/* Idea card image styling */
+.idea-image-container {
+    margin: 15px 0;
+    text-align: center;
+}
+
+.idea-image {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+    max-height: 200px;
+    display: block;
+    margin: 0 auto;
+}
+
+.idea-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 15px;
+}
+
 .comments {
     font-size: 14px;
     color: #666;
@@ -446,7 +622,7 @@ header {
 
 /* Popup Styles */
 .popup-container {
-    display: none;
+    display: none; /* Changed from block to none */
     position: fixed;
     top: 0;
     left: 0;
@@ -460,80 +636,97 @@ header {
 
 .popup-content {
     background-color: white;
-    padding: 25px;
-    border-radius: 8px;
+    padding: 30px;
+    border-radius: 10px;
     width: 90%;
-    max-width: 400px;
+    max-width: 500px;
     position: relative;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
+
+.popup-content {
+        max-height: 90vh;
+        overflow-y: auto;
+    }
 
 .popup-content h2 {
     margin-top: 0;
     color: #333;
-    font-size: 1.5rem;
+    font-size: 1.8rem;
     margin-bottom: 20px;
+    text-align: center;
 }
 
 .form-group {
-    margin-bottom: 15px;
+    margin-bottom: 20px;
 }
 
 .form-group label {
     display: block;
-    margin-bottom: 5px;
+    margin-bottom: 8px;
     font-weight: bold;
+    color: #333;
 }
 
 .form-group select,
-.form-group input[type="text"] {
+.form-group input[type="text"],
+.form-group textarea {
     width: 100%;
-    padding: 8px;
+    padding: 10px;
     border: 1px solid #ddd;
-    border-radius: 4px;
+    border-radius: 5px;
     box-sizing: border-box;
+    font-size: 1rem;
+}
+
+textarea {
+    resize: none;
 }
 
 .file-upload {
     display: flex;
     align-items: center;
+    gap: 10px;
 }
 
 .file-upload-label {
-    background-color: #f0f0f0;
+    background-color: #4CAF50;
+    color: white;
     padding: 8px 12px;
-    border-radius: 4px;
+    border-radius: 5px;
     cursor: pointer;
-    border: 1px solid #ddd;
-    margin-right: 10px;
+    font-size: 0.9rem;
 }
 
 .file-upload-label:hover {
-    background-color: #e0e0e0;
-}
-
-#photo {
-    width: 0.1px;
-    height: 0.1px;
-    opacity: 0;
-    overflow: hidden;
-    position: absolute;
-    z-index: -1;
+    background-color: #3e8e41;
 }
 
 #file-chosen {
+    font-size: 0.9rem;
     color: #666;
+}
+
+input[type="file"] {
+    display: none;
+}
+
+.form-hint {
+    font-size: 0.85rem;
+    color: #666;
+    margin-top: 5px;
 }
 
 .submit-btn {
     width: 100%;
-    padding: 10px;
+    padding: 12px;
     background-color: rgb(4, 144, 4);
     color: white;
     border: none;
-    border-radius: 4px;
+    border-radius: 5px;
     cursor: pointer;
     font-size: 1rem;
+    font-weight: bold;
     margin-top: 10px;
 }
 
@@ -759,6 +952,423 @@ header {
     margin-left: 10px;
 }
 
+
 @keyframes spin {
     to { transform: rotate(360deg); }
+}
+
+.file-upload {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.file-upload-label {
+    background-color: #4CAF50;
+    color: white;
+    padding: 5px 10px;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+#file-chosen {
+    font-size: 14px;
+    color: #666;
+}
+
+input[type="file"] {
+    display: none;
+}
+
+.donation-images {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 15px 0;
+}
+
+.donation-image {
+    width: 100px;
+    height: 100px;
+    object-fit: cover;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.donation-image:hover {
+    transform: scale(1.05);
+}
+
+.donation-image-container {
+    text-align: center;
+    margin: 15px 0;
+}
+
+.donation-image {
+    max-width: 100%;
+    max-height: 300px;
+    border-radius: 8px;
+    object-fit: contain;
+}
+
+ .photo-preview img {
+        width: 80px;
+        height: 80px;
+        object-fit: cover;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: opacity 0.3s ease;
+    }   
+
+.photo-preview img:hover {
+    transform: scale(1.1);
+}
+
+.photo-zoom-modal {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.8);
+    z-index: 1000;
+}
+
+.zoomed-photo {
+    max-width: 90%;
+    max-height: 90%;
+    border-radius: 10px;
+}
+
+.close-modal {
+    position: absolute;
+    top: 20px;
+    right: 30px;
+    font-size: 2rem;
+    color: white;
+    cursor: pointer;
+}
+
+.photo-preview {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 10px;
+    padding: 10px;
+    border: 1px dashed #ddd;
+    border-radius: 5px;
+    background-color: #f9f9f9;
+}
+
+.photo-preview img {
+    transition: opacity 0.3s ease;
+}
+
+.photo-preview img:hover {
+    opacity: 0.8;
+}
+
+.file-upload {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 5px;
+}
+
+.file-upload-label {
+    background-color: #4CAF50;
+    color: white;
+    padding: 8px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.file-upload-label:hover {
+    background-color: #3e8e41;
+}
+
+#file-chosen {
+    font-style: italic;
+    color: #666;
+}
+
+    .photo-preview-container {
+        max-height: 150px;
+        overflow-y: auto;
+        margin-top: 10px;
+        padding: 10px;
+        border: 1px dashed #ddd;
+        border-radius: 5px;
+        background-color: #f9f9f9;
+    }
+
+     .photo-preview-item {
+        position: relative;
+        display: inline-block;
+        margin: 5px;
+    }
+
+    .remove-image-btn {
+        position: absolute;
+        top: -8px;
+        right: -8px;
+        background: red;
+        color: white;
+        border: none;
+        border-radius: 50%;
+        width: 20px;
+        height: 20px;
+        cursor: pointer;
+        font-size: 12px;
+        line-height: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* Custom scrollbar for the preview container */
+    .photo-preview-container::-webkit-scrollbar {
+        width: 8px;
+    }
+    
+    .photo-preview-container::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 4px;
+    }
+    
+    .photo-preview-container::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 4px;
+    }
+    
+    .photo-preview-container::-webkit-scrollbar-thumb:hover {
+        background: #555;
+    }
+
+            /* Additional styles to fix text overflow issues */
+        .donation-post, .idea-card, .card, .project-item, .leaderboard-item {
+            overflow-wrap: break-word;
+            word-wrap: break-word;
+            max-width: 100%;
+        }
+        
+        .donation-description p, .idea-description, .project-item div {
+            word-break: break-word;
+            overflow-wrap: anywhere;
+        }
+        
+        .donation-header h4, .idea-header h3, .project-item strong {
+            word-break: break-word;
+        }
+        
+        .donation-meta, .idea-meta {
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        /* Fix for long comments */
+        .donation-description {
+            max-height: 100px;
+            overflow-y: auto;
+            margin-bottom: 15px;
+        }
+        
+        .donation-description p {
+            word-wrap: break-word;
+            margin: 0;
+        }
+        
+        /* Fix for comment section */
+        .comments-section {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .comment-text {
+            max-height: 100px;
+            overflow-y: auto;
+        }
+        
+        /* Fix for image display */
+        .donation-images {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 15px 0;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .donation-image {
+            width: 100px;
+            height: 100px;
+            object-fit: cover;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        
+        /* Scrollbar styling */
+        .donation-description::-webkit-scrollbar,
+        .comments-section::-webkit-scrollbar,
+        .donation-images::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .donation-description::-webkit-scrollbar-track,
+        .comments-section::-webkit-scrollbar-track,
+        .donation-images::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 3px;
+        }
+        
+        .donation-description::-webkit-scrollbar-thumb,
+        .comments-section::-webkit-scrollbar-thumb,
+        .donation-images::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 3px;
+        }
+        
+        .donation-description::-webkit-scrollbar-thumb:hover,
+        .comments-section::-webkit-scrollbar-thumb:hover,
+        .donation-images::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+        
+        .photo-preview-container {
+    max-height: 150px;
+    overflow-y: auto;
+    margin-top: 10px;
+    padding: 10px;
+    border: 1px dashed #ddd;
+    border-radius: 5px;
+    background-color: #f9f9f9;
+}
+        .photo-preview {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .photo-preview-item img {
+    width: 80px;
+    height: 80px;
+    object-fit: cover;
+    border-radius: 4px;
+    cursor: pointer;
+}
+        
+        
+        
+        .photo-preview img {
+            width: 80px;
+            height: 80px;
+            object-fit: cover;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: opacity 0.3s ease;
+        }
+        
+        .photo-preview img:hover {
+            opacity: 0.8;
+        }
+        
+        .remove-image-btn {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background: red;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            font-size: 12px;
+            line-height: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .popup-content {
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        
+        /* Custom scrollbar for the preview container */
+        .photo-preview-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .photo-preview-container::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+        
+        .photo-preview-container::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+        
+        .photo-preview-container::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+        
+        .file-upload {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 5px;
+        }
+
+        .file-upload-label {
+            background-color: #4CAF50;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .file-upload-label:hover {
+            background-color: #3e8e41;
+        }
+
+        #file-chosen {
+            font-style: italic;
+            color: #666;
+        }
+        
+        /* Responsive improvements */
+        @media (max-width: 768px) {
+            .container {
+                grid-template-columns: 1fr;
+                gap: 15px;
+            }
+            
+            .donation-meta {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .donation-actions {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .right-sidebar {
+                order: -1;
+            }
+        }
+
+        .file-count-message {
+    font-size: 14px;
+    color: #666;
+    margin-top: 5px;
+    font-weight: 500;
 }
