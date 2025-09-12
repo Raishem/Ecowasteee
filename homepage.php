@@ -11,6 +11,9 @@ $conn = getDBConnection();
 $donor_id = $_SESSION['user_id'];
 $image_paths_json = null; // Default to null if no images are uploaded
 
+// In the donations foreach loop, change the query to:
+$donor_stmt = $conn->prepare("SELECT user_id, first_name FROM users WHERE user_id = ?");
+
 // Handle form submission (POST request)
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Check if required fields are set
@@ -35,7 +38,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             mkdir($upload_dir, 0777, true);
         }
 
+        $file_count = 0;
         foreach ($_FILES['photos']['name'] as $key => $file_name) {
+            // Stop if we've reached the 4-file limit
+            if ($file_count >= 4) {
+                break;
+            }
+            
+            // Skip empty file fields
+            if (empty($file_name)) {
+                continue;
+            }
+            
             if ($_FILES['photos']['error'][$key] === UPLOAD_ERR_OK) {
                 $file_tmp = $_FILES['photos']['tmp_name'][$key];
                 $file_type = mime_content_type($file_tmp);
@@ -50,6 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 if (move_uploaded_file($file_tmp, $target_file)) {
                     $image_paths[] = $target_file; // Save the file path
+                    $file_count++;
                 } else {
                     die('Failed to upload image: ' . $file_name);
                 }
@@ -85,6 +100,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true || empty($_SESSION['user_id'])) {
     header('Location: login.php');
     exit();
+}
+
+// Function to calculate time ago
+function getTimeAgo($timestamp) {
+    $currentTime = time();
+    $timeDiff = $currentTime - strtotime($timestamp);
+    
+    if ($timeDiff < 60) {
+        return 'just now';
+    } elseif ($timeDiff < 3600) {
+        $minutes = floor($timeDiff / 60);
+        return $minutes . ' min ago';
+    } elseif ($timeDiff < 86400) {
+        $hours = floor($timeDiff / 3600);
+        return $hours . ' hour' . ($hours > 1 ? 's' : '') . ' ago';
+    } elseif ($timeDiff < 2592000) {
+        $days = floor($timeDiff / 86400);
+        return $days . ' day' . ($days > 1 ? 's' : '') . ' ago';
+    } else {
+        return date('M d, Y', strtotime($timestamp));
+    }
 }
 
 // Fetch user data
@@ -129,9 +165,158 @@ while ($row = $result->fetch_assoc()) $leaders[] = $row;
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Home | EcoWaste</title>
     <link rel="stylesheet" href="assets/css/homepage.css">
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&family=Open+Sans&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&family=Open Sans&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .file-count-message {
+            font-size: 14px;
+            color: #666;
+            margin-top: 5px;
+            font-weight: 500;
+        }
+        
+        /* Donation Post Styling to match the design */
+        .donation-post {
+            padding: 20px;
+            border: 1px solid #e8e8e8;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            background-color: #fff;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        
+        .donation-user-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: #3d6a06;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 12px;
+            flex-shrink: 0;
+        }
+        
+        .user-info {
+            flex: 1;
+        }
+        
+        .user-name {
+            font-weight: 600;
+            font-size: 16px;
+            color: #333;
+            margin-bottom: 4px;
+        }
+        
+        .donation-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            font-size: 13px;
+            color: #666;
+        }
+        
+        .category {
+            font-weight: 500;
+        }
+        
+        .time-ago {
+            color: #999;
+        }
+        
+        .quantity-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+        
+        .quantity-label {
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .quantity-unit {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .donation-description {
+            margin-bottom: 15px;
+            padding: 12px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+        }
+        
+        .donation-description p {
+            margin: 0;
+            color: #444;
+            line-height: 1.5;
+        }
+        
+        .donation-images {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .donation-image {
+            width: 80px;
+            height: 80px;
+            object-fit: cover;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        
+        .donation-image:hover {
+            transform: scale(1.05);
+        }
+        
+        .donation-actions {
+            display: flex;
+            justify-content: flex-end;
+        }
+        
+        .request-btn {
+            padding: 10px 20px;
+            background-color: #2e8b57;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        
+        .request-btn:hover {
+            background-color: #3cb371;
+        }
 
+        .profile-link {
+    color: #333;
+    text-decoration: none;
+    transition: color 0.3s;
+    font-weight: 600;
+}
+
+.profile-link:hover {
+    color: #2e8b57;
+    text-decoration: underline;
+}
+    </style>
 </head>
 <body>
         <header>
@@ -199,53 +384,88 @@ while ($row = $result->fetch_assoc()) $leaders[] = $row;
                 <p>No donations available.</p>
             <?php else: ?>
                 <?php foreach ($donations as $donation): ?>
-<div class="donation-post">
-    <div class="donation-header">
-        <h4><?= htmlspecialchars($donation['item_name']) ?></h4>
-        <div class="donation-meta">
-            <span class="category">Category: <?= htmlspecialchars($donation['category']) ?></span>
-            <span class="quantity">Quantity: <?= htmlspecialchars($donation['quantity']) ?></span>
-            <span class="time-ago"><?= htmlspecialchars(date('M d, Y', strtotime($donation['donated_at']))) ?></span>
+                <div class="donation-post">
+    <!-- User info header -->
+    <div class="donation-user-header">
+        <div class="user-avatar">
+            <?php 
+                // Get user_id and first_name of donor
+                $donor_stmt = $conn->prepare("SELECT user_id, first_name FROM users WHERE user_id = ?");
+                $donor_stmt->bind_param("i", $donation['donor_id']);
+                $donor_stmt->execute();
+                $donor_result = $donor_stmt->get_result();
+                $donor = $donor_result->fetch_assoc();
+                $donor_initial = strtoupper(substr(htmlspecialchars($donor['first_name']), 0, 1));
+            ?>
+            <?= $donor_initial ?>
+        </div>
+        <div class="user-info">
+            <div class="user-name">
+                <a href="profile_view.php?user_id=<?= $donor['user_id'] ?>" class="profile-link">
+                    <?= htmlspecialchars($donor['first_name']) ?>
+                </a>
+            </div>
+            <div class="donation-meta">
+                <span class="category">Category: <?= htmlspecialchars($donation['category']) ?></span>
+                <span class="time-ago"><?= getTimeAgo($donation['donated_at']) ?></span>
+            </div>
         </div>
     </div>
-                
-    <div class="donation-description">
-        <p><?= nl2br(htmlspecialchars($donation['description'] ?? '')) ?></p>
-    </div>
-
-<?php if (!empty($donation['image_path'])): ?>
-    <?php
-    $images = json_decode($donation['image_path'], true);
-    if (is_array($images) && !empty($images)): ?>
-        <div class="donation-images">
-            <?php foreach ($images as $image): ?>
-                <img src="<?= htmlspecialchars($image) ?>" alt="<?= htmlspecialchars($donation['item_name']) ?>" class="donation-image" onclick="openPhotoZoom('<?= htmlspecialchars($image) ?>')">
-            <?php endforeach; ?>
-        </div>
-    <?php endif; ?>
-<?php endif; ?>
-
-
     
+    <!-- Quantity information -->
+    <div class="quantity-info">
+        <div class="quantity-label">Quantity: <?= htmlspecialchars($donation['quantity']) ?>/<?= htmlspecialchars($donation['quantity']) ?></div>
+        <div class="quantity-unit">Units</div>
+    </div>
+    
+    <!-- Description -->
+    <?php if (!empty($donation['description'])): ?>
+    <div class="donation-description">
+        <p><?= nl2br(htmlspecialchars($donation['description'])) ?></p>
+    </div>
+    <?php endif; ?>
+    
+    <!-- Images if available -->
+    <?php if (!empty($donation['image_path'])): ?>
+        <?php
+        $images = json_decode($donation['image_path'], true);
+        if (is_array($images) && !empty($images)): ?>
+            <div class="donation-images">
+                <?php foreach ($images as $image): ?>
+                    <img src="<?= htmlspecialchars($image) ?>" alt="<?= htmlspecialchars($donation['item_name']) ?>" class="donation-image" onclick="openPhotoZoom('<?= htmlspecialchars($image) ?>')">
+                <?php endforeach; ?>
+            </div>
+        <?php endif; ?>
+    <?php endif; ?>
+    
+    <!-- Action buttons -->
     <div class="donation-actions">
         <button class="request-btn">Request Donation</button>
-                        <div class="donation-stats">
-                            <a href="#" class="comments-toggle">0 Comments</a>
-                        </div>
-                    </div>
-                   
-                    <!-- Comments Section -->
-                    <div class="comments-section" style="display: none;">
-                        <div class="comments-list">
-                            <!-- Comments will be loaded here -->
-                            <p class="no-comments">No comments yet. Be the first to comment!</p>
-                        </div>
-                        <div class="add-comment">
-                            <textarea id="addComment1" name="addComment1" placeholder="Add a comment..." class="comment-text"></textarea>
-                            <button class="post-comment-btn">Post Comment</button>
-                        </div>
-                    </div>
-                </div>
+        <button class="comments-btn" onclick="toggleComments(this)">
+            <i class="fas fa-comment"></i> Comments
+        </button>
+    </div>
+    
+    <!-- Comments Section -->
+    <div class="comments-section" style="display: none;">
+        <div class="comments-list">
+            <div class="comment">
+                <div class="comment-author">John Doe</div>
+                <p class="comment-text">Is this still available? I'm interested!</p>
+                <div class="comment-time">2 hours ago</div>
+            </div>
+            <div class="comment">
+                <div class="comment-author">Jane Smith</div>
+                <p class="comment-text">Can I pick this up tomorrow?</p>
+                <div class="comment-time">1 hour ago</div>
+            </div>
+        </div>
+        <div class="add-comment">
+            <textarea placeholder="Add a comment..." class="comment-textarea"></textarea>
+            <button class="post-comment-btn">Post Comment</button>
+        </div>
+    </div>
+</div>
                 <?php endforeach; ?>
             <?php endif; ?>
         </div>
@@ -348,20 +568,26 @@ while ($row = $result->fetch_assoc()) $leaders[] = $row;
             </div>
             <div class="form-group">
                 <label for="quantity">Quantity:</label>
-                <input type="text" id="quantity" name="quantity" placeholder="Enter quantity" required>
-            </div>
+                <input type="number" id="quantity" name="quantity" placeholder="Enter quantity" 
+                    min="1" required>
+                </div>
+
             <div class="form-group">
                 <label for="description">Description:</label>
                 <textarea id="description" name="description" placeholder="Describe your donation..." rows="4" required></textarea>
             </div>
+            
             <div class="form-group">
-                <label for="photos">Attach Photos (up to 5):</label>
+                <label for="photos">Attach Photos (up to 4):</label>
                 <div class="file-upload">
                     <input type="file" id="photos" name="photos[]" accept="image/*" multiple>
                     <label for="photos" class="file-upload-label">Choose Files</label>
                     <span id="file-chosen">No files chosen</span>
                 </div>
-                <small class="form-hint">You can upload up to 5 photos.</small>
+                <small class="form-hint">You can upload up to 4 photos. Only JPG, PNG, and GIF files are allowed.</small>
+                
+                <!-- File count message -->
+                <div id="file-count-message" class="file-count-message" style="display: none;"></div>
                 
                 <!-- Scrollable image preview container -->
                 <div id="photoPreviewContainer" class="photo-preview-container">
@@ -397,7 +623,7 @@ while ($row = $result->fetch_assoc()) $leaders[] = $row;
                 <h3>Share Your Feedback</h3>
                 <div class="emoji-rating" id="emojiRating">
                     <div class="emoji-option" data-rating="1"><span class="emoji">😞</span><span class="emoji-label">Very Sad</span></div>
-                    <div class="emoji-option" data-rating="2"><span class="emoji">😕</span><span class="emoji-label">Sad</span></div>
+                    <div class="emoji-option" data-rating="2"><span class="emoji">😕</span><span class="emoji-label>Sad</span></div>
                     <div class="emoji-option" data-rating="3"><span class="emoji">😐</span><span class="emoji-label">Neutral</span></div>
                     <div class="emoji-option" data-rating="4"><span class="emoji">🙂</span><span class="emoji-label">Happy</span></div>
                     <div class="emoji-option" data-rating="5"><span class="emoji">😍</span><span class="emoji-label">Very Happy</span></div>
@@ -420,6 +646,22 @@ while ($row = $result->fetch_assoc()) $leaders[] = $row;
         </div>
     </div>
 <script>
+
+    function toggleComments(button) {
+    const donationPost = button.closest('.donation-post');
+    const commentsSection = donationPost.querySelector('.comments-section');
+    
+    if (commentsSection) {
+        const isVisible = commentsSection.style.display === 'block';
+        commentsSection.style.display = isVisible ? 'none' : 'block';
+        
+        // Update button text based on visibility
+        button.innerHTML = isVisible ? 
+            '<i class="fas fa-comment"></i> Comments' : 
+            '<i class="fas fa-times"></i> Close Comments';
+    }
+}
+
     // Tab Functionality
     function openTab(tabName) {
         document.getElementById('donations').style.display = tabName === 'donations' ? 'block' : 'none';
@@ -501,6 +743,7 @@ while ($row = $result->fetch_assoc()) $leaders[] = $row;
                 document.getElementById('donationForm').reset();
                 document.getElementById('file-chosen').textContent = 'No files chosen';
                 document.getElementById('photoPreview').innerHTML = '';
+                document.getElementById('file-count-message').style.display = 'none';
                 selectedFiles = [];
                 donationFormContainer.style.display = 'block';
                 successPopup.style.display = 'none';
@@ -510,19 +753,22 @@ while ($row = $result->fetch_assoc()) $leaders[] = $row;
         // Fix for multiple image upload - store selected files
         let selectedFiles = [];
         const photoInput = document.getElementById('photos');
+        const maxFiles = 4; // Set maximum files to 4
         
         photoInput.addEventListener('change', function() {
             const newFiles = Array.from(this.files);
             
-            // Add new files to selectedFiles array
+            // Add new files to selectedFiles array (don't clear existing ones)
             newFiles.forEach(file => {
-                // Check if file is already selected
-                const isDuplicate = selectedFiles.some(
-                    selectedFile => selectedFile.name === file.name && selectedFile.size === file.size
-                );
-                
-                if (!isDuplicate && selectedFiles.length < 5) {
-                    selectedFiles.push(file);
+                if (selectedFiles.length < maxFiles) {
+                    // Check if file is already selected
+                    const isDuplicate = selectedFiles.some(
+                        selectedFile => selectedFile.name === file.name && selectedFile.size === file.size
+                    );
+                    
+                    if (!isDuplicate) {
+                        selectedFiles.push(file);
+                    }
                 }
             });
             
@@ -547,15 +793,6 @@ while ($row = $result->fetch_assoc()) $leaders[] = $row;
             photoPreview.innerHTML = '';
             
             if (selectedFiles.length > 0) {
-                // Show message about selected files
-                const fileCount = document.createElement('p');
-                fileCount.textContent = `Selected ${selectedFiles.length} file(s)`;
-                fileCount.style.marginBottom = '10px';
-                fileCount.style.fontSize = '14px';
-                fileCount.style.color = '#666';
-                fileCount.style.width = '100%';
-                photoPreview.appendChild(fileCount);
-                
                 selectedFiles.forEach((file, index) => {
                     if (file.type.match('image.*')) {
                         const reader = new FileReader();
@@ -609,18 +846,27 @@ while ($row = $result->fetch_assoc()) $leaders[] = $row;
                 });
             }
             
-            // Show warning if more than 5 files selected
-            if (selectedFiles.length > 5) {
+            // Show file count message below the hint
+            const fileCountElement = document.getElementById('file-count-message');
+            if (selectedFiles.length > 0) {
+                fileCountElement.textContent = `Selected ${selectedFiles.length} of ${maxFiles} files`;
+                fileCountElement.style.display = 'block';
+            } else {
+                fileCountElement.style.display = 'none';
+            }
+            
+            // Show warning if more than max files selected
+            if (selectedFiles.length > maxFiles) {
                 const warning = document.createElement('p');
-                warning.textContent = 'Maximum 5 files allowed. Only the first 5 will be uploaded.';
+                warning.textContent = `Maximum ${maxFiles} files allowed. Only the first ${maxFiles} will be uploaded.`;
                 warning.style.color = 'red';
                 warning.style.fontSize = '12px';
                 warning.style.marginTop = '10px';
                 warning.style.width = '100%';
                 photoPreview.appendChild(warning);
                 
-                // Keep only first 5 files
-                selectedFiles = selectedFiles.slice(0, 5);
+                // Keep only first maxFiles files
+                selectedFiles = selectedFiles.slice(0, maxFiles);
                 
                 // Update the file input
                 const dataTransfer = new DataTransfer();
@@ -630,172 +876,6 @@ while ($row = $result->fetch_assoc()) $leaders[] = $row;
                 // Update UI again
                 updateFileDisplay();
             }
-        }
-    });
-
-    // Comment functionality
-    document.addEventListener('DOMContentLoaded', function() {
-        // Toggle comments visibility
-        document.querySelectorAll('.comments-toggle').forEach(toggle => {
-            toggle.addEventListener('click', function(e) {
-                e.preventDefault();
-                const commentsSection = this.closest('.donation-post').querySelector('.comments-section');
-                const isVisible = commentsSection.style.display === 'block';
-                
-                commentsSection.style.display = isVisible ? 'none' : 'block';
-                
-                if (!isVisible) {
-                    // Load comments if not already loaded
-                    loadComments(this.closest('.donation-post'));
-                }
-            });
-        });
-        
-        // Post comment functionality
-        document.querySelectorAll('.post-comment-btn').forEach(btn => {
-            btn.addEventListener('click', function (e) {
-                e.preventDefault(); // Prevent the default form submission behavior
-                const commentText = this.closest('.add-comment').querySelector('.comment-text');
-                const comment = commentText.value.trim();
-
-                if (comment) {
-                    postComment(this.closest('.donation-post'), comment);
-                    commentText.value = ''; // Clear the comment input field
-                }
-            });
-        });
-        
-        // Allow pressing Enter to post comment (while holding Shift for new line)
-        document.querySelectorAll('.comment-text').forEach(textarea => {
-            textarea.addEventListener('keydown', function(e) {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    this.closest('.add-comment').querySelector('.post-comment-btn').click();
-                }
-            });
-        });
-    });
-
-    function loadComments(donationPost) {
-        const commentsList = donationPost.querySelector('.comments-list');
-        const noComments = donationPost.querySelector('.no-comments');
-        
-        // Simulate loading comments (replace with actual API call)
-        setTimeout(() => {
-            // In a real application, you would fetch comments from your server
-            // For now, we'll just show the "no comments" message
-            noComments.style.display = 'block';
-        }, 500);
-    }
-
-    function postComment(donationPost, commentText) {
-        const commentsList = donationPost.querySelector('.comments-list');
-        const noComments = donationPost.querySelector('.no-comments');
-        const commentsToggle = donationPost.querySelector('.comments-toggle');
-
-        // Hide "no comments" message
-        noComments.style.display = 'none';
-
-        // Create new comment element
-        const commentDiv = document.createElement('div');
-        commentDiv.className = 'comment';
-        commentDiv.innerHTML = `
-            <div class="comment-author">You</div>
-            <p class="comment-text">${commentText}</p>
-        `;
-
-        // Add comment to list
-        commentsList.appendChild(commentDiv);
-
-        // Update comments count
-        const currentCount = parseInt(commentsToggle.textContent) || 0;
-        commentsToggle.textContent = `${currentCount + 1} Comments`;
-
-        // Scroll to the new comment
-        commentDiv.scrollIntoView({ behavior: 'smooth' });
-    }
-
-    // Feedback system JavaScript
-    document.addEventListener('DOMContentLoaded', function() {
-        const feedbackBtn = document.getElementById('feedbackBtn');
-        const feedbackModal = document.getElementById('feedbackModal');
-        const feedbackCloseBtn = document.getElementById('feedbackCloseBtn');
-        const emojiOptions = document.querySelectorAll('.emoji-option');
-        const feedbackForm = document.getElementById('feedbackForm');
-        const thankYouMessage = document.getElementById('thankYouMessage');
-        const feedbackSubmitBtn = document.getElementById('feedbackSubmitBtn');
-        const spinner = document.getElementById('spinner');
-        const ratingError = document.getElementById('ratingError');
-        const textError = document.getElementById('textError');
-        const feedbackText = document.getElementById('feedbackText');
-        let selectedRating = 0;
-        
-        emojiOptions.forEach(option => {
-            option.addEventListener('click', () => {
-                emojiOptions.forEach(opt => opt.classList.remove('selected'));
-                option.classList.add('selected');
-                selectedRating = option.getAttribute('data-rating');
-                ratingError.style.display = 'none';
-            });
-        });
-        
-        feedbackForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            let isValid = true;
-            if (selectedRating === 0) {
-                ratingError.style.display = 'block';
-                isValid = false;
-            } else {
-                ratingError.style.display = 'none';
-            }
-            if (feedbackText.value.trim() === '') {
-                textError.style.display = 'block';
-                isValid = false;
-            } else {
-                textError.style.display = 'none';
-            }
-            if (!isValid) return;
-            feedbackSubmitBtn.disabled = true;
-            spinner.style.display = 'block';
-            setTimeout(() => {
-                spinner.style.display = 'none';
-                feedbackForm.style.display = 'none';
-                thankYouMessage.style.display = 'block';
-                setTimeout(() => {
-                    feedbackModal.style.display = 'none';
-                    feedbackForm.style.display = 'block';
-                    thankYouMessage.style.display = 'none';
-                    feedbackText.value = '';
-                    emojiOptions.forEach(opt => opt.classList.remove('selected'));
-                    selectedRating = 0;
-                    feedbackSubmitBtn.disabled = false;
-                }, 3000);
-            }, 1500);
-        });
-        
-        feedbackBtn.addEventListener('click', () => {
-            feedbackModal.style.display = 'flex';
-        });
-        
-        feedbackCloseBtn.addEventListener('click', closeFeedbackModal);
-        
-        window.addEventListener('click', (event) => {
-            if (event.target === feedbackModal) {
-                closeFeedbackModal();
-            }
-        });
-        
-        function closeFeedbackModal() {
-            feedbackModal.style.display = 'none';
-            feedbackForm.style.display = 'block';
-            thankYouMessage.style.display = 'none';
-            feedbackText.value = '';
-            emojiOptions.forEach(opt => opt.classList.remove('selected'));
-            selectedRating = 0;
-            ratingError.style.display = 'none';
-            textError.style.display = 'none';
-            feedbackSubmitBtn.disabled = false;
-            spinner.style.display = 'none';
         }
     });
 

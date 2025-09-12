@@ -648,3 +648,25 @@ header {
                 grid-template-columns: 1fr 1fr;
             }
         }
+
+        .success-message {
+    background-color: #d4edda;
+    color: #155724;
+    padding: 12px 20px;
+    border-radius: 5px;
+    margin-bottom: 20px;
+    border-left: 4px solid #28a745;
+}
+
+.redeem-form {
+    margin-top: 15px;
+}
+
+.reward-claimed {
+    margin-top: 15px;
+    color: #28a745;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
