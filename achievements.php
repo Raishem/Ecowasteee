@@ -28,12 +28,87 @@ while ($row = $result->fetch_assoc()) $tasks[] = $row;
 // If no tasks exist, create default tasks for the user
 if (empty($tasks)) {
     $default_tasks = [
+        // Donation-related tasks
         [
-            'title' => 'Eco Beginner',
-            'description' => 'Complete your first recycling project',
+            'title' => 'Rising Donor',
+            'description' => 'Complete your first donation',
+            'reward' => '20 EcoPoints',
+            'reward_type' => 'points',
+            'reward_value' => 20,
+            'progress' => '0/1',
+            'status' => 'In Progress',
+            'current' => 0,
+            'target' => 1,
+            'action_type' => 'items_donated'
+        ],
+        [
+            'title' => 'Helpful Friend',
+            'description' => 'Complete 10 donations',
             'reward' => '50 EcoPoints',
             'reward_type' => 'points',
             'reward_value' => 50,
+            'progress' => '0/10',
+            'status' => 'In Progress',
+            'current' => 0,
+            'target' => 10,
+            'action_type' => 'items_donated'
+        ],
+        [
+            'title' => 'Care Giver',
+            'description' => 'Complete 15 donations',
+            'reward' => '100 EcoPoints',
+            'reward_type' => 'points',
+            'reward_value' => 100,
+            'progress' => '0/15',
+            'status' => 'In Progress',
+            'current' => 0,
+            'target' => 15,
+            'action_type' => 'items_donated'
+        ],
+        [
+            'title' => 'Generous Giver',
+            'description' => 'Complete 20 donations',
+            'reward' => '150 EcoPoints',
+            'reward_type' => 'points',
+            'reward_value' => 150,
+            'progress' => '0/20',
+            'status' => 'In Progress',
+            'current' => 0,
+            'target' => 20,
+            'action_type' => 'items_donated'
+        ],
+        [
+            'title' => 'Community Helper',
+            'description' => 'Complete 25 donations',
+            'reward' => '200 EcoPoints',
+            'reward_type' => 'points',
+            'reward_value' => 200,
+            'progress' => '0/25',
+            'status' => 'In Progress',
+            'current' => 0,
+            'target' => 25,
+            'action_type' => 'items_donated'
+        ],
+        [
+            'title' => 'Charity Champion',
+            'description' => 'Complete 30 donations',
+            'reward' => '250 EcoPoints',
+            'reward_type' => 'points',
+            'reward_value' => 250,
+            'progress' => '0/30',
+            'status' => 'In Progress',
+            'current' => 0,
+            'target' => 30,
+            'action_type' => 'items_donated'
+        ],
+        
+        // Project creation tasks
+        [
+            'title' => 'Eco Beginner',
+            'description' => 'Start your first recycling project',
+            'reward' => '20 EcoPoints',
+            'reward_type' => 'points',
+            'reward_value' => 20,
             'progress' => '0/1',
             'status' => 'In Progress',
             'current' => 0,
@@ -41,64 +116,138 @@ if (empty($tasks)) {
             'action_type' => 'projects_completed'
         ],
         [
-            'title' => 'Plastic Crusher',
-            'description' => 'Recycle 10 plastic items',
-            'reward' => 'Plastic Crusher Badge',
-            'reward_type' => 'badge',
-            'reward_value' => 1,
+            'title' => 'Eco Builder',
+            'description' => 'Create 10 recycling projects',
+            'reward' => '50 EcoPoints',
+            'reward_type' => 'points',
+            'reward_value' => 50,
             'progress' => '0/10',
             'status' => 'In Progress',
             'current' => 0,
             'target' => 10,
-            'action_type' => 'items_recycled'
-        ],
-        [
-            'title' => 'Eco Warrior',
-            'description' => 'Complete multiple recycling projects',
-            'reward' => '75 EcoPoints',
-            'reward_type' => 'points',
-            'reward_value' => 75,
-            'progress' => '0/5',
-            'status' => 'In Progress',
-            'current' => 0,
-            'target' => 5,
             'action_type' => 'projects_completed'
         ],
         [
-            'title' => 'Paper Saver',
-            'description' => 'Recycle 15 paper items',
-            'reward' => 'Paper Saver Badge',
-            'reward_type' => 'badge',
-            'reward_value' => 1,
+            'title' => 'Nature Keeper',
+            'description' => 'Create 15 recycling projects',
+            'reward' => '100 EcoPoints',
+            'reward_type' => 'points',
+            'reward_value' => 100,
             'progress' => '0/15',
             'status' => 'In Progress',
             'current' => 0,
             'target' => 15,
-            'action_type' => 'items_recycled'
+            'action_type' => 'projects_completed'
         ],
         [
-            'title' => 'Glass Guardian',
-            'description' => 'Recycle 8 glass items',
-            'reward' => 'Glass Guardian Badge',
-            'reward_type' => 'badge',
-            'reward_value' => 1,
-            'progress' => '0/8',
+            'title' => 'Conservation Expert',
+            'description' => 'Create 20 recycling projects',
+            'reward' => '150 EcoPoints',
+            'reward_type' => 'points',
+            'reward_value' => 150,
+            'progress' => '0/20',
             'status' => 'In Progress',
             'current' => 0,
-            'target' => 8,
-            'action_type' => 'items_recycled'
+            'target' => 20,
+            'action_type' => 'projects_completed'
         ],
         [
-            'title' => 'Donation Hero',
-            'description' => 'Make 5 successful donations',
+            'title' => 'Zero Waste Hero',
+            'description' => 'Create 25 recycling projects',
+            'reward' => '200 EcoPoints',
+            'reward_type' => 'points',
+            'reward_value' => 200,
+            'progress' => '0/25',
+            'status' => 'In Progress',
+            'current' => 0,
+            'target' => 25,
+            'action_type' => 'projects_completed'
+        ],
+        [
+            'title' => 'Earth Saver',
+            'description' => 'Create 30 recycling projects',
+            'reward' => '250 EcoPoints',
+            'reward_type' => 'points',
+            'reward_value' => 250,
+            'progress' => '0/30',
+            'status' => 'In Progress',
+            'current' => 0,
+            'target' => 30,
+            'action_type' => 'projects_completed'
+        ],
+        
+        // Recycling project completion tasks
+        [
+            'title' => 'Eco Star',
+            'description' => 'Complete a recycling project',
+            'reward' => '20 EcoPoints',
+            'reward_type' => 'points',
+            'reward_value' => 20,
+            'progress' => '0/1',
+            'status' => 'In Progress',
+            'current' => 0,
+            'target' => 1,
+            'action_type' => 'projects_completed'
+        ],
+        [
+            'title' => 'Eco Warrior',
+            'description' => 'Complete 10 recycling projects',
+            'reward' => '50 EcoPoints',
+            'reward_type' => 'points',
+            'reward_value' => 50,
+            'progress' => '0/10',
+            'status' => 'In Progress',
+            'current' => 0,
+            'target' => 10,
+            'action_type' => 'projects_completed'
+        ],
+        [
+            'title' => 'Eco Elite',
+            'description' => 'Complete 15 recycling projects',
             'reward' => '100 EcoPoints',
             'reward_type' => 'points',
             'reward_value' => 100,
-            'progress' => '0/5',
+            'progress' => '0/15',
             'status' => 'In Progress',
             'current' => 0,
-            'target' => 5,
-            'action_type' => 'items_donated'
+            'target' => 15,
+            'action_type' => 'projects_completed'
+        ],
+        [
+            'title' => 'Eco Pro',
+            'description' => 'Complete 20 recycling projects',
+            'reward' => '150 EcoPoints',
+            'reward_type' => 'points',
+            'reward_value' => 150,
+            'progress' => '0/20',
+            'status' => 'In Progress',
+            'current' => 0,
+            'target' => 20,
+            'action_type' => 'projects_completed'
+        ],
+        [
+            'title' => 'Eco Master',
+            'description' => 'Complete 25 recycling projects',
+            'reward' => '200 EcoPoints',
+            'reward_type' => 'points',
+            'reward_value' => 200,
+            'progress' => '0/25',
+            'status' => 'In Progress',
+            'current' => 0,
+            'target' => 25,
+            'action_type' => 'projects_completed'
+        ],
+        [
+            'title' => 'Eco Legend',
+            'description' => 'Complete 30 recycling projects',
+            'reward' => '250 EcoPoints',
+            'reward_type' => 'points',
+            'reward_value' => 250,
+            'progress' => '0/30',
+            'status' => 'In Progress',
+            'current' => 0,
+            'target' => 30,
+            'action_type' => 'projects_completed'
         ]
     ];
     
