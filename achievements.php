@@ -15,7 +15,10 @@ $user_id = $_SESSION['user_id'];
 $stats = $conn->query("SELECT * FROM user_stats WHERE user_id = $user_id")->fetch_assoc();
 
 // Calculate level and progress
-$total_points = ($stats['items_recycled'] ?? 0) + ($stats['items_donated'] ?? 0) * 2;
+$items_recycled = $stats['items_recycled'] ?? 0;
+$items_donated = $stats['items_donated'] ?? 0;
+$total_points = $items_recycled + ($items_donated * 2);
+
 $level = floor($total_points / 25); // 25 points per level
 $current_level_points = $total_points % 25;
 $progress_percentage = ($current_level_points / 25) * 100;
@@ -113,7 +116,7 @@ if (empty($tasks)) {
             'status' => 'In Progress',
             'current' => 0,
             'target' => 1,
-            'action_type' => 'projects_completed'
+            'action_type' => 'projects_created'
         ],
         [
             'title' => 'Eco Builder',
@@ -125,7 +128,7 @@ if (empty($tasks)) {
             'status' => 'In Progress',
             'current' => 0,
             'target' => 10,
-            'action_type' => 'projects_completed'
+            'action_type' => 'projects_created'
         ],
         [
             'title' => 'Nature Keeper',
@@ -137,7 +140,7 @@ if (empty($tasks)) {
             'status' => 'In Progress',
             'current' => 0,
             'target' => 15,
-            'action_type' => 'projects_completed'
+            'action_type' => 'projects_created'
         ],
         [
             'title' => 'Conservation Expert',
@@ -149,7 +152,7 @@ if (empty($tasks)) {
             'status' => 'In Progress',
             'current' => 0,
             'target' => 20,
-            'action_type' => 'projects_completed'
+            'action_type' => 'projects_created'
         ],
         [
             'title' => 'Zero Waste Hero',
@@ -161,7 +164,7 @@ if (empty($tasks)) {
             'status' => 'In Progress',
             'current' => 0,
             'target' => 25,
-            'action_type' => 'projects_completed'
+            'action_type' => 'projects_created'
         ],
         [
             'title' => 'Earth Saver',
@@ -173,7 +176,7 @@ if (empty($tasks)) {
             'status' => 'In Progress',
             'current' => 0,
             'target' => 30,
-            'action_type' => 'projects_completed'
+            'action_type' => 'projects_created'
         ],
         
         // Recycling project completion tasks
@@ -309,16 +312,36 @@ if (isset($_POST['redeem_reward']) && isset($_POST['task_id'])) {
                 if ($task['reward_type'] === 'points' && isset($task['reward_value'])) {
                     // Add points to user's total
                     $points = $task['reward_value'];
-                    $conn->query("UPDATE user_stats SET total_points = total_points + $points WHERE user_id = $user_id");
+                    
+                    // Update user_stats total_points if column exists
+                    $points_column_check = $conn->query("SHOW COLUMNS FROM user_stats LIKE 'total_points'");
+                    if ($points_column_check->num_rows > 0) {
+                        $conn->query("UPDATE user_stats SET total_points = total_points + $points WHERE user_id = $user_id");
+                    }
+                    
+                    // Also update users table points if that column exists
+                    $user_points_column = $conn->query("SHOW COLUMNS FROM users LIKE 'points'");
+                    if ($user_points_column->num_rows > 0) {
+                        $conn->query("UPDATE users SET points = points + $points WHERE user_id = $user_id");
+                    }
                     
                     // Update achievements earned
-                    $conn->query("UPDATE user_stats SET achievements_earned = achievements_earned + 1 WHERE user_id = $user_id");
+                    $achievements_column = $conn->query("SHOW COLUMNS FROM user_stats LIKE 'achievements_earned'");
+                    if ($achievements_column->num_rows > 0) {
+                        $conn->query("UPDATE user_stats SET achievements_earned = achievements_earned + 1 WHERE user_id = $user_id");
+                    }
                 } elseif ($task['reward_type'] === 'badge') {
                     // Add badge to user's collection
-                    $conn->query("UPDATE user_stats SET badges_earned = badges_earned + 1 WHERE user_id = $user_id");
+                    $badges_column = $conn->query("SHOW COLUMNS FROM user_stats LIKE 'badges_earned'");
+                    if ($badges_column->num_rows > 0) {
+                        $conn->query("UPDATE user_stats SET badges_earned = badges_earned + 1 WHERE user_id = $user_id");
+                    }
                     
                     // Update achievements earned
-                    $conn->query("UPDATE user_stats SET achievements_earned = achievements_earned + 1 WHERE user_id = $user_id");
+                    $achievements_column = $conn->query("SHOW COLUMNS FROM user_stats LIKE 'achievements_earned'");
+                    if ($achievements_column->num_rows > 0) {
+                        $conn->query("UPDATE user_stats SET achievements_earned = achievements_earned + 1 WHERE user_id = $user_id");
+                    }
                 }
             }
             
@@ -338,15 +361,22 @@ if (isset($_POST['redeem_reward']) && isset($_POST['task_id'])) {
 
 // Update task progress based on user stats
 foreach ($tasks as $task) {
-    if ($task['status'] !== 'Completed') {
-        // Check if action_type column exists and is set
-        $action_type_column = $conn->query("SHOW COLUMNS FROM user_tasks LIKE 'action_type'");
-        if ($action_type_column->num_rows > 0 && isset($task['action_type'])) {
-            $action_type = $task['action_type'];
-            $current_value = $stats[$action_type] ?? 0;
+    // Check if action_type column exists and is set
+    $action_type_column = $conn->query("SHOW COLUMNS FROM user_tasks LIKE 'action_type'");
+    if ($action_type_column->num_rows > 0 && isset($task['action_type'])) {
+        $action_type = $task['action_type'];
+        
+        // Handle the different action types
+        if ($action_type === 'projects_created') {
+            $current_value = isset($stats['projects_created']) ? $stats['projects_created'] : 0;
+        } else if ($action_type === 'items_donated') {
+            $current_value = $stats['items_donated'] ?? 0;
+        } else if ($action_type === 'projects_completed') {
+            $current_value = $stats['projects_completed'] ?? 0;
+        } else if ($action_type === 'items_recycled') {
+            $current_value = $stats['items_recycled'] ?? 0;
         } else {
-            // Default behavior if action_type doesn't exist
-            $current_value = 0;
+            $current_value = $stats[$action_type] ?? 0;
         }
         
         $target_value = $task['target_value'];
@@ -376,6 +406,15 @@ while ($row = $result->fetch_assoc()) $tasks[] = $row;
 
 // Reload stats after potential updates
 $stats = $conn->query("SELECT * FROM user_stats WHERE user_id = $user_id")->fetch_assoc();
+
+// Recalculate points after potential updates
+$items_recycled = $stats['items_recycled'] ?? 0;
+$items_donated = $stats['items_donated'] ?? 0;
+$total_points = $items_recycled + ($items_donated * 2);
+
+$level = floor($total_points / 25);
+$current_level_points = $total_points % 25;
+$progress_percentage = ($current_level_points / 25) * 100;
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -387,44 +426,6 @@ $stats = $conn->query("SELECT * FROM user_stats WHERE user_id = $user_id")->fetc
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&family=Open+Sans&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
-<style>
-    .profile-pic {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-right: 10px;
-    overflow: hidden;
-    background-color: #3d6a06ff;
-    color: white;
-    font-weight: bold;
-    font-size: 18px;
-}
-
-.success-message {
-    background-color: #d4edda;
-    color: #155724;
-    padding: 12px 20px;
-    border-radius: 5px;
-    margin-bottom: 20px;
-    border-left: 4px solid #28a745;
-}
-
-.redeem-form {
-    margin-top: 15px;
-}
-
-.reward-claimed {
-    margin-top: 15px;
-    color: #28a745;
-    font-weight: bold;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-</style>
 
 <body>
     <header>
@@ -434,19 +435,19 @@ $stats = $conn->query("SELECT * FROM user_stats WHERE user_id = $user_id")->fetc
             </div>
             <h1>EcoWaste</h1>
         </div>
-<div class="user-profile" id="userProfile">
-    <div class="profile-pic">
-        <?= strtoupper(substr(htmlspecialchars($_SESSION['first_name'] ?? 'User'), 0, 1)) ?>
-    </div>
-    <span class="profile-name"><?= htmlspecialchars($_SESSION['first_name'] ?? 'User') ?></span>
-    <i class="fas fa-chevron-down dropdown-arrow"></i>
-    <div class="profile-dropdown">
-        <a href="profile.php" class="dropdown-item"><i class="fas fa-user"></i> My Profile</a>
-        <a href="#" class="dropdown-item"><i class="fas fa-cog"></i> Settings</a>
-        <div class="dropdown-divider"></div>
-        <a href="logout.php" class="dropdown-item"><i class="fas fa-sign-out-alt"></i> Logout</a>
-    </div>
-</div>
+        <div class="user-profile" id="userProfile">
+            <div class="profile-pic">
+                <?= strtoupper(substr(htmlspecialchars($_SESSION['first_name'] ?? 'User'), 0, 1)) ?>
+            </div>
+            <span class="profile-name"><?= htmlspecialchars($_SESSION['first_name'] ?? 'User') ?></span>
+            <i class="fas fa-chevron-down dropdown-arrow"></i>
+            <div class="profile-dropdown">
+                <a href="profile.php" class="dropdown-item"><i class="fas fa-user"></i> My Profile</a>
+                <a href="#" class="dropdown-item"><i class="fas fa-cog"></i> Settings</a>
+                <div class="dropdown-divider"></div>
+                <a href="logout.php" class="dropdown-item"><i class="fas fa-sign-out-alt"></i> Logout</a>
+            </div>
+        </div>
     </header>
 
     <div class="container">
@@ -481,7 +482,7 @@ $stats = $conn->query("SELECT * FROM user_stats WHERE user_id = $user_id")->fetc
                     <div class="circular-progress">
                         <svg class="progress-ring" width="200" height="200">
                             <circle class="progress-ring-circle" stroke="#e0e0e0" stroke-width="10" fill="transparent" r="90" cx="100" cy="100"/>
-                            <circle class="progress-ring-progress" stroke="#82AA52" stroke-width="10" fill="transparent" r="90" cx="100" cy="100" 
+                            <circle class="progress-ring-progress" stroke="#ffffff" stroke-width="10" fill="transparent" r="90" cx="100" cy="100" 
                                     stroke-dasharray="565.48" stroke-dashoffset="<?= 565.48 - (565.48 * $progress_percentage / 100) ?>"/>
                         </svg>
                         <div class="circle">
@@ -526,6 +527,12 @@ $stats = $conn->query("SELECT * FROM user_stats WHERE user_id = $user_id")->fetc
                         <?php foreach ($tasks as $task): 
                             $is_completed = $task['status'] === 'Completed';
                             $reward_claimed = isset($task['reward_claimed']) ? $task['reward_claimed'] : 0;
+                            
+                            // Parse progress to get current and target values
+                            $progress_parts = explode('/', $task['progress']);
+                            $current_progress = isset($progress_parts[0]) ? (int)$progress_parts[0] : 0;
+                            $target_progress = isset($progress_parts[1]) ? (int)$progress_parts[1] : 1;
+                            $progress_percent = $target_progress > 0 ? ($current_progress / $target_progress) * 100 : 0;
                         ?>
                         <div class="task-item <?= $is_completed ? 'completed' : 'in-progress' ?>">
                             <div class="task-main">
@@ -548,9 +555,7 @@ $stats = $conn->query("SELECT * FROM user_stats WHERE user_id = $user_id")->fetc
                             </div>
                             <?php if (!$is_completed): ?>
                             <div class="progress-bar">
-                                <div class="progress-fill" style="width: <?= 
-                                    ($task['current_value'] / $task['target_value']) * 100 
-                                ?>%"></div>
+                                <div class="progress-fill" style="width: <?= $progress_percent ?>%"></div>
                             </div>
                             <?php elseif ($is_completed && !$reward_claimed): ?>
                             <form method="POST" class="redeem-form">

@@ -32,6 +32,7 @@ header {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    position: sticky;
 }
 
 .logo-container {
@@ -132,6 +133,12 @@ header {
     background-color: #F6FFEB;
     padding: 30px 20px;
     box-shadow: 3px 0 10px rgba(0,0,0,0.1);
+            box-shadow: 3px 0 10px rgba(0,0,0,0.1);
+            height: fit-content;
+            border-radius: 10px;
+            position: sticky;
+            top: 20px;
+
 }
 
 .sidebar nav ul {
