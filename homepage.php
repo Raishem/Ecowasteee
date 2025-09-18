@@ -2,12 +2,14 @@
 session_start();
 require_once 'config.php';
 
-if (!isset($_SESSION['user_id'])) {
+$conn = getDBConnection();
+
+// Check login status (moved this to the top to avoid undefined session errors)
+if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true || empty($_SESSION['user_id'])) {
     header('Location: login.php');
     exit();
 }
 
-$conn = getDBConnection();
 $donor_id = $_SESSION['user_id'];
 $image_paths_json = null;
 
@@ -21,12 +23,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['comment_text']) && is
     $user_id = $_SESSION['user_id'];
     $created_at = date('Y-m-d H:i:s');
     
-    // Insert comment into database
     $stmt = $conn->prepare("INSERT INTO comments (donation_id, user_id, comment_text, created_at) VALUES (?, ?, ?, ?)");
     $stmt->bind_param("iiss", $donation_id, $user_id, $comment_text, $created_at);
     
     if ($stmt->execute()) {
-        // Refresh the page to show the new comment
         header('Location: ' . $_SERVER['PHP_SELF']);
         exit();
     } else {
@@ -92,105 +92,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['wasteType'])) {
         }
     }
 
-    // Insert donation into the database
-    $stmt = $conn->prepare("INSERT INTO donations (item_name, quantity, category, description, donor_id, donated_at, status, image_path) VALUES (?, ?, ?, ?, ?, ?, 'Available', ?)");
-    if (!$stmt) {
-        die('Error: Failed to prepare statement. ' . $conn->error);
-    }
+    // Insert donation into donations table
+    $stmt = $conn->prepare("INSERT INTO donations (item_name, quantity, category, description, donor_id, donated_at, status, image_path) 
+                             VALUES (?, ?, ?, ?, ?, ?, 'Available', ?)");
+    $stmt->bind_param("sisssss", $item_name, $quantity, $category, $description, $donor_id, $donated_at, $image_paths_json);
+    $stmt->execute();
 
-    if (!$stmt->bind_param("sisssss", $item_name, $quantity, $category, $description, $donor_id, $donated_at, $image_paths_json)) {
-        die('Error: Failed to bind parameters. ' . $stmt->error);
-    }
-
-    if (!$stmt->execute()) {
-        die('Error: Failed to execute statement. ' . $stmt->error);
-    }
-
-    // UPDATE USER STATS - Check if columns exist before updating
-    // Check if user_stats record exists
+    // ✅ Update USER STATS (only counts, no direct points)
     $stats_check = $conn->query("SELECT * FROM user_stats WHERE user_id = $donor_id");
     if ($stats_check->num_rows === 0) {
-        // Check which columns exist in user_stats table
-        $columns_result = $conn->query("SHOW COLUMNS FROM user_stats");
-        $columns = [];
-        while ($row = $columns_result->fetch_assoc()) {
-            $columns[] = $row['Field'];
-        }
-        
-        // Build insert query based on available columns
-        $insert_columns = ['user_id'];
-        $insert_values = [$donor_id];
-        
-        if (in_array('items_donated', $columns)) {
-            $insert_columns[] = 'items_donated';
-            $insert_values[] = $quantity;
-        } else {
-            $insert_columns[] = 'items_donated';
-            $insert_values[] = $quantity;
-        }
-        
-        if (in_array('items_recycled', $columns)) {
-            $insert_columns[] = 'items_recycled';
-            $insert_values[] = 0;
-        }
-        
-        if (in_array('projects_completed', $columns)) {
-            $insert_columns[] = 'projects_completed';
-            $insert_values[] = 0;
-        }
-        
-        if (in_array('achievements_earned', $columns)) {
-            $insert_columns[] = 'achievements_earned';
-            $insert_values[] = 0;
-        }
-        
-        if (in_array('badges_earned', $columns)) {
-            $insert_columns[] = 'badges_earned';
-            $insert_values[] = 0;
-        }
-        
-        if (in_array('total_points', $columns)) {
-            $insert_columns[] = 'total_points';
-            $insert_values[] = $quantity * 2;
-        }
-        
-        $placeholders = implode(',', array_fill(0, count($insert_values), '?'));
-        $types = str_repeat('i', count($insert_values));
-        
-        $insert_stmt = $conn->prepare("INSERT INTO user_stats (" . implode(',', $insert_columns) . ") VALUES ($placeholders)");
-        $insert_stmt->bind_param($types, ...$insert_values);
-        $insert_stmt->execute();
+        $conn->query("INSERT INTO user_stats (user_id, items_donated, items_recycled, projects_completed, achievements_earned, badges_earned) 
+                      VALUES ($donor_id, $quantity, 0, 0, 0, 0)");
     } else {
-        // Update existing user_stats record
-        // Check if items_donated column exists
-        $column_check = $conn->query("SHOW COLUMNS FROM user_stats LIKE 'items_donated'");
-        if ($column_check->num_rows > 0) {
-            $conn->query("UPDATE user_stats SET items_donated = items_donated + $quantity WHERE user_id = $donor_id");
-        }
-        
-        // Check if total_points column exists
-        $points_column_check = $conn->query("SHOW COLUMNS FROM user_stats LIKE 'total_points'");
-        if ($points_column_check->num_rows > 0) {
-            $points_earned = $quantity * 2;
-            $conn->query("UPDATE user_stats SET total_points = total_points + $points_earned WHERE user_id = $donor_id");
-        }
-    }
-    
-    // Also update the main users table points if that column exists
-    $points_column = $conn->query("SHOW COLUMNS FROM users LIKE 'points'");
-    if ($points_column->num_rows > 0) {
-        $points_earned = $quantity * 2;
-        $conn->query("UPDATE users SET points = points + $points_earned WHERE user_id = $donor_id");
+        $conn->query("UPDATE user_stats SET items_donated = items_donated + $quantity WHERE user_id = $donor_id");
     }
 
     header('Location: ' . $_SERVER['PHP_SELF']);
-    exit();
-}
-
-
-// Check login status
-if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true || empty($_SESSION['user_id'])) {
-    header('Location: login.php');
     exit();
 }
 
@@ -199,20 +116,11 @@ function getTimeAgo($timestamp) {
     $currentTime = time();
     $timeDiff = $currentTime - strtotime($timestamp);
     
-    if ($timeDiff < 60) {
-        return 'just now';
-    } elseif ($timeDiff < 3600) {
-        $minutes = floor($timeDiff / 60);
-        return $minutes . ' min ago';
-    } elseif ($timeDiff < 86400) {
-        $hours = floor($timeDiff / 3600);
-        return $hours . ' hour' . ($hours > 1 ? 's' : '') . ' ago';
-    } elseif ($timeDiff < 2592000) {
-        $days = floor($timeDiff / 86400);
-        return $days . ' day' . ($days > 1 ? 's' : '') . ' ago';
-    } else {
-        return date('M d, Y', strtotime($timestamp));
-    }
+    if ($timeDiff < 60) return 'just now';
+    elseif ($timeDiff < 3600) return floor($timeDiff / 60) . ' min ago';
+    elseif ($timeDiff < 86400) return floor($timeDiff / 3600) . ' hour' . (floor($timeDiff / 3600) > 1 ? 's' : '') . ' ago';
+    elseif ($timeDiff < 2592000) return floor($timeDiff / 86400) . ' day' . (floor($timeDiff / 86400) > 1 ? 's' : '') . ' ago';
+    else return date('M d, Y', strtotime($timestamp));
 }
 
 // Fetch user data
@@ -232,7 +140,7 @@ $donations = [];
 $result = $conn->query("SELECT * FROM donations WHERE status='Available' ORDER BY donated_at DESC LIMIT 5");
 while ($row = $result->fetch_assoc()) $donations[] = $row;
 
-// Fetch comments for each donation
+// Fetch comments
 $comments = [];
 foreach ($donations as $donation) {
     $donation_id = $donation['donation_id'];
@@ -264,6 +172,7 @@ $leaders = [];
 $result = $conn->query("SELECT first_name, points FROM users ORDER BY points DESC LIMIT 10");
 while ($row = $result->fetch_assoc()) $leaders[] = $row;
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>

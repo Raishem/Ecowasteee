@@ -58,6 +58,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_project'])) {
                         }
                     }
                 }
+
+                // Update user stats for projects created
+$user_id = $_SESSION['user_id'];
+$conn->query("UPDATE user_stats SET projects_created = COALESCE(projects_created, 0) + 1 WHERE user_id = $user_id");
+
+// If the row doesn't exist, create it
+if ($conn->affected_rows === 0) {
+    $conn->query("INSERT INTO user_stats (user_id, projects_created, items_donated, items_recycled, projects_completed, achievements_earned, badges_earned) 
+                  VALUES ($user_id, 1, 0, 0, 0, 0, 0)");
+}
                 
                 // Commit transaction
                 $conn->commit();
