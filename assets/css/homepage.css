@@ -1538,3 +1538,43 @@ input[type="file"] {
     background-color: #3cb371;
 }
 
+/* Request Popup */
+.popup-container {
+    position: fixed;
+    top:0; left:0; right:0; bottom:0;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 999;
+}
+.popup-content {
+    background:#fff;
+    padding:20px;
+    border-radius:10px;
+    width:400px;
+    max-width:90%;
+}
+.popup-content h2 {
+    margin-top:0;
+    color:#2e8b57;
+}
+.popup-content .form-group {
+    margin-bottom:15px;
+}
+.popup-content label {
+    font-weight:600;
+}
+.popup-content input, .popup-content select {
+    width:100%;
+    padding:8px;
+    margin-top:5px;
+    border:1px solid #ccc;
+    border-radius:5px;
+}
+.popup-content button {
+    padding:8px 12px;
+    border:none;
+    border-radius:5px;
+    cursor:pointer;
+}

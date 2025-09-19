@@ -4,7 +4,7 @@ require_once 'config.php';
 
 $conn = getDBConnection();
 
-// Check login status (moved this to the top to avoid undefined session errors)
+// Check login status
 if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true || empty($_SESSION['user_id'])) {
     header('Location: login.php');
     exit();
@@ -13,11 +13,11 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true || empty($
 $donor_id = $_SESSION['user_id'];
 $image_paths_json = null;
 
-// Prepare statement to fetch donor information
-$donor_stmt = $conn->prepare("SELECT user_id, first_name FROM users WHERE user_id = ?");
-
-// Handle comment submission
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['comment_text']) && isset($_POST['donation_id'])) {
+/* ----------------------------
+   Handle comment submission
+---------------------------- */
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['comment_text']) && isset($_POST['donation_id']) && !isset($_POST['submit_request_donation'])) {
+    // note: the extra check !isset($_POST['submit_request_donation']) avoids collision with request form inputs
     $comment_text = htmlspecialchars($_POST['comment_text']);
     $donation_id = (int)$_POST['donation_id'];
     $user_id = $_SESSION['user_id'];
@@ -27,6 +27,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['comment_text']) && is
     $stmt->bind_param("iiss", $donation_id, $user_id, $comment_text, $created_at);
     
     if ($stmt->execute()) {
+        // redirect back to avoid resubmission (no donation_success param for comments)
         header('Location: ' . $_SERVER['PHP_SELF']);
         exit();
     } else {
@@ -34,8 +35,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['comment_text']) && is
     }
 }
 
-// Handle donation form submission
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['wasteType'])) {
+/* ----------------------------
+   Handle donation form submission
+---------------------------- */
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['wasteType']) && !isset($_POST['submit_request_donation'])) {
     if (empty($_POST['wasteType']) || empty($_POST['quantity']) || empty($_POST['description'])) {
         die('Error: All fields are required.');
     }
@@ -48,7 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['wasteType'])) {
     $donated_at = date('Y-m-d H:i:s');
     $image_paths_json = null;
 
-    // Handle photo upload
+    // Handle photo upload (unchanged)
     $image_paths = array();
     if (isset($_FILES['photos']) && count($_FILES['photos']['name']) > 0) {
         $upload_dir = 'assets/uploads/';
@@ -58,26 +61,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['wasteType'])) {
 
         $file_count = 0;
         foreach ($_FILES['photos']['name'] as $key => $file_name) {
-            if ($file_count >= 4) {
-                break;
-            }
-            
-            if (empty($file_name)) {
-                continue;
-            }
-            
+            if ($file_count >= 4) break;
+            if (empty($file_name)) continue;
             if ($_FILES['photos']['error'][$key] === UPLOAD_ERR_OK) {
                 $file_tmp = $_FILES['photos']['tmp_name'][$key];
                 $file_type = mime_content_type($file_tmp);
                 $allowed_types = ['image/jpeg', 'image/png', 'image/gif'];
-
                 if (!in_array($file_type, $allowed_types)) {
                     die('Error: Only JPG, PNG, and GIF files are allowed.');
                 }
-
                 $unique_file_name = uniqid() . '_' . basename($file_name);
                 $target_file = $upload_dir . $unique_file_name;
-
                 if (move_uploaded_file($file_tmp, $target_file)) {
                     $image_paths[] = $target_file;
                     $file_count++;
@@ -86,19 +80,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['wasteType'])) {
                 }
             }
         }
-        
         if (!empty($image_paths)) {
             $image_paths_json = json_encode($image_paths);
         }
     }
 
     // Insert donation into donations table
-    $stmt = $conn->prepare("INSERT INTO donations (item_name, quantity, category, description, donor_id, donated_at, status, image_path) 
+    $total_quantity = $quantity; // store the original amount
+
+    $stmt = $conn->prepare("INSERT INTO donations (item_name, quantity, total_quantity, category, description, donor_id, donated_at, status, image_path) 
                              VALUES (?, ?, ?, ?, ?, ?, 'Available', ?)");
-    $stmt->bind_param("sisssss", $item_name, $quantity, $category, $description, $donor_id, $donated_at, $image_paths_json);
+    $stmt->bind_param("sisssss", $item_name, $quantity, $total_quantity, $category, $description, $donor_id, $donated_at, $image_paths_json);
     $stmt->execute();
 
-    // ✅ Update USER STATS (only counts, no direct points)
+    // Update USER STATS (only counts)
     $stats_check = $conn->query("SELECT * FROM user_stats WHERE user_id = $donor_id");
     if ($stats_check->num_rows === 0) {
         $conn->query("INSERT INTO user_stats (user_id, items_donated, items_recycled, projects_completed, achievements_earned, badges_earned) 
@@ -107,9 +102,96 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['wasteType'])) {
         $conn->query("UPDATE user_stats SET items_donated = items_donated + $quantity WHERE user_id = $donor_id");
     }
 
-    header('Location: ' . $_SERVER['PHP_SELF']);
+    // redirect with donation success flag so frontend can show popup
+    header('Location: ' . $_SERVER['PHP_SELF'] . '?donation_success=1');
     exit();
 }
+
+/* ----------------------------
+   Handle request donation with extra details
+   Validations:
+     - donation exists
+     - cannot request own donation
+     - quantity_claim <= available
+     - decrement donation.quantity immediately
+---------------------------- */
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_request_donation'])) {
+    $donation_id = isset($_POST['donation_id']) ? (int)$_POST['donation_id'] : 0;
+    $user_id = $_SESSION['user_id'];
+    $quantity_claim = max(1, (int)$_POST['quantity_claim']);
+    $project_id = isset($_POST['project_id']) ? (int)$_POST['project_id'] : null;
+    $urgency_level = isset($_POST['urgency_level']) ? htmlspecialchars($_POST['urgency_level']) : null;
+
+    // Basic validation
+    if ($donation_id <= 0 || $quantity_claim <= 0) {
+        header('Location: ' . $_SERVER['PHP_SELF'] . '?request_error=invalid');
+        exit();
+    }
+
+    // Fetch donation row
+    $chk = $conn->prepare("SELECT donor_id, quantity FROM donations WHERE donation_id = ?");
+    $chk->bind_param("i", $donation_id);
+    $chk->execute();
+    $don = $chk->get_result()->fetch_assoc();
+
+    if (!$don) {
+        header('Location: ' . $_SERVER['PHP_SELF'] . '?request_error=notfound');
+        exit();
+    }
+
+    // Block requesting own donation
+    if ($don['donor_id'] == $user_id) {
+        header('Location: ' . $_SERVER['PHP_SELF'] . '?request_error=self');
+        exit();
+    }
+
+    // Check available quantity
+    $available = (int)$don['quantity'];
+    if ($quantity_claim > $available) {
+        header('Location: ' . $_SERVER['PHP_SELF'] . '?request_error=over');
+        exit();
+    }
+
+    // Atomically decrement donation quantity
+    $upd = $conn->prepare("UPDATE donations SET quantity = quantity - ? WHERE donation_id = ? AND quantity >= ?");
+    $upd->bind_param("iii", $quantity_claim, $donation_id, $quantity_claim);
+    $upd->execute();
+
+    if ($upd->affected_rows === 0) {
+        // update didn't apply (race condition or insufficient quantity)
+        header('Location: ' . $_SERVER['PHP_SELF'] . '?request_error=concurrent');
+        exit();
+    }
+
+    // If quantity hit zero, mark Completed
+    $conn->query("UPDATE donations SET status = 'Completed' WHERE donation_id = $donation_id AND quantity = 0");
+
+    // Ensure donation_requests table exists (create if missing)
+    $create_sql = "CREATE TABLE IF NOT EXISTS donation_requests (
+        request_id INT AUTO_INCREMENT PRIMARY KEY,
+        donation_id INT NOT NULL,
+        user_id INT NOT NULL,
+        quantity_claim INT NOT NULL,
+        project_id INT NULL,
+        urgency_level VARCHAR(20) DEFAULT NULL,
+        requested_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        INDEX (donation_id),
+        INDEX (user_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;";
+    $conn->query($create_sql);
+
+    // Insert request record
+    $ins = $conn->prepare("INSERT INTO donation_requests (donation_id, user_id, quantity_claim, project_id, urgency_level, requested_at) VALUES (?, ?, ?, ?, ?, NOW())");
+    $ins->bind_param("iiiis", $donation_id, $user_id, $quantity_claim, $project_id, $urgency_level);
+    $ins->execute();
+
+    header('Location: ' . $_SERVER['PHP_SELF'] . '?request_success=1');
+    exit();
+}
+
+/* ----------------------------
+   Helper functions and data fetches (unchanged)
+---------------------------- */
 
 // Function to calculate time ago
 function getTimeAgo($timestamp) {
@@ -135,12 +217,12 @@ if (!$user) {
     exit();
 }
 
-// Fetch available donations
+// Fetch available donations (status Available)
 $donations = [];
-$result = $conn->query("SELECT * FROM donations WHERE status='Available' ORDER BY donated_at DESC LIMIT 5");
+$result = $conn->query("SELECT * FROM donations WHERE status='Available' ORDER BY donated_at DESC");
 while ($row = $result->fetch_assoc()) $donations[] = $row;
 
-// Fetch comments
+// Fetch comments per donation
 $comments = [];
 foreach ($donations as $donation) {
     $donation_id = $donation['donation_id'];
@@ -162,7 +244,14 @@ while ($row = $result->fetch_assoc()) $ideas[] = $row;
 // Fetch user stats
 $stats = $conn->query("SELECT * FROM user_stats WHERE user_id = {$user['user_id']}")->fetch_assoc();
 
-// Fetch user projects
+// Fetch user's projects (for request dropdown)
+$user_projects = [];
+$result = $conn->query("SELECT project_id, project_name FROM projects WHERE user_id = {$_SESSION['user_id']}");
+while ($row = $result->fetch_assoc()) {
+    $user_projects[] = $row;
+}
+
+// Fetch user projects (sidebar)
 $projects = [];
 $result = $conn->query("SELECT * FROM projects WHERE user_id = {$user['user_id']} ORDER BY created_at DESC LIMIT 3");
 while ($row = $result->fetch_assoc()) $projects[] = $row;
@@ -171,6 +260,34 @@ while ($row = $result->fetch_assoc()) $projects[] = $row;
 $leaders = [];
 $result = $conn->query("SELECT first_name, points FROM users ORDER BY points DESC LIMIT 10");
 while ($row = $result->fetch_assoc()) $leaders[] = $row;
+
+/* Helper to render nested comments remains the same if you have it earlier.
+   (If you removed it earlier, re-add the render_comments function.) */
+function render_comments($comments, $donation_id, $parent_id = NULL) {
+    foreach ($comments as $comment) {
+        // if parent_id column exists you can use nested comments; for now this assumes flat list
+        if ($comment['parent_id'] == $parent_id) {
+            echo "<div class='comment'>";
+            echo "<div class='comment-header'>
+                    <span class='comment-author'>" . htmlspecialchars($comment['first_name']) . "</span>
+                    <span class='comment-time'>" . getTimeAgo($comment['created_at']) . "</span>
+                  </div>";
+            echo "<p class='comment-text'>" . nl2br(htmlspecialchars($comment['comment_text'])) . "</p>";
+            // reply form (if you added parent_id in DB)
+            echo "<div class='add-comment' style='margin-left:20px;'>
+                    <form method='POST' action='homepage.php'>
+                        <textarea name='comment_text' class='comment-textarea' placeholder='Reply...' required></textarea>
+                        <input type='hidden' name='donation_id' value='{$donation_id}'>
+                        <input type='hidden' name='parent_id' value='{$comment['comment_id']}'>
+                        <button type='submit' class='post-comment-btn'>Reply</button>
+                    </form>
+                  </div>";
+            // Recursive render if nested
+            render_comments($comments, $donation_id, $comment['comment_id']);
+            echo "</div>";
+        }
+    }
+}
 ?>
 
 <!DOCTYPE html>
@@ -524,7 +641,10 @@ while ($row = $result->fetch_assoc()) $leaders[] = $row;
     </div>
     
     <div class="quantity-info">
-        <div class="quantity-label">Quantity: <?= htmlspecialchars($donation['quantity']) ?>/<?= htmlspecialchars($donation['quantity']) ?></div>
+        <div class="quantity-label">
+        Quantity: <?= htmlspecialchars($donation['quantity']) ?>/<?= htmlspecialchars($donation['total_quantity']) ?>
+        </div>
+
         <div class="quantity-unit">Units</div>
     </div>
     
@@ -546,38 +666,42 @@ while ($row = $result->fetch_assoc()) $leaders[] = $row;
         <?php endif; ?>
     <?php endif; ?>
     
-    <div class="donation-actions">
-        <button class="request-btn">Request Donation</button>
-        <button class="comments-btn" onclick="toggleComments(this, <?= $donation['donation_id'] ?>)">
-            <i class="fas fa-comment"></i> Comments
-        </button>
-    </div>
-    
-    <div class="comments-section" id="comments-<?= $donation['donation_id'] ?>" style="display: none;">
-        <div class="comments-list">
-            <?php if (isset($comments[$donation['donation_id']]) && count($comments[$donation['donation_id']]) > 0): ?>
-                <?php foreach ($comments[$donation['donation_id']] as $comment): ?>
-                    <div class="comment">
-                        <div class="comment-header">
-                            <span class="comment-author"><?= htmlspecialchars($comment['first_name']) ?></span>
-                            <span class="comment-time"><?= getTimeAgo($comment['created_at']) ?></span>
-                        </div>
-                        <p class="comment-text"><?= nl2br(htmlspecialchars($comment['comment_text'])) ?></p>
+                    <div class="donation-actions">
+                            <input type="hidden" name="donation_id" value="<?= $donation['donation_id'] ?>">
+                            <?php if ($donation['donor_id'] != $_SESSION['user_id']): ?>
+                            <button type="button" class="request-btn"
+        onclick="openRequestPopup(<?= $donation['donation_id'] ?>, '<?= htmlspecialchars($donation['item_name']) ?>', <?= (int)$donation['quantity'] ?>)"
+        <?= $donation['quantity'] <= 0 ? 'disabled' : '' ?>>
+        Request Donation
+    </button>
+<?php endif; ?>
+
+
+                
+                        <button class="comments-btn" onclick="toggleComments(this, <?= $donation['donation_id'] ?>)">
+                            <i class="fas fa-comment"></i> Comments
+                        </button>
                     </div>
-                <?php endforeach; ?>
-            <?php else: ?>
-                <div class="no-comments">No comments yet. Be the first to comment!</div>
-            <?php endif; ?>
-        </div>
-        <div class="add-comment">
-            <form method="POST" action="homepage.php">
-                <textarea name="comment_text" class="comment-textarea" placeholder="Add a comment..." required></textarea>
-                <input type="hidden" name="donation_id" value="<?= $donation['donation_id'] ?>">
-                <button type="submit" class="post-comment-btn">Post Comment</button>
-            </form>
-        </div>
-    </div>
-</div>
+    
+                    <div class="comments-section" id="comments-<?= $donation['donation_id'] ?>" style="display: none;">
+                        <div class="comments-list">
+                            <?php
+                            if (isset($comments[$donation['donation_id']]) && count($comments[$donation['donation_id']]) > 0) {
+                                render_comments($comments[$donation['donation_id']], $donation['donation_id']);
+                            } else {
+                                echo "<div class='no-comments'>No comments yet. Be the first to comment!</div>";
+                            }
+                            ?>
+                        </div>
+                        <div class="add-comment">
+                            <form method="POST" action="homepage.php">
+                                <textarea name="comment_text" class="comment-textarea" placeholder="Add a comment..." required></textarea>
+                                <input type="hidden" name="donation_id" value="<?= $donation['donation_id'] ?>">
+                                <button type="submit" class="post-comment-btn">Post Comment</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
                 <?php endforeach; ?>
             <?php endif; ?>
         </div>
@@ -716,6 +840,71 @@ while ($row = $result->fetch_assoc()) $leaders[] = $row;
     </div>
 </div>
 
+<!-- Request Donation Popup -->
+<div id="requestPopup" class="popup-container" style="display:none;">
+    <div class="popup-content">
+        <h2>Request Materials</h2>
+        <form method="POST" action="homepage.php">
+            <input type="hidden" id="popupDonationId" name="donation_id">
+
+            <div class="form-group">
+                <label>Waste:</label>
+                <span id="popupWasteName"></span>
+            </div>
+
+            <div class="form-group">
+                <label>Available Items:</label>
+                <span id="popupAvailable"></span>
+            </div>
+
+            <div class="form-group">
+                <label>Quantity to Claim:</label>
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <button type="button" onclick="updateQuantity(-1)">-</button>
+                    <input type="text" id="quantityClaim" name="quantity_claim" value="1" readonly style="width:50px;text-align:center;">
+                    <button type="button" onclick="updateQuantity(1)">+</button>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Recycling Project:</label>
+                <select name="project_id" required>
+                    <option value="">Select a project</option>
+                    <?php foreach ($user_projects as $project): ?>
+                        <option value="<?= $project['project_id'] ?>"><?= htmlspecialchars($project['project_name']) ?></option>
+                    <?php endforeach; ?>
+                    </select>
+                </div>
+
+
+            <div class="form-group">
+                <label>Urgency Level:</label>
+                <select name="urgency_level" required>
+                    <option value="High">High (Immediate Need)</option>
+                    <option value="Medium">Medium (Within 2 weeks)</option>
+                    <option value="Low">Low (Planning ahead)</option>
+                </select>
+            </div>
+
+            <div style="margin-top:15px;">
+                <button type="submit" name="submit_request_donation" class="request-btn">Submit Request</button>
+                <button type="button" class="close-btn" onclick="closeRequestPopup()">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Request Success Popup -->
+<div id="requestSuccessPopup" class="popup-container" style="display:none;">
+    <div class="popup-content success-popup">
+        <h2>Request Sent!</h2>
+        <p>Your request has been submitted successfully. Please wait for the donor’s response.</p>
+        <button class="continue-btn" onclick="closeRequestSuccessPopup()">Continue</button>
+    </div>
+</div>
+
+
+
 <!-- Photo Zoom Modal -->
 <div id="photoZoomModal" class="photo-zoom-modal" style="display:none;">
     <span class="close-modal">&times;</span>
@@ -754,7 +943,10 @@ while ($row = $result->fetch_assoc()) $leaders[] = $row;
             </div>
         </div>
     </div>
+
+
 <script>
+
     function toggleComments(button, donationId) {
         const commentsSection = document.getElementById('comments-' + donationId);
         const isVisible = commentsSection.style.display === 'block';
@@ -788,6 +980,46 @@ while ($row = $result->fetch_assoc()) $leaders[] = $row;
         const donationPopup = document.getElementById('donationPopup');
         const donationFormContainer = document.getElementById('donationFormContainer');
         const successPopup = document.getElementById('successPopup');
+        const urlParams = new URLSearchParams(window.location.search);
+
+        if (urlParams.has('request_success')) {
+        // show your request success popup if available
+        if (document.getElementById('requestSuccessPopup')) {
+            document.getElementById('requestSuccessPopup').style.display = 'flex';
+        } else {
+            alert('Request submitted successfully.');
+        }
+        window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
+    if (urlParams.has('request_error')) {
+        const e = urlParams.get('request_error');
+        let msg = 'Failed to submit request.';
+        if (e === 'self') msg = 'You cannot request your own donation.';
+        if (e === 'over') msg = 'Requested quantity exceeds available items.';
+        if (e === 'notfound') msg = 'Donation not found.';
+        if (e === 'concurrent') msg = 'Unable to process request (item may have been claimed by someone else).';
+        if (e === 'invalid') msg = 'Invalid request data.';
+        alert(msg);
+        window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
+        // donation_success handling (your existing logic)
+    if (urlParams.has('donation_success')) {
+        const donationPopup = document.getElementById('donationPopup');
+        const donationFormContainer = document.getElementById('donationFormContainer');
+        const successPopup = document.getElementById('successPopup');
+        if (donationPopup && donationFormContainer && successPopup) {
+            donationPopup.style.display = 'flex';
+            donationFormContainer.style.display = 'none';
+            successPopup.style.display = 'block';
+        } else {
+            alert('Donation posted successfully.');
+        }
+        window.history.replaceState({}, document.title, window.location.pathname);
+    }  
+
+        
 
         if (!donateWasteBtn || !donationPopup) {
             console.error('Required elements not found in the DOM');
@@ -868,6 +1100,7 @@ while ($row = $result->fetch_assoc()) $leaders[] = $row;
             
             updateFileDisplay();
         });
+
         
         function updateFileDisplay() {
             const fileNames = selectedFiles.length > 0 
@@ -955,6 +1188,45 @@ while ($row = $result->fetch_assoc()) $leaders[] = $row;
             }
         }
     });
+
+    
+
+    let currentAvailable = 0;
+
+function openRequestPopup(donationId, wasteName, available) {
+    document.getElementById('popupDonationId').value = donationId;
+    document.getElementById('popupWasteName').textContent = wasteName;
+    document.getElementById('popupAvailable').textContent = available;
+    document.getElementById('quantityClaim').value = 1;
+    currentAvailable = available;
+
+    document.getElementById('requestPopup').style.display = 'flex';
+}
+
+function closeRequestPopup() {
+    document.getElementById('requestPopup').style.display = 'none';
+}
+
+
+
+function updateQuantity(change) {
+    let qtyInput = document.getElementById('quantityClaim');
+    let qty = parseInt(qtyInput.value) || 1;
+    qty += change;
+    if (qty < 1) qty = 1;
+    if (qty > currentAvailable) qty = currentAvailable;
+    qtyInput.value = qty;
+}
+
+       function showRequestSuccessPopup() {
+        document.getElementById('requestPopup').style.display = 'none';
+        document.getElementById('requestSuccessPopup').style.display = 'flex';
+    }
+
+        function closeRequestSuccessPopup() {
+        document.getElementById('requestSuccessPopup').style.display = 'none';
+    }
+
 
     function openPhotoZoom(photoSrc) {
         const modal = document.getElementById('photoZoomModal');
