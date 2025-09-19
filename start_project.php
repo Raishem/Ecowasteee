@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once 'config.php';
+$conn = getDBConnection();
 
 // Check login
 if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true || empty($_SESSION['user_id'])) {
@@ -85,6 +86,32 @@ if ($conn->affected_rows === 0) {
         }
     }
 }
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $user_id = $_SESSION['user_id'];
+    $name = trim($_POST['project_name']);
+    $desc = trim($_POST['description']);
+    $status = 'In Progress'; // default when created
+
+    $stmt = $conn->prepare("INSERT INTO projects (user_id, project_name, description, status) VALUES (?, ?, ?, ?)");
+    $stmt->execute([$user_id, $name, $desc, $status]);
+
+    $project_id = $conn->lastInsertId();
+
+    // Save materials if provided
+    if (!empty($_POST['materials'])) {
+        foreach ($_POST['materials'] as $m) {
+            if (!empty($m['name']) && !empty($m['quantity'])) {
+                $mat_stmt = $conn->prepare("INSERT INTO project_materials (project_id, material_name, quantity) VALUES (?, ?, ?)");
+                $mat_stmt->execute([$project_id, $m['name'], (int)$m['quantity']]);
+            }
+        }
+    }
+
+    header("Location: projects.php");
+    exit;
+}
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
