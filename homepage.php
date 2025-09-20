@@ -88,10 +88,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['wasteType']) && !isse
     // Insert donation into donations table
     $total_quantity = $quantity; // store the original amount
 
-    $stmt = $conn->prepare("INSERT INTO donations (item_name, quantity, total_quantity, category, description, donor_id, donated_at, status, image_path) 
-                             VALUES (?, ?, ?, ?, ?, ?, 'Available', ?)");
-    $stmt->bind_param("sisssss", $item_name, $quantity, $total_quantity, $category, $description, $donor_id, $donated_at, $image_paths_json);
-    $stmt->execute();
+    $stmt = $conn->prepare("INSERT INTO donations (item_name, quantity, total_quantity, category, description, donor_id, donated_at, image_path, status) 
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Available')");
+    if (!$stmt) {
+        die('Error: Failed to prepare statement. ' . $conn->error);
+    }
+
+    if (!$stmt->bind_param("sissssss", $item_name, $quantity, $total_quantity, $category, $description, $donor_id, $donated_at, $image_paths_json)) {
+        die('Error: Failed to bind parameters. ' . $stmt->error);
+    }
+
+    if (!$stmt->execute()) {
+        die('Error: Failed to execute statement. ' . $stmt->error);
+    }
 
     // Update USER STATS (only counts)
     $stats_check = $conn->query("SELECT * FROM user_stats WHERE user_id = $donor_id");

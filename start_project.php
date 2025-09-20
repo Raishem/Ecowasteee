@@ -96,7 +96,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $stmt = $conn->prepare("INSERT INTO projects (user_id, project_name, description, status) VALUES (?, ?, ?, ?)");
     $stmt->execute([$user_id, $name, $desc, $status]);
 
-    $project_id = $conn->lastInsertId();
+    //$project_id = $conn->lastInsertId();
 
     // Save materials if provided
     if (!empty($_POST['materials'])) {
