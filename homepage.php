@@ -592,7 +592,7 @@ function render_comments($comments, $donation_id, $parent_id = NULL) {
             <div class="welcome-card">
                 <h2>WELCOME TO ECOWASTE</h2>
                 <div class="divider"></div>
-                <p>Join our community in making the world a cleaner place</p>
+                <p>Join our community in making the world a cleaner places</p>
                 <div class="btn-container">
                     <button type="button" class="btn" id="donateWasteBtn" role="button" tabindex="0">Donate Waste</button>
                     <a href="start_project.php" class="btn">Start Recycling</a>
