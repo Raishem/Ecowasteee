@@ -189,9 +189,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_request_donati
     exit();
 }
 
-/* ----------------------------
-   Helper functions and data fetches (unchanged)
----------------------------- */
+//Helper functions and data fetches 
 
 // Function to calculate time ago
 function getTimeAgo($timestamp) {
@@ -588,6 +586,7 @@ function render_comments($comments, $donation_id, $parent_id = NULL) {
                 </ul>
             </nav>
         </aside>
+
         <main class="main-content">
             <div class="welcome-card">
                 <h2>WELCOME TO ECOWASTE</h2>
@@ -738,6 +737,7 @@ function render_comments($comments, $donation_id, $parent_id = NULL) {
 </div>
 
         </main>
+        
         <div class="right-sidebar">
             <div class="card">
                 <h2>Your Projects</h2>
