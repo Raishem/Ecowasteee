@@ -69,14 +69,59 @@ function time_elapsed($datetime) {
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&family=Open+Sans&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        .profile-pic { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 10px; overflow: hidden; background-color: #3d6a06ff; color: white; font-weight: bold; font-size: 18px; }
-        .filter-tab { cursor: pointer; margin-right: 10px; font-weight: bold; }
-        .filter-tab.active { color: #2e8b57; }
-        .empty-state { text-align: center; margin-top: 30px; font-style: italic; color: #555; }
-        .project-card { border: 1px solid #ccc; border-radius: 8px; padding: 15px; margin-bottom: 15px; background: #f7f7f7; }
-        .project-card p { margin: 5px 0; }
-        .action-btn { display: inline-block; margin-top: 10px; padding: 8px 15px; background: #2e8b57; color: white; border-radius: 5px; text-decoration: none; }
-        .action-btn:hover { opacity: 0.9; }
+        .profile-pic { 
+            width: 40px; 
+            height: 40px; 
+            border-radius: 50%; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            margin-right: 10px; 
+            overflow: hidden; 
+            background-color: #3d6a06ff; 
+            color: white; 
+            font-weight: bold; 
+            font-size: 18px; 
+        }
+
+        .filter-tab { 
+            cursor: pointer; m
+            argin-right: 10px; 
+            font-weight: bold; 
+        }
+
+        .filter-tab.active { 
+            color: #2e8b57; 
+        }
+        .empty-state { 
+            text-align: center; 
+            margin-top: 30px; 
+            font-style: italic; 
+            color: #555; 
+        }
+        .project-card { 
+            border: 1px solid #ccc; 
+            border-radius: 8px; 
+            padding: 15px; 
+            margin-bottom: 15px; 
+            background: #f7f7f7; 
+        }
+        .project-card p { 
+            margin: 5px 0; 
+        }
+        .action-btn { 
+            display: inline-block; 
+            margin-top: 10px; 
+            padding: 8px 15px; 
+            background: #2e8b57; 
+            color: white; 
+            border-radius: 5px; 
+            text-decoration: none; 
+        }
+        .action-btn:hover { 
+            opacity: 0.9; 
+        }
+        
     </style>
 </head>
 <body>

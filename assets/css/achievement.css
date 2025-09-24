@@ -31,6 +31,9 @@ header {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
 }
 
 .logo-container {
@@ -130,6 +133,11 @@ header {
     box-shadow: 3px 0 10px rgba(0,0,0,0.1);
     height: fit-content;
     border-radius: 10px;
+    position: sticky;
+    top: 70px; /* match your header height */
+    align-self: start;
+    height: calc(100vh - 70px);
+    overflow-y: auto;
 }
 
 .sidebar nav ul {
