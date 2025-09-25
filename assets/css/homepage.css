@@ -32,7 +32,10 @@ header {
     display: flex;
     align-items: center;
     justify-content: space-between;
+<<<<<<< Updated upstream
     position: sticky;
+=======
+>>>>>>> Stashed changes
 }
 
 .logo-container {
