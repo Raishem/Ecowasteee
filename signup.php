@@ -42,11 +42,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             // Check if email exists
             $stmt = $conn->prepare("SELECT user_id FROM users WHERE email = ?");
-            $stmt->bind_param("s", $email);
-            $stmt->execute();
-            $stmt->store_result();
+            $stmt->execute([$email]);
             
-            if ($stmt->num_rows > 0) {
+            if ($stmt->rowCount() > 0) {
                 $error_message = "Email already registered";
             } else {
                 // Insert new user
@@ -56,27 +54,21 @@ $stmt = $conn->prepare("INSERT INTO users
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
 if (false === $stmt) {
-    die("Prepare failed: " . $conn->error);
+    die("Prepare failed");
 }
 
-$bindResult = $stmt->bind_param("sssssssss", 
-    $email, $passwordHash, $firstName, $middleName, $lastName,
-    $contactNumber, $address, $city, $zipCode);
-
-if (false === $bindResult) {
-    die("Bind failed: " . $stmt->error);
-}
-
-if ($stmt->execute()) {
-    $_SESSION['new_user_email'] = $email;
-    $show_success_modal = true;
-} else {
-    $error_message = "Execute failed: " . $stmt->error;
-    error_log("Database error: " . $stmt->error);
+try {
+    if ($stmt->execute([$email, $passwordHash, $firstName, $middleName, $lastName,
+        $contactNumber, $address, $city, $zipCode])) {
+        $_SESSION['new_user_email'] = $email;
+        $show_success_modal = true;
+    }
+} catch (PDOException $e) {
+    $error_message = "Execute failed: " . $e->getMessage();
+    error_log("Database error: " . $e->getMessage());
 }
             }
-            $stmt->close();
-            $conn->close();
+            // No need to close PDO statements or connections explicitly
         } catch (Exception $e) {
             error_log("Database error: " . $e->getMessage());
             $error_message = "A system error occurred. Please try again later.";

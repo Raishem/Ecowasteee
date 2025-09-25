@@ -55,16 +55,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Insert donation into the database
     $stmt = $conn->prepare("INSERT INTO donations (item_name, quantity, category, donor_id, donated_at, status, image_path, description) VALUES (?, ?, ?, ?, ?, 'Available', ?, ?)");
     if (!$stmt) {
-        die('Error: Failed to prepare statement. ' . $conn->error);
+        die('Error: Failed to prepare statement.');
     }
 
-    // Corrected bind_param() with 8 variables
-    if (!$stmt->bind_param("sisdsss", $item_name, $quantity, $category, $donor_id, $donated_at, $image_paths_json, $description)) {
-        die('Error: Failed to bind parameters. ' . $stmt->error);
-    }
-
-    if (!$stmt->execute()) {
-        die('Error: Failed to execute statement. ' . $stmt->error);
+    try {
+        $stmt->execute([$item_name, $quantity, $category, $donor_id, $donated_at, $image_paths_json, $description]);
+    } catch (PDOException $e) {
+        die('Error: Failed to execute statement. ' . $e->getMessage());
     }
 
     header('Location: donations.php');

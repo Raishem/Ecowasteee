@@ -14,26 +14,20 @@ $user_id = $_SESSION['user_id'];
 // Fetch My Donations
 $myDonations = [];
 $stmt = $conn->prepare("SELECT * FROM donations WHERE donor_id = ?");
-$stmt->bind_param("i", $user_id);
-$stmt->execute();
-$result = $stmt->get_result();
-while ($row = $result->fetch_assoc()) $myDonations[] = $row;
+$stmt->execute([$user_id]);
+while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) $myDonations[] = $row;
 
 // Fetch Requested Donations
 $requestedDonations = [];
 $stmt = $conn->prepare("SELECT * FROM donations WHERE requested_by = ?");
-$stmt->bind_param("i", $user_id);
-$stmt->execute();
-$result = $stmt->get_result();
-while ($row = $result->fetch_assoc()) $requestedDonations[] = $row;
+$stmt->execute([$user_id]);
+while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) $requestedDonations[] = $row;
 
 // Fetch Received Donations
 $receivedDonations = [];
 $stmt = $conn->prepare("SELECT * FROM donations WHERE receiver_id = ?");
-$stmt->bind_param("i", $user_id);
-$stmt->execute();
-$result = $stmt->get_result();
-while ($row = $result->fetch_assoc()) $receivedDonations[] = $row;
+$stmt->execute([$user_id]);
+while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) $receivedDonations[] = $row;
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -41,6 +35,7 @@ while ($row = $result->fetch_assoc()) $receivedDonations[] = $row;
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Donations | EcoWaste</title>
+    <link rel="stylesheet" href="assets/css/common-buttons.css">
     <link rel="stylesheet" href="assets/css/donations.css">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&family=Open+Sans&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">

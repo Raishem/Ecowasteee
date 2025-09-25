@@ -16,17 +16,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             $conn = getDBConnection();
             $stmt = $conn->prepare("SELECT user_id FROM users WHERE reset_token = ? AND reset_expiry > NOW()");
-            $stmt->bind_param("s", $token);
-            $stmt->execute();
-            $result = $stmt->get_result();
+            $stmt->execute([$token]);
             
-            if ($result->num_rows === 1) {
-                $user = $result->fetch_assoc();
+            if ($stmt->rowCount() === 1) {
+                $user = $stmt->fetch(PDO::FETCH_ASSOC);
                 $hashedPassword = password_hash($password, PASSWORD_BCRYPT);
                 
                 $stmt = $conn->prepare("UPDATE users SET password_hash = ?, reset_token = NULL, reset_expiry = NULL WHERE user_id = ?");
-                $stmt->bind_param("si", $hashedPassword, $user['user_id']);
-                $stmt->execute();
+                $stmt->execute([$hashedPassword, $user['user_id']]);
                 
                 $success = 'Password updated successfully. You can now login.';
             } else {

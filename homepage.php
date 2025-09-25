@@ -23,14 +23,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['comment_text']) && is
     
     // Insert comment into database
     $stmt = $conn->prepare("INSERT INTO comments (donation_id, user_id, comment_text, created_at) VALUES (?, ?, ?, ?)");
-    $stmt->bind_param("iiss", $donation_id, $user_id, $comment_text, $created_at);
     
-    if ($stmt->execute()) {
+    try {
+        $stmt->execute([$donation_id, $user_id, $comment_text, $created_at]);
         // Refresh the page to show the new comment
         header('Location: ' . $_SERVER['PHP_SELF']);
         exit();
-    } else {
-        die('Error: Failed to post comment. ' . $stmt->error);
+    } catch (PDOException $e) {
+        die('Error: Failed to post comment. ' . $e->getMessage());
     }
 }
 
@@ -93,27 +93,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['wasteType'])) {
     }
 
     // Insert donation into the database
-    $stmt = $conn->prepare("INSERT INTO donations (item_name, quantity, category, description, donor_id, donated_at, status, image_path) VALUES (?, ?, ?, ?, ?, ?, 'Available', ?)");
-    if (!$stmt) {
-        die('Error: Failed to prepare statement. ' . $conn->error);
-    }
-
-    if (!$stmt->bind_param("sisssss", $item_name, $quantity, $category, $description, $donor_id, $donated_at, $image_paths_json)) {
-        die('Error: Failed to bind parameters. ' . $stmt->error);
-    }
-
-    if (!$stmt->execute()) {
-        die('Error: Failed to execute statement. ' . $stmt->error);
+    try {
+        $stmt = $conn->prepare("INSERT INTO donations (item_name, quantity, category, description, donor_id, donated_at, status, image_path) VALUES (?, ?, ?, ?, ?, ?, 'Available', ?)");
+        $stmt->execute([$item_name, $quantity, $category, $description, $donor_id, $donated_at, $image_paths_json]);
+    } catch (PDOException $e) {
+        die('Error: Failed to insert donation. ' . $e->getMessage());
     }
 
     // UPDATE USER STATS - Check if columns exist before updating
     // Check if user_stats record exists
-    $stats_check = $conn->query("SELECT * FROM user_stats WHERE user_id = $donor_id");
-    if ($stats_check->num_rows === 0) {
+    $stats_check = $conn->prepare("SELECT COUNT(*) as count FROM user_stats WHERE user_id = ?");
+    $stats_check->execute([$donor_id]);
+    $stats_count = $stats_check->fetch(PDO::FETCH_ASSOC);
+    
+    if ($stats_count['count'] === 0) {
         // Check which columns exist in user_stats table
-        $columns_result = $conn->query("SHOW COLUMNS FROM user_stats");
+        $columns_stmt = $conn->prepare("SHOW COLUMNS FROM user_stats");
+        $columns_stmt->execute();
         $columns = [];
-        while ($row = $columns_result->fetch_assoc()) {
+        while ($row = $columns_stmt->fetch(PDO::FETCH_ASSOC)) {
             $columns[] = $row['Field'];
         }
         
@@ -155,32 +153,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['wasteType'])) {
         }
         
         $placeholders = implode(',', array_fill(0, count($insert_values), '?'));
-        $types = str_repeat('i', count($insert_values));
         
         $insert_stmt = $conn->prepare("INSERT INTO user_stats (" . implode(',', $insert_columns) . ") VALUES ($placeholders)");
-        $insert_stmt->bind_param($types, ...$insert_values);
-        $insert_stmt->execute();
+        $insert_stmt->execute($insert_values);
     } else {
         // Update existing user_stats record
         // Check if items_donated column exists
-        $column_check = $conn->query("SHOW COLUMNS FROM user_stats LIKE 'items_donated'");
-        if ($column_check->num_rows > 0) {
-            $conn->query("UPDATE user_stats SET items_donated = items_donated + $quantity WHERE user_id = $donor_id");
+        $column_check = $conn->prepare("SHOW COLUMNS FROM user_stats LIKE 'items_donated'");
+        $column_check->execute();
+        if ($column_check->rowCount() > 0) {
+            $update_stmt = $conn->prepare("UPDATE user_stats SET items_donated = items_donated + ? WHERE user_id = ?");
+            $update_stmt->execute([$quantity, $donor_id]);
         }
         
         // Check if total_points column exists
-        $points_column_check = $conn->query("SHOW COLUMNS FROM user_stats LIKE 'total_points'");
-        if ($points_column_check->num_rows > 0) {
+        $points_column_check = $conn->prepare("SHOW COLUMNS FROM user_stats LIKE 'total_points'");
+        $points_column_check->execute();
+        if ($points_column_check->rowCount() > 0) {
             $points_earned = $quantity * 2;
-            $conn->query("UPDATE user_stats SET total_points = total_points + $points_earned WHERE user_id = $donor_id");
+            $update_points_stmt = $conn->prepare("UPDATE user_stats SET total_points = total_points + ? WHERE user_id = ?");
+            $update_points_stmt->execute([$points_earned, $donor_id]);
         }
     }
     
     // Also update the main users table points if that column exists
-    $points_column = $conn->query("SHOW COLUMNS FROM users LIKE 'points'");
-    if ($points_column->num_rows > 0) {
+    $points_column = $conn->prepare("SHOW COLUMNS FROM users LIKE 'points'");
+    $points_column->execute();
+    if ($points_column->rowCount() > 0) {
         $points_earned = $quantity * 2;
-        $conn->query("UPDATE users SET points = points + $points_earned WHERE user_id = $donor_id");
+        $update_user_points = $conn->prepare("UPDATE users SET points = points + ? WHERE user_id = ?");
+        $update_user_points->execute([$points_earned, $donor_id]);
     }
 
     header('Location: ' . $_SERVER['PHP_SELF']);
@@ -217,9 +219,8 @@ function getTimeAgo($timestamp) {
 
 // Fetch user data
 $stmt = $conn->prepare("SELECT * FROM users WHERE user_id = ?");
-$stmt->bind_param("i", $_SESSION['user_id']);
-$stmt->execute();
-$user = $stmt->get_result()->fetch_assoc();
+$stmt->execute([$_SESSION['user_id']]);
+$user = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$user) {
     session_destroy();
@@ -229,40 +230,47 @@ if (!$user) {
 
 // Fetch available donations
 $donations = [];
-$result = $conn->query("SELECT * FROM donations WHERE status='Available' ORDER BY donated_at DESC LIMIT 5");
-while ($row = $result->fetch_assoc()) $donations[] = $row;
+$stmt = $conn->prepare("SELECT * FROM donations WHERE status='Available' ORDER BY donated_at DESC LIMIT 5");
+$stmt->execute();
+while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) $donations[] = $row;
 
 // Fetch comments for each donation
 $comments = [];
 foreach ($donations as $donation) {
     $donation_id = $donation['donation_id'];
-    $comment_result = $conn->query("SELECT c.*, u.first_name FROM comments c 
+    $comment_stmt = $conn->prepare("SELECT c.*, u.first_name FROM comments c 
                                    JOIN users u ON c.user_id = u.user_id 
-                                   WHERE c.donation_id = $donation_id 
+                                   WHERE c.donation_id = ? 
                                    ORDER BY c.created_at DESC");
+    $comment_stmt->execute([$donation_id]);
     $comments[$donation_id] = [];
-    while ($comment_row = $comment_result->fetch_assoc()) {
+    while ($comment_row = $comment_stmt->fetch(PDO::FETCH_ASSOC)) {
         $comments[$donation_id][] = $comment_row;
     }
 }
 
 // Fetch recycled ideas
 $ideas = [];
-$result = $conn->query("SELECT * FROM recycled_ideas ORDER BY posted_at DESC LIMIT 5");
-while ($row = $result->fetch_assoc()) $ideas[] = $row;
+$stmt = $conn->prepare("SELECT * FROM recycled_ideas ORDER BY posted_at DESC LIMIT 5");
+$stmt->execute();
+while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) $ideas[] = $row;
 
 // Fetch user stats
-$stats = $conn->query("SELECT * FROM user_stats WHERE user_id = {$user['user_id']}")->fetch_assoc();
+$stmt = $conn->prepare("SELECT * FROM user_stats WHERE user_id = ?");
+$stmt->execute([$user['user_id']]);
+$stats = $stmt->fetch(PDO::FETCH_ASSOC);
 
 // Fetch user projects
 $projects = [];
-$result = $conn->query("SELECT * FROM projects WHERE user_id = {$user['user_id']} ORDER BY created_at DESC LIMIT 3");
-while ($row = $result->fetch_assoc()) $projects[] = $row;
+$stmt = $conn->prepare("SELECT * FROM projects WHERE user_id = ? ORDER BY created_at DESC LIMIT 3");
+$stmt->execute([$user['user_id']]);
+while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) $projects[] = $row;
 
 // Fetch leaderboard
 $leaders = [];
-$result = $conn->query("SELECT first_name, points FROM users ORDER BY points DESC LIMIT 10");
-while ($row = $result->fetch_assoc()) $leaders[] = $row;
+$stmt = $conn->prepare("SELECT first_name, points FROM users ORDER BY points DESC LIMIT 10");
+$stmt->execute();
+while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) $leaders[] = $row;
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -270,7 +278,9 @@ while ($row = $result->fetch_assoc()) $leaders[] = $row;
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Home | EcoWaste</title>
+    <link rel="stylesheet" href="assets/css/common-buttons.css">
     <link rel="stylesheet" href="assets/css/homepage.css">
+    <link rel="stylesheet" href="assets/css/header.css">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&family=Open Sans&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -534,11 +544,13 @@ while ($row = $result->fetch_assoc()) $leaders[] = $row;
                 </div>
                 <h1>EcoWaste</h1>
             </div>
-            <div class="user-profile" id="userProfile">
-                <div class="profile-pic">
-                    <?= strtoupper(substr(htmlspecialchars($user['first_name']), 0, 1)) ?>
-                </div>
-                <span class="profile-name"><?= htmlspecialchars($user['first_name']) ?></span>
+            <div class="header-actions">
+                <?php include 'includes/notifications.php'; ?>
+                <div class="user-profile" id="userProfile">
+                    <div class="profile-pic">
+                        <?= strtoupper(substr(htmlspecialchars($user['first_name']), 0, 1)) ?>
+                    </div>
+                    <span class="profile-name"><?= htmlspecialchars($user['first_name']) ?></span>
                 <i class="fas fa-chevron-down dropdown-arrow"></i>
                 <div class="profile-dropdown">
                     <a href="profile.php" class="dropdown-item"><i class="fas fa-user"></i> My Profile</a>
@@ -593,10 +605,8 @@ while ($row = $result->fetch_assoc()) $leaders[] = $row;
         <div class="user-avatar">
             <?php 
                 $donor_stmt = $conn->prepare("SELECT user_id, first_name FROM users WHERE user_id = ?");
-                $donor_stmt->bind_param("i", $donation['donor_id']);
-                $donor_stmt->execute();
-                $donor_result = $donor_stmt->get_result();
-                $donor = $donor_result->fetch_assoc();
+                $donor_stmt->execute([$donation['donor_id']]);
+                $donor = $donor_stmt->fetch(PDO::FETCH_ASSOC);
                 $donor_initial = strtoupper(substr(htmlspecialchars($donor['first_name']), 0, 1));
             ?>
             <?= $donor_initial ?>

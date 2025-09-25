@@ -11,8 +11,9 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true || empty($
 
 // Fetch leaderboard
 $users = [];
-$result = $conn->query("SELECT first_name, points FROM users ORDER BY points DESC LIMIT 10");
-while ($row = $result->fetch_assoc()) $users[] = $row;
+$stmt = $conn->prepare("SELECT first_name, points FROM users ORDER BY points DESC LIMIT 10");
+$stmt->execute();
+while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) $users[] = $row;
 ?>
 <!DOCTYPE html>
 <html lang="en">

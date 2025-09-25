@@ -12,20 +12,18 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true || empty($
 // Get user data from database
 $user_id = $_SESSION['user_id'];
 $user_query = $conn->prepare("SELECT * FROM users WHERE user_id = ?");
-$user_query->bind_param("i", $user_id);
-$user_query->execute();
-$user_result = $user_query->get_result();
-$user_data = $user_result->fetch_assoc();
+$user_query->execute([$user_id]);
+$user_data = $user_query->fetch(PDO::FETCH_ASSOC);
 
 // Fetch donations
 $donations = [];
-$result = $conn->query("SELECT * FROM donations WHERE status='Available' ORDER BY donated_at DESC");
-while ($row = $result->fetch_assoc()) $donations[] = $row;
+$stmt = $conn->query("SELECT * FROM donations WHERE status='Available' ORDER BY donated_at DESC");
+while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) $donations[] = $row;
 
 // Fetch recycled ideas
 $ideas = [];
-$result = $conn->query("SELECT * FROM recycled_ideas ORDER BY posted_at DESC");
-while ($row = $result->fetch_assoc()) $ideas[] = $row;
+$stmt = $conn->query("SELECT * FROM recycled_ideas ORDER BY posted_at DESC");
+while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) $ideas[] = $row;
 ?>
 <!DOCTYPE html>
 <html lang="en">

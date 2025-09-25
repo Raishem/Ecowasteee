@@ -3,15 +3,33 @@
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
-// Configuration and helper functions only
 
-// Database connection
+// Database credentials as constants for both MySQLi and PDO
+define('DB_HOST', 'localhost');
+define('DB_NAME', 'ecowaste');
+define('DB_USER', 'root');
+define('DB_PASS', '');
+
+// Database connection (PDO)
 function getDBConnection() {
-    $conn = new mysqli('localhost', 'root', '', 'ecowaste');
-    if ($conn->connect_error) {
-        die('Database connection failed: ' . $conn->connect_error);
+    $host = DB_HOST;
+    $db   = DB_NAME;
+    $user = DB_USER;
+    $pass = DB_PASS;
+    $charset = "utf8mb4";
+
+    $dsn = "mysql:host=$host;dbname=$db;charset=$charset";
+    $options = [
+        PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        PDO::ATTR_EMULATE_PREPARES   => false,
+    ];
+
+    try {
+        return new PDO($dsn, $user, $pass, $options);
+    } catch (PDOException $e) {
+        die("Database connection failed: " . $e->getMessage());
     }
-    return $conn;
 }
 
 // CSRF helpers

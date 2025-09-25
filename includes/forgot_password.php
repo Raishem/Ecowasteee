@@ -9,16 +9,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             $conn = getDBConnection();
             $stmt = $conn->prepare("SELECT user_id FROM users WHERE email = ?");
-            $stmt->bind_param("s", $email);
-            $stmt->execute();
+            $stmt->execute([$email]);
             
-            if ($stmt->get_result()->num_rows > 0) {
+            if ($stmt->rowCount() > 0) {
                 $token = bin2hex(random_bytes(32));
                 $expiry = date('Y-m-d H:i:s', time() + 3600); // 1 hour
                 
                 $stmt = $conn->prepare("UPDATE users SET reset_token = ?, reset_expiry = ? WHERE email = ?");
-                $stmt->bind_param("sss", $token, $expiry, $email);
-                $stmt->execute();
+                $stmt->execute([$token, $expiry, $email]);
                 
                 // Send email with reset link (implementation depends on your mailer)
                 $resetLink = "https://yourdomain.com/reset_password.php?token=$token";
@@ -39,20 +37,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     exit();
 }
 
-// Add this where you handle the POST request
-$token = bin2hex(random_bytes(32));
-$expiry = date('Y-m-d H:i:s', time() + PASSWORD_RESET_EXPIRY);
-
-$stmt = $conn->prepare("UPDATE users SET reset_token = ?, reset_expiry = ? WHERE email = ?");
-$stmt->bind_param("sss", $token, $expiry, $email);
-
-if ($stmt->execute()) {
-    if (sendPasswordResetEmail($email, $token)) {
-        $_SESSION['message'] = 'Password reset link sent to your email';
-    } else {
-        $_SESSION['error'] = 'Failed to send email. Please try again.';
-    }
-}
+// This code appears to be duplicated and outside the POST handler
+// It should be removed or moved inside the POST handler
 
 ?>
 <!DOCTYPE html>

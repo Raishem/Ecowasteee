@@ -26,23 +26,21 @@ try {
     $conn = getDBConnection();
     $stmt = $conn->prepare("SELECT user_id, email, password_hash, first_name FROM users WHERE email = ?");
     if (!$stmt) {
-        error_log("Prepare failed: " . $conn->error);
+        error_log("Prepare failed");
         $_SESSION['login_error'] = 'Database error.';
         header('Location: login.php');
         exit();
     }
-    $stmt->bind_param("s", $email);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    error_log("Query executed. Num rows: " . $result->num_rows);
+    $stmt->execute([$email]);
+    error_log("Query executed. Num rows: " . $stmt->rowCount());
 
-    if ($result->num_rows === 0) {
+    if ($stmt->rowCount() === 0) {
         $_SESSION['login_error'] = 'Invalid email or password';
         header('Location: login.php');
         exit();
     }
 
-    $user = $result->fetch_assoc();
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
     error_log("User found: " . print_r($user, true));
 
     // Verify password
@@ -77,8 +75,7 @@ try {
             'samesite' => 'Strict'
         ]);
         $stmt = $conn->prepare("UPDATE users SET remember_token = ?, token_expiry = ? WHERE user_id = ?");
-        $stmt->bind_param("ssi", $token, $expiry, $user['user_id']);
-        $stmt->execute();
+        $stmt->execute([$token, $expiry, $user['user_id']]);
     }
 
     header('Location: homepage.php');

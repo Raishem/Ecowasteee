@@ -1,7 +1,11 @@
 <?php
+
 session_start();
 require_once 'config.php';
-$conn = getDBConnection();
+$conn = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
+if ($conn->connect_error) {
+    die('Connection failed: ' . $conn->connect_error);
+}
 $user_id = $_SESSION['user_id'];
 
 // Check login
@@ -24,10 +28,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
     // Update user data in database
     $update_query = $conn->prepare("UPDATE users SET first_name = ?, middle_name = ?, last_name = ?, email = ?, contact_number = ?, address = ?, city = ?, zip_code = ? WHERE user_id = ?");
     $update_query->bind_param("ssssssssi", $first_name, $middle_name, $last_name, $email, $contact_number, $address, $city, $zip_code, $user_id);
-    
     if ($update_query->execute()) {
         $success_message = "Profile updated successfully!";
-        // Refresh user data
         $_SESSION['success_message'] = $success_message;
         header("Location: profile.php");
         exit();
@@ -86,8 +88,10 @@ foreach ($create_tables_sql as $sql) {
 }
 
 // Insert sample badges if none exist
+// MySQLi version
 $check_badges = $conn->query("SELECT COUNT(*) as count FROM badges");
-if ($check_badges->fetch_assoc()['count'] == 0) {
+$badge_count_row = $check_badges->fetch_assoc();
+if ($badge_count_row && $badge_count_row['count'] == 0) {
     $sample_badges = [
         "('Eco Beginner', 'Completed your first eco activity', 'fas fa-seedling', 10)",
         "('Recycling Pro', 'Recycled 10+ items', 'fas fa-recycle', 50)",
@@ -100,10 +104,14 @@ if ($check_badges->fetch_assoc()['count'] == 0) {
 }
 
 // Insert sample activities if none exist for this user
+
+
 $check_activities = $conn->prepare("SELECT COUNT(*) as count FROM user_activities WHERE user_id = ?");
 $check_activities->bind_param("i", $user_id);
 $check_activities->execute();
-$activity_count = $check_activities->get_result()->fetch_assoc()['count'];
+$result = $check_activities->get_result();
+$activity_count_row = $result->fetch_assoc();
+$activity_count = $activity_count_row ? $activity_count_row['count'] : 0;
 
 if ($activity_count == 0) {
     $sample_activities = [
@@ -117,10 +125,14 @@ if ($activity_count == 0) {
 }
 
 // Ensure user has stats record
+
+
 $check_stats = $conn->prepare("SELECT COUNT(*) as count FROM user_stats WHERE user_id = ?");
 $check_stats->bind_param("i", $user_id);
 $check_stats->execute();
-$stats_count = $check_stats->get_result()->fetch_assoc()['count'];
+$result = $check_stats->get_result();
+$stats_count_row = $result->fetch_assoc();
+$stats_count = $stats_count_row ? $stats_count_row['count'] : 0;
 
 if ($stats_count == 0) {
     $conn->query("INSERT INTO user_stats (user_id, projects_completed, achievements_earned, badges_earned, items_donated, items_recycled) 
@@ -128,36 +140,40 @@ if ($stats_count == 0) {
 }
 
 // Fetch user data
+
+
 $user_query = $conn->prepare("SELECT user_id, email, first_name, middle_name, last_name, contact_number, address, city, zip_code, created_at, points FROM users WHERE user_id = ?");
 $user_query->bind_param("i", $user_id);
 $user_query->execute();
-$user_result = $user_query->get_result();
-$user_data = $user_result->fetch_assoc();
+$result = $user_query->get_result();
+$user_data = $result->fetch_assoc();
 
 // Fetch user stats
+
+
 $stats_query = $conn->prepare("SELECT projects_completed, achievements_earned, badges_earned, items_donated, items_recycled FROM user_stats WHERE user_id = ?");
 $stats_query->bind_param("i", $user_id);
 $stats_query->execute();
-$stats_result = $stats_query->get_result();
-$stats_data = $stats_result->fetch_assoc();
+$result = $stats_query->get_result();
+$stats_data = $result->fetch_assoc();
 
 // Calculate level based on points
 $level = floor(($user_data['points'] ?? 0) / 25);
 
 // Fetch user badges
+
 $badges = [];
 $badges_query = $conn->prepare("
     SELECT b.badge_name, b.description, b.icon 
     FROM user_badges ub 
     JOIN badges b ON ub.badge_id = b.badge_id 
     WHERE ub.user_id = ? 
-    ORDER BY ub.earned_date DESC 
     LIMIT 5
 ");
 $badges_query->bind_param("i", $user_id);
 $badges_query->execute();
-$badges_result = $badges_query->get_result();
-while ($row = $badges_result->fetch_assoc()) {
+$result = $badges_query->get_result();
+while ($row = $result->fetch_assoc()) {
     $badges[] = $row;
 }
 
@@ -165,26 +181,20 @@ while ($row = $badges_result->fetch_assoc()) {
 if (empty($badges) && isset($user_data['points'])) {
     $points = $user_data['points'];
     $auto_badges = $conn->prepare("SELECT badge_id FROM badges WHERE points_required <= ? ORDER BY points_required DESC");
-    $auto_badges->bind_param("i", $points);
-    $auto_badges->execute();
-    $auto_badges_result = $auto_badges->get_result();
-    
-    while ($badge = $auto_badges_result->fetch_assoc()) {
+    $auto_badges->execute([$points]);
+    $auto_badges = $auto_badges->get_result();
+    while ($badge = $auto_badges->fetch_assoc()) {
         // Assign badge to user
         $assign_badge = $conn->prepare("INSERT IGNORE INTO user_badges (user_id, badge_id) VALUES (?, ?)");
-        $assign_badge->bind_param("ii", $user_id, $badge['badge_id']);
-        $assign_badge->execute();
-        
+        $assign_badge->execute([$user_id, $badge['badge_id']]);
         // Add to badges array for display
         $badge_info = $conn->prepare("SELECT badge_name, description, icon FROM badges WHERE badge_id = ?");
-        $badge_info->bind_param("i", $badge['badge_id']);
-        $badge_info->execute();
-        $badge_info_result = $badge_info->get_result();
-        if ($badge_data = $badge_info_result->fetch_assoc()) {
+        $badge_info->execute([$badge['badge_id']]);
+        $badge_result = $badge_info->get_result();
+        if ($badge_data = $badge_result->fetch_assoc()) {
             $badges[] = $badge_data;
         }
     }
-    
     // Update badges earned count
     if (!empty($badges)) {
         $conn->query("UPDATE user_stats SET badges_earned = " . count($badges) . " WHERE user_id = $user_id");
@@ -200,13 +210,11 @@ $activities_query = $conn->prepare("
     ORDER BY created_at DESC 
     LIMIT 4
 ");
-if ($activities_query) {
-    $activities_query->bind_param("i", $user_id);
-    $activities_query->execute();
-    $activities_result = $activities_query->get_result();
-    while ($row = $activities_result->fetch_assoc()) {
-        $activities[] = $row;
-    }
+$activities_query->bind_param("i", $user_id);
+$activities_query->execute();
+$result = $activities_query->get_result();
+while ($row = $result->fetch_assoc()) {
+    $activities[] = $row;
 }
 
 // Get activity icon based on type

@@ -11,21 +11,30 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true || empty($
 // Get user data from database
 $user_id = $_SESSION['user_id'];
 $conn = getDBConnection();
-$user_query = $conn->prepare("SELECT * FROM users WHERE user_id = ?");
-$user_query->bind_param("i", $user_id);
-$user_query->execute();
-$user_result = $user_query->get_result();
-$user_data = $user_result->fetch_assoc();
+if (!$conn) {
+    die("Database connection failed.");
+}
+
+try {
+    $user_query = $conn->prepare("SELECT * FROM users WHERE user_id = ?");
+    $user_query->execute([$user_id]);
+    $user_data = $user_query->fetch(PDO::FETCH_ASSOC);
+    if (!$user_data) {
+        $user_data = [];
+    }
+} catch (PDOException $e) {
+    die("Database error: " . $e->getMessage());
+}
 
 // Handle form submission
 $success_message = '';
 $error_message = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_project'])) {
-    $project_name = trim($_POST['project_name']);
-    $project_description = trim($_POST['project_description']);
-    $materials = $_POST['materials'] ?? [];
-    $quantities = $_POST['quantities'] ?? [];
+    $project_name = isset($_POST['project_name']) ? trim($_POST['project_name']) : '';
+    $project_description = isset($_POST['project_description']) ? trim($_POST['project_description']) : '';
+    $materials = isset($_POST['materials']) ? (array)$_POST['materials'] : [];
+    $quantities = isset($_POST['quantities']) ? (array)$_POST['quantities'] : [];
     
     // Validate inputs
     if (empty($project_name)) {
@@ -35,42 +44,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_project'])) {
     } elseif (empty($materials) || empty($materials[0])) {
         $error_message = "At least one material is required.";
     } else {
-        // Start transaction
-        $conn->begin_transaction();
-        
         try {
+            // Start transaction
+            $conn->beginTransaction();
+            
             // Insert project
             $project_stmt = $conn->prepare("INSERT INTO projects (user_id, project_name, description) VALUES (?, ?, ?)");
-            $project_stmt->bind_param("iss", $user_id, $project_name, $project_description);
+            if (!$project_stmt->execute([$user_id, $project_name, $project_description])) {
+                throw new PDOException("Failed to create project");
+            }
             
-            if ($project_stmt->execute()) {
-                $project_id = $conn->insert_id;
-                
-                // Insert materials
-                $material_stmt = $conn->prepare("INSERT INTO project_materials (project_id, material_name, quantity) VALUES (?, ?, ?)");
-                
-                foreach ($materials as $index => $material) {
-                    if (!empty($material) && !empty($quantities[$index])) {
-                        $quantity = (int)$quantities[$index];
-                        if ($quantity > 0) {
-                            $material_stmt->bind_param("isi", $project_id, $material, $quantity);
-                            $material_stmt->execute();
+            $project_id = $conn->lastInsertId();
+            
+            // Insert materials
+            $material_stmt = $conn->prepare("INSERT INTO project_materials (project_id, material_name, quantity) VALUES (?, ?, ?)");
+            if (!$material_stmt) {
+                throw new PDOException("Failed to prepare material statement");
+            }
+            
+            foreach ($materials as $index => $material) {
+                if (!empty($material) && isset($quantities[$index])) {
+                    $quantity = (int)$quantities[$index];
+                    if ($quantity > 0) {
+                        if (!$material_stmt->execute([$project_id, $material, $quantity])) {
+                            throw new PDOException("Failed to insert material");
                         }
                     }
                 }
-                
-                // Commit transaction
-                $conn->commit();
-                $success_message = "Project created successfully!";
-                
-                // Clear form
-                $_POST = array();
-            } else {
-                throw new Exception("Error creating project: " . $conn->error);
             }
-        } catch (Exception $e) {
+            
+            // Commit transaction
+            $conn->commit();
+            $success_message = "Project created successfully!";
+            
+            // Clear form
+            $_POST = array();
+            
+        } catch (PDOException $e) {
             // Rollback transaction on error
-            $conn->rollback();
+            if ($conn) {
+                $conn->rollBack();
+            }
             $error_message = "Error creating project: " . $e->getMessage();
         }
     }
