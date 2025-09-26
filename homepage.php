@@ -1247,6 +1247,113 @@ function updateQuantity(change) {
     document.querySelector('.close-modal').addEventListener('click', function () {
         document.getElementById('photoZoomModal').style.display = 'none';
     });
+
+    //Feedback Modal
+document.addEventListener("DOMContentLoaded", function () {
+    const feedbackBtn = document.getElementById("feedbackBtn");
+    const feedbackModal = document.getElementById("feedbackModal");
+    const feedbackCloseBtn = document.getElementById("feedbackCloseBtn");
+    const emojiOptions = document.querySelectorAll(".emoji-option");
+    const feedbackSubmitBtn = document.getElementById("feedbackSubmitBtn");
+    const feedbackText = document.getElementById("feedbackText");
+    const ratingError = document.getElementById("ratingError");
+    const textError = document.getElementById("textError");
+    const thankYouMessage = document.getElementById("thankYouMessage");
+    const feedbackForm = document.getElementById("feedbackForm");
+    const spinner = document.getElementById("spinner");
+
+    let selectedRating = 0;
+
+    // Open modal
+    feedbackBtn.addEventListener("click", () => {
+        feedbackModal.style.display = "flex";
+        feedbackForm.style.display = "block";
+        thankYouMessage.style.display = "none";
+    });
+
+    // Close modal
+    feedbackCloseBtn.addEventListener("click", () => {
+        feedbackModal.style.display = "none";
+    });
+
+    // Close modal when clicking outside
+    window.addEventListener("click", (e) => {
+        if (e.target === feedbackModal) {
+            feedbackModal.style.display = "none";
+        }
+    });
+
+    // Rating selection
+    emojiOptions.forEach(option => {
+        option.addEventListener("click", () => {
+            emojiOptions.forEach(o => o.classList.remove("selected"));
+            option.classList.add("selected");
+            selectedRating = option.getAttribute("data-rating");
+            ratingError.style.display = "none";
+        });
+    });
+
+    // Submit feedback
+    feedbackSubmitBtn.addEventListener("click", function (e) {
+        e.preventDefault();
+
+        let valid = true;
+
+        if (selectedRating === 0) {
+            ratingError.style.display = "block";
+            valid = false;
+        }
+
+        if (feedbackText.value.trim() === "") {
+            textError.style.display = "block";
+            valid = false;
+        } else {
+            textError.style.display = "none";
+        }
+
+        if (!valid) return;
+
+        // Show spinner
+        spinner.style.display = "inline-block";
+        feedbackSubmitBtn.disabled = true;
+
+        // Send feedback to server (AJAX)
+        fetch("feedback_process.php", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            credentials: "same-origin",
+            body: `rating=${selectedRating}&feedback=${encodeURIComponent(feedbackText.value)}`
+        })
+        .then(res => res.json())
+        .then(data => {
+            spinner.style.display = "none";
+            feedbackSubmitBtn.disabled = false;
+
+            if (data.status === "success") {
+                feedbackForm.style.display = "none";
+                thankYouMessage.style.display = "block";
+
+                setTimeout(() => {
+                    feedbackModal.style.display = "none";
+                    feedbackForm.style.display = "block";
+                    thankYouMessage.style.display = "none";
+                    feedbackText.value = "";
+                    selectedRating = 0;
+                    emojiOptions.forEach(o => o.classList.remove("selected"));
+                }, 3000);
+            } else {
+                alert(data.message || "Failed to submit feedback.");
+            }
+        })
+        .catch(err => {
+            spinner.style.display = "none";
+            feedbackSubmitBtn.disabled = false;
+            alert("Failed to submit feedback. Please try again.");
+            console.error(err);
+        });
+
+    });
+});
 </script>
 </body>
 </html>

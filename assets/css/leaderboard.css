@@ -301,9 +301,10 @@ header {
             max-width: 500px;
             box-shadow: 0 5px 15px rgba(0,0,0,0.3);
             position: relative;
+            z-index: 2001;
         }
         
-        .close-btn {
+        .feedback-close-btn {
             position: absolute;
             top: 15px;
             right: 15px;
@@ -312,7 +313,7 @@ header {
             color: #777;
         }
         
-        .close-btn:hover {
+        .feedback-close-btn:hover {
             color: #333;
         }
         
@@ -333,7 +334,7 @@ header {
             font-family: 'Open Sans', sans-serif;
         }
         
-        .feedback-form button {
+        .feedback-submit-btn {
             background-color: #82AA52;
             color: white;
             border: none;
@@ -342,6 +343,7 @@ header {
             cursor: pointer;
             font-weight: 600;
             transition: background-color 0.3s;
+            width: 100%;
         }
         
         .feedback-form button:hover {
@@ -410,7 +412,7 @@ header {
 
         /* Error message */
         .error-message {
-            color: #e74c3c;
+            color: #e74c3c;     
             font-size: 13px;
             margin-top: 5px;
             display: none;

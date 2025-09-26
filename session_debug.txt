@@ -1,0 +1,12 @@
+Array
+(
+    [csrf_token] => b7a4c37654a5b9ea1b9b75c35c90fec6797347cf012957324ff946ad919bb240
+    [logged_in] => 1
+    [user_id] => 4
+    [email] => hanner707@gmail.com
+    [first_name] => Hanner
+    [total_points] => 810
+    [level] => 14
+    [progress_points] => 5
+    [progress_percentage] => 5.2631578947368
+)

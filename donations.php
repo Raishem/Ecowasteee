@@ -369,7 +369,7 @@ while ($row = $result->fetch_assoc()) {
 
 /* Scrollable content area like sidebar */
 .tab-content-wrapper {
-    max-height: calc(100vh - 250px); /* adjust based on header+tabs height */
+    max-height: calc(100vh - 300px); /* adjust based on header+tabs height */
     overflow-y: auto;
     padding-right: 10px;
 }
@@ -468,12 +468,12 @@ while ($row = $result->fetch_assoc()) {
         
         <main class="main-content">
             <div class="donations-container">
-            <div class="page-header">
-                <h2 class="page-title">Donation Management</h2>
-            </div>
-            <p class="page-description" id="tab-description">
-                Here are all the donations you created. You can manage them here.
-            </p>
+                <div class="page-header">
+                    <h2 class="page-title">Donation Management</h2>
+                </div>
+                <p class="page-description" id="tab-description">
+                    Here are all the donations you created. You can manage them here.
+                </p>
 
             
                 <div class="tabs-container">
@@ -485,359 +485,375 @@ while ($row = $result->fetch_assoc()) {
                     </div>
                 </div>
 
-<div class="tab-content-wrapper">
+                <div class="tab-content-wrapper">
 
-<!-- My Donations Tab -->
-<div id="my-donations" class="tab-content tab-active">
-    <div class="donations-grid">
-        <?php if (!empty($myDonations)): ?>
-            <?php foreach ($myDonations as $d): ?>
-                <div class="donation-card">
-                    <div class="donation-header">
-                        <span class="donation-title"><?= htmlspecialchars($d['item_name']) ?></span>
-                        <span class="donation-status 
-                            <?= strtolower($d['status']) == 'pending' ? 'status-pending' :
-                               (strtolower($d['status']) == 'completed' ? 'status-completed' :
-                               (strtolower($d['status']) == 'requested' ? 'status-requested' : 'status-pending')) ?>">
-                            <?= htmlspecialchars($d['status']) ?>
-                        </span>
-                    </div>
-                    <div class="donation-details">
-                        <p class="donation-detail"><strong>Donated:</strong> 
-                            <?= $d['donated_at'] ? date("M d, Y", strtotime($d['donated_at'])) : '—' ?>
-                        </p>
-                        <p class="donation-detail"><strong>Types of waste:</strong> 
-                            <?= htmlspecialchars($d['category'] ?? '—') ?>
-                        </p>
-                        <p class="donation-detail"><strong>Quantity:</strong> 
-                            <?= $d['quantity'] ?>/<?= $d['total_quantity'] ?>
-                        </p>
-                        <p class="donation-detail description"><strong>Description:</strong> 
-                            <?= htmlspecialchars($d['description'] ?? '—') ?>
-                        </p>
+                    <!-- My Donations Tab -->
+                    <div id="my-donations" class="tab-content tab-active">
+                        <div class="donations-grid">
+                            <?php if (!empty($myDonations)): ?>
+                                <?php foreach ($myDonations as $d): ?>
+                                    <div class="donation-card">
+                                        <div class="donation-header">
+                                            <span class="donation-title"><?= htmlspecialchars($d['item_name']) ?></span>
+                                            <span class="donation-status 
+                                                <?= strtolower($d['status']) == 'pending' ? 'status-pending' :
+                                                (strtolower($d['status']) == 'completed' ? 'status-completed' :
+                                                (strtolower($d['status']) == 'requested' ? 'status-requested' : 'status-pending')) ?>">
+                                                <?= htmlspecialchars($d['status']) ?>
+                                            </span>
+                                        </div>
+                                        <div class="donation-details">
+                                            <p class="donation-detail"><strong>Donated:</strong> 
+                                                <?= $d['donated_at'] ? date("M d, Y", strtotime($d['donated_at'])) : '—' ?>
+                                            </p>
+                                            <p class="donation-detail"><strong>Types of waste:</strong> 
+                                                <?= htmlspecialchars($d['category'] ?? '—') ?>
+                                            </p>
+                                            <p class="donation-detail"><strong>Quantity:</strong> 
+                                                <?= $d['quantity'] ?>/<?= $d['total_quantity'] ?>
+                                            </p>
+                                            <p class="donation-detail description"><strong>Description:</strong> 
+                                                <?= htmlspecialchars($d['description'] ?? '—') ?>
+                                            </p>
 
-                        
-                        <?php if (!empty($donationRequestsMap[$d['donation_id']])): ?>
-                            <p class="donation-detail"><strong>Requested by:</strong></p>
-                            <ul class="donation-requests-list">
-                                <?php foreach ($donationRequestsMap[$d['donation_id']] as $req): ?>
-                                    <li>
-                                        <?= htmlspecialchars($req['claimer_name']) ?> 
-                                        (Project: <?= htmlspecialchars($req['project_name'] ?? '—') ?>, 
-                                        Requested at: <?= date("M d, Y H:i", strtotime($req['requested_at'])) ?>)
-                                    </li>
+                                            
+                                            <?php if (!empty($donationRequestsMap[$d['donation_id']])): ?>
+                                                <p class="donation-detail"><strong>Requested by:</strong></p>
+                                                <ul class="donation-requests-list">
+                                                    <?php foreach ($donationRequestsMap[$d['donation_id']] as $req): ?>
+                                                        <li>
+                                                            <?= htmlspecialchars($req['claimer_name']) ?> 
+                                                            (Project: <?= htmlspecialchars($req['project_name'] ?? '—') ?>, 
+                                                            Requested at: <?= date("M d, Y H:i", strtotime($req['requested_at'])) ?>)
+                                                        </li>
+                                                    <?php endforeach; ?>
+                                                </ul>
+                                            <?php else: ?>
+                                                <p class="donation-detail"><strong>Requested by:</strong> None yet</p>
+                                            <?php endif; ?>
+
+                                            <p class="donation-detail"><strong>Delivered:</strong> 
+                                                <?= $d['delivered_at'] ? date("M d, Y", strtotime($d['delivered_at'])) : 'Pending' ?>
+                                            </p>
+                                        </div>
+                                        <div class="card-actions">
+                                            <a href="#" class="view-details" data-id="<?= $d['donation_id'] ?>">View Details</a>
+                                            <button class="delete-btn" data-id="<?= $d['donation_id'] ?>">Delete</button>
+                                        </div>
+                                    </div>
                                 <?php endforeach; ?>
-                            </ul>
-                        <?php else: ?>
-                            <p class="donation-detail"><strong>Requested by:</strong> None yet</p>
-                        <?php endif; ?>
-
-                        <p class="donation-detail"><strong>Delivered:</strong> 
-                            <?= $d['delivered_at'] ? date("M d, Y", strtotime($d['delivered_at'])) : 'Pending' ?>
-                        </p>
+                            <?php else: ?>
+                                <div class="empty-state">
+                                    <i class="fas fa-box-open"></i>
+                                    <h3>No donations yet</h3>
+                                    <p>You haven't created any donations yet. Start by creating your first donation!</p>
+                                </div>
+                            <?php endif; ?>
+                        </div>
                     </div>
-                    <div class="card-actions">
-                        <a href="#" class="view-details" data-id="<?= $d['donation_id'] ?>">View Details</a>
-                        <button class="delete-btn" data-id="<?= $d['donation_id'] ?>">Delete</button>
+
+
+                    <!-- My Requested Donations Tab -->
+                    <div id="my-requests" class="tab-content">
+                        <?php if (!empty($myRequests)): ?>
+                            <?php foreach ($myRequests as $rq): ?>
+                                <div class="donation-card">
+                                    <div class="donation-header">
+                                        <span class="donation-title"><?= htmlspecialchars($rq['item_name']) ?></span>
+                                        <span class="donation-status 
+                                            <?= strtolower($rq['status']) == 'pending' ? 'status-pending' :
+                                            (strtolower($rq['status']) == 'completed' ? 'status-completed' :
+                                            (strtolower($rq['status']) == 'requested' ? 'status-received' : '')) ?>">
+                                            <?= htmlspecialchars($rq['status']) ?>
+                                        </span>
+                                    </div>
+                                    <div class="donation-details">
+                                        <p class="donation-detail"><strong>Donation by:</strong> 
+                                        <?= htmlspecialchars($rq['donor_first_name'] . ' ' . $rq['donor_last_name']) ?></p>
+                                        <p class="donation-detail"><strong>Project:</strong> <?= htmlspecialchars($rq['project_name']) ?></p>
+                                        <p class="donation-detail"><strong>Request Date:</strong> <?= date("M d, Y H:i", strtotime($rq['requested_at'])) ?></p>
+                                    </div>
+                                    <div class="card-actions">
+                                        <button class="edit-request-btn" data-id="<?= $rq['request_id'] ?>">Edit Request</button>
+                                        <button class="cancel-request-btn" data-id="<?= $rq['request_id'] ?>">Cancel Request</button>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <div class="empty-state">
+                                <i class="fas fa-hand-paper"></i>
+                                <h3>No donation requests</h3>
+                                <p>You haven't requested any donations yet.</p>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+
+                    <!-- Requests for My Donations Tab -->
+                    <div id="requests-for-me" class="tab-content">
+                        <?php if (!empty($requestsForMe)): ?>
+                            <?php foreach ($requestsForMe as $r): ?>
+                                <div class="donation-card">
+                                    <div class="donation-header">
+                                        <span class="donation-title"><?= htmlspecialchars($r['item_name']) ?></span>
+                                        <span class="donation-status status-pending">Pending</span>
+                                    </div>
+                                    <div class="donation-details">
+                                        <p class="donation-detail"><strong>Requested by:</strong> <?= htmlspecialchars($r['first_name'].' '.$r['last_name']) ?></p>
+                                        <p class="donation-detail"><strong>Project:</strong> <?= htmlspecialchars($r['project_name']) ?></p>
+                                        <p class="donation-detail"><strong>Requested At:</strong> <?= date("M d, Y H:i", strtotime($r['requested_at'])) ?></p>
+                                    </div>
+                                    <div class="card-actions">
+                                        <button class="edit-request-btn" data-id="<?= $r['request_id'] ?>">Approve</button>
+                                        <button class="cancel-request-btn" data-id="<?= $r['request_id'] ?>">Decline</button>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <div class="empty-state">
+                                <i class="fas fa-users"></i>
+                                <h3>No requests for your donations</h3>
+                                <p>No one has requested your donations yet.</p>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+
+                    <!-- Received Donations Tab -->
+                    <div id="received-donations" class="tab-content">
+                        <?php if (!empty($receivedDonations)): ?>
+                            <?php foreach ($receivedDonations as $rec): ?>
+                                <div class="donation-card">
+                                    <div class="donation-header">
+                                        <span class="donation-title"><?= htmlspecialchars($rec['item_name']) ?></span>
+                                        <span class="donation-status status-completed">Received</span>
+                                    </div>
+                                    <div class="donation-details">
+                                        <p class="donation-detail"><strong>Donor:</strong> <?= $rec['donor_name'] ?? '—' ?></p>
+                                        <p class="donation-detail"><strong>Delivered At:</strong>
+                                            <?= $rec['received_at'] ? date("M d, Y", strtotime($rec['received_at'])) : '—' ?>
+                                        </p>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <div class="empty-state">
+                                <i class="fas fa-gift"></i>
+                                <h3>No donations received yet</h3>
+                                <p>You haven't received any donations yet.</p>
+                            </div>
+                        <?php endif; ?>
                     </div>
                 </div>
-            <?php endforeach; ?>
-        <?php else: ?>
-            <div class="empty-state">
-                <i class="fas fa-box-open"></i>
-                <h3>No donations yet</h3>
-                <p>You haven't created any donations yet. Start by creating your first donation!</p>
-            </div>
-        <?php endif; ?>
-    </div>
-</div>
-
-            <!-- My Requested Donations Tab -->
-            <div id="my-requests" class="tab-content">
-                <?php if (!empty($myRequests)): ?>
-                    <?php foreach ($myRequests as $rq): ?>
-                        <div class="donation-card">
-                            <div class="donation-header">
-                                <span class="donation-title"><?= htmlspecialchars($rq['item_name']) ?></span>
-                                <span class="donation-status 
-                                    <?= strtolower($rq['status']) == 'pending' ? 'status-pending' :
-                                       (strtolower($rq['status']) == 'completed' ? 'status-completed' :
-                                       (strtolower($rq['status']) == 'requested' ? 'status-received' : '')) ?>">
-                                    <?= htmlspecialchars($rq['status']) ?>
-                                </span>
-                            </div>
-                            <div class="donation-details">
-                                <p class="donation-detail"><strong>Donation by:</strong> 
-                                <?= htmlspecialchars($rq['donor_first_name'] . ' ' . $rq['donor_last_name']) ?></p>
-                                <p class="donation-detail"><strong>Project:</strong> <?= htmlspecialchars($rq['project_name']) ?></p>
-                                <p class="donation-detail"><strong>Request Date:</strong> <?= date("M d, Y H:i", strtotime($rq['requested_at'])) ?></p>
-                            </div>
-                            <div class="card-actions">
-                                <button class="edit-request-btn" data-id="<?= $rq['request_id'] ?>">Edit Request</button>
-                                <button class="cancel-request-btn" data-id="<?= $rq['request_id'] ?>">Cancel Request</button>
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
-                <?php else: ?>
-                    <div class="empty-state">
-                        <i class="fas fa-hand-paper"></i>
-                        <h3>No donation requests</h3>
-                        <p>You haven't requested any donations yet.</p>
-                    </div>
-                <?php endif; ?>
-            </div>
-
-            <!-- Requests for My Donations Tab -->
-            <div id="requests-for-me" class="tab-content">
-                <?php if (!empty($requestsForMe)): ?>
-                    <?php foreach ($requestsForMe as $r): ?>
-                        <div class="donation-card">
-                            <div class="donation-header">
-                                <span class="donation-title"><?= htmlspecialchars($r['item_name']) ?></span>
-                                <span class="donation-status status-pending">Pending</span>
-                            </div>
-                            <div class="donation-details">
-                                <p class="donation-detail"><strong>Requested by:</strong> <?= htmlspecialchars($r['first_name'].' '.$r['last_name']) ?></p>
-                                <p class="donation-detail"><strong>Project:</strong> <?= htmlspecialchars($r['project_name']) ?></p>
-                                <p class="donation-detail"><strong>Requested At:</strong> <?= date("M d, Y H:i", strtotime($r['requested_at'])) ?></p>
-                            </div>
-                            <div class="card-actions">
-                                <button class="edit-request-btn" data-id="<?= $r['request_id'] ?>">Approve</button>
-                                <button class="cancel-request-btn" data-id="<?= $r['request_id'] ?>">Decline</button>
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
-                <?php else: ?>
-                    <div class="empty-state">
-                        <i class="fas fa-users"></i>
-                        <h3>No requests for your donations</h3>
-                        <p>No one has requested your donations yet.</p>
-                    </div>
-                <?php endif; ?>
-            </div>
-
-            <!-- Received Donations Tab -->
-            <div id="received-donations" class="tab-content">
-                <?php if (!empty($receivedDonations)): ?>
-                    <?php foreach ($receivedDonations as $rec): ?>
-                        <div class="donation-card">
-                            <div class="donation-header">
-                                <span class="donation-title"><?= htmlspecialchars($rec['item_name']) ?></span>
-                                <span class="donation-status status-completed">Received</span>
-                            </div>
-                            <div class="donation-details">
-                                <p class="donation-detail"><strong>Donor:</strong> <?= $rec['donor_name'] ?? '—' ?></p>
-                                <p class="donation-detail"><strong>Delivered At:</strong>
-                                    <?= $rec['received_at'] ? date("M d, Y", strtotime($rec['received_at'])) : '—' ?>
-                                </p>
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
-                <?php else: ?>
-                    <div class="empty-state">
-                        <i class="fas fa-gift"></i>
-                        <h3>No donations received yet</h3>
-                        <p>You haven't received any donations yet.</p>
-                    </div>
-                <?php endif; ?>
             </div>
         </main>
     </div>
-</div>
 
     <div class="feedback-btn" id="feedbackBtn">💬</div>
-    <div class="feedback-modal" id="feedbackModal">
-        <div class="feedback-content">
-            <span class="feedback-close-btn" id="feedbackCloseBtn">&times;</span>
-            <div class="feedback-form" id="feedbackForm">
-                <h3>Share Your Feedback</h3>
-                <div class="emoji-rating" id="emojiRating">
-                    <div class="emoji-option" data-rating="1"><span class="emoji">😞</span><span class="emoji-label">Very Sad</span></div>
-                    <div class="emoji-option" data-rating="2"><span class="emoji">😕</span><span class="emoji-label">Sad</span></div>
-                    <div class="emoji-option" data-rating="3"><span class="emoji">😐</span><span class="emoji-label">Neutral</span></div>
-                    <div class="emoji-option" data-rating="4"><span class="emoji">🙂</span><span class="emoji-label">Happy</span></div>
-                    <div class="emoji-option" data-rating="5"><span class="emoji">😍</span><span class="emoji-label">Very Happy</span></div>
-                </div>
-                <div class="error-message" id="ratingError">Please select a rating</div>
-                <p class="feedback-detail">Please share in detail what we can improve more?</p>
-                <textarea id="feedbackText" placeholder="Your feedback helps us make EcoWaste better..."></textarea>
-                <div class="error-message" id="textError">Please provide your feedback</div>
-                <button type="submit" class="feedback-submit-btn" id="feedbackSubmitBtn">
-                    Submit Feedback
-                    <div class="spinner" id="spinner"></div>
-                </button>
+<div class="feedback-modal" id="feedbackModal">
+    <div class="feedback-content">
+        <span class="feedback-close-btn" id="feedbackCloseBtn">&times;</span>
+        <!-- changed from div to form -->
+        <form class="feedback-form" id="feedbackForm">
+            <h3>Share Your Feedback</h3>
+            <div class="emoji-rating" id="emojiRating">
+                <div class="emoji-option" data-rating="1"><span class="emoji">😞</span><span class="emoji-label">Very Sad</span></div>
+                <div class="emoji-option" data-rating="2"><span class="emoji">😕</span><span class="emoji-label">Sad</span></div>
+                <div class="emoji-option" data-rating="3"><span class="emoji">😐</span><span class="emoji-label">Neutral</span></div>
+                <div class="emoji-option" data-rating="4"><span class="emoji">🙂</span><span class="emoji-label">Happy</span></div>
+                <div class="emoji-option" data-rating="5"><span class="emoji">😍</span><span class="emoji-label">Very Happy</span></div>
             </div>
-            <div class="thank-you-message" id="thankYouMessage">
-                <span class="thank-you-emoji">🎉</span>
-                <h3>Thank You!</h3>
-                <p>We appreciate your feedback and will use it to improve EcoWaste.</p>
-                <p>Your opinion matters to us!</p>
-            </div>
+            <div class="error-message" id="ratingError">Please select a rating</div>
+            <p class="feedback-detail">Please share in detail what we can improve more?</p>
+            <textarea id="feedbackText" placeholder="Your feedback helps us make EcoWaste better..."></textarea>
+            <div class="error-message" id="textError">Please provide your feedback</div>
+            <button type="submit" class="feedback-submit-btn" id="feedbackSubmitBtn">
+                Submit Feedback
+                <div class="spinner" id="spinner"></div>
+            </button>
+        </form>
+        <div class="thank-you-message" id="thankYouMessage">
+            <span class="thank-you-emoji">🎉</span>
+            <h3>Thank You!</h3>
+            <p>We appreciate your feedback and will use it to improve EcoWaste.</p>
+            <p>Your opinion matters to us!</p>
         </div>
     </div>
+</div>
 
-    <script>
-        document.getElementById('userProfile').addEventListener('click', function() {
-            this.classList.toggle('active');
-        });
+<!-- Load jQuery first -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 
-        document.addEventListener('click', function(event) {
-            const userProfile = document.getElementById('userProfile');
-            if (!userProfile.contains(event.target)) {
-                userProfile.classList.remove('active');
-            }
-        });
-
-        const descriptions = {
-            "my-donations": "Here are all the donations you created. You can manage them here.",
-            "requests-for-me": "These are requests from other users for your donations.",
-            "my-requests": "These are the donation requests you have made to other donors.",
-            "received-donations": "These are the donations you have successfully received."
-        };
-
-        function showTab(tabId, btn) {
-            document.querySelectorAll(".tab-content").forEach(tc => tc.classList.remove("tab-active"));
-            document.getElementById(tabId).classList.add("tab-active");
-
-            document.querySelectorAll(".tab-btn").forEach(tb => tb.classList.remove("tab-btn-active"));
-            btn.classList.add("tab-btn-active");
-
-            document.getElementById("tab-description").textContent = descriptions[tabId];
+<script>
+    // Profile dropdown toggle
+    document.getElementById('userProfile').addEventListener('click', function() {
+        this.classList.toggle('active');
+    });
+    document.addEventListener('click', function(event) {
+        const userProfile = document.getElementById('userProfile');
+        if (!userProfile.contains(event.target)) {
+            userProfile.classList.remove('active');
         }
+    });
 
-        // Delete donation
-        $(document).on("click", ".delete-btn", function(){
-            if(confirm("Are you sure you want to delete this donation?")) {
-                let id = $(this).data("id");
-                $.post("donate_process.php", { action: "delete_donation", donation_id: id }, function(){
-                    location.reload();
-                });
-            }
-        });
+    // Tab descriptions
+    const descriptions = {
+        "my-donations": "Here are all the donations you created. You can manage them here.",
+        "requests-for-me": "These are requests from other users for your donations.",
+        "my-requests": "These are the donation requests you have made to other donors.",
+        "received-donations": "These are the donations you have successfully received."
+    };
 
-        // View details
-        $(document).on("click", ".view-details", function(e){
-            e.preventDefault();
+    // Show tab
+    function showTab(tabId, btn) {
+        $(".tab-content").removeClass("tab-active");
+        $(".tab-btn").removeClass("tab-btn-active");
+        $("#" + tabId).addClass("tab-active");
+        $(btn).addClass("tab-btn-active");
+        $("#tab-description").text(descriptions[tabId]);
+    }
+
+    // Delete donation
+    $(document).on("click", ".delete-btn", function() {
+        if (confirm("Are you sure you want to delete this donation?")) {
             let id = $(this).data("id");
-            $.get("donate_process.php", { action: "view_donation", donation_id: id }, function(data){
-                $("#details-body").html(data);
-                $("#details-modal").show();
+            $.post("donate_process.php", { action: "delete_donation", donation_id: id }, function() {
+                location.reload();
             });
-        });
-
-        // Cancel request
-        $(document).on("click", ".cancel-request-btn", function(){
-            if(confirm("Cancel this request?")) {
-                let id = $(this).data("id");
-                $.post("donate_process.php", { action: "cancel_request", request_id: id }, function(){
-                    location.reload();
-                });
-            }
-        });
-
-        // Edit request (redirect or modal)
-        $(document).on("click", ".edit-request-btn", function(){
-            let id = $(this).data("id");
-            window.location.href = "edit_request.php?id=" + id;
-        });
-            
-        function showTab(tabId, clickedBtn) {
-            const contents = document.querySelectorAll('.tab-content');
-            const buttons = document.querySelectorAll('.tab-btn');
-            contents.forEach(c => c.classList.remove('tab-active'));
-            buttons.forEach(b => b.classList.remove('tab-btn-active'));
-            document.getElementById(tabId).classList.add('tab-active');
-            clickedBtn.classList.add('tab-btn-active');
         }
-        
-        document.addEventListener('DOMContentLoaded', function() {
-            const feedbackBtn = document.getElementById('feedbackBtn');
-            const feedbackModal = document.getElementById('feedbackModal');
-            const feedbackCloseBtn = document.getElementById('feedbackCloseBtn');
-            const emojiOptions = document.querySelectorAll('.emoji-option');
-            const feedbackForm = document.getElementById('feedbackForm');
-            const thankYouMessage = document.getElementById('thankYouMessage');
-            const feedbackSubmitBtn = document.getElementById('feedbackSubmitBtn');
-            const spinner = document.getElementById('spinner');
-            const ratingError = document.getElementById('ratingError');
-            const textError = document.getElementById('textError');
-            const feedbackText = document.getElementById('feedbackText');
-            let selectedRating = 0;
-            
-            emojiOptions.forEach(option => {
-                option.addEventListener('click', () => {
-                    emojiOptions.forEach(opt => opt.classList.remove('selected'));
-                    option.classList.add('selected');
-                    selectedRating = option.getAttribute('data-rating');
-                    ratingError.style.display = 'none';
-                });
+    });
+
+    // View details
+    $(document).on("click", ".view-details", function(e) {
+        e.preventDefault();
+        let id = $(this).data("id");
+        $.get("donate_process.php", { action: "view_donation", donation_id: id }, function(data) {
+            $("#details-body").html(data);
+            $("#details-modal").show();
+        });
+    });
+
+    // Cancel request
+    $(document).on("click", ".cancel-request-btn", function() {
+        if (confirm("Cancel this request?")) {
+            let id = $(this).data("id");
+            $.post("donate_process.php", { action: "cancel_request", request_id: id }, function() {
+                location.reload();
             });
-            
-            feedbackForm.addEventListener('submit', function(e) {
-                e.preventDefault();
-                let isValid = true;
-                
-                if (selectedRating === 0) {
-                    ratingError.style.display = 'block';
-                    isValid = false;
-                } else {
-                    ratingError.style.display = 'none';
-                }
-                
-                if (feedbackText.value.trim() === '') {
-                    textError.style.display = 'block';
-                    isValid = false;
-                } else {
-                    textError.style.display = 'none';
-                }
-                
-                if (!isValid) return;
-                
-                feedbackSubmitBtn.disabled = true;
-                spinner.style.display = 'block';
-                
+        }
+    });
+
+    // Edit request
+    $(document).on("click", ".edit-request-btn", function() {
+        let id = $(this).data("id");
+        window.location.href = "edit_request.php?id=" + id;
+    });
+
+    // Feedback modal
+    $(document).ready(function() {
+        const feedbackBtn = $("#feedbackBtn");
+        const feedbackModal = $("#feedbackModal");
+        const feedbackCloseBtn = $("#feedbackCloseBtn");
+        const emojiOptions = $(".emoji-option");
+        const feedbackForm = $("#feedbackForm");
+        const thankYouMessage = $("#thankYouMessage");
+        const feedbackSubmitBtn = $("#feedbackSubmitBtn");
+        const spinner = $("#spinner");
+        const ratingError = $("#ratingError");
+        const textError = $("#textError");
+        const feedbackText = $("#feedbackText");
+
+        let selectedRating = 0;
+
+        // Emoji select
+        emojiOptions.on("click", function() {
+            emojiOptions.removeClass("selected");
+            $(this).addClass("selected");
+            selectedRating = $(this).data("rating");
+            ratingError.hide();
+        });
+
+        // Feedback form submit
+feedbackForm.on("submit", function(e) {
+    e.preventDefault();
+    let isValid = true;
+
+    if (selectedRating === 0) {
+        ratingError.show();
+        isValid = false;
+    } else {
+        ratingError.hide();
+    }
+
+    if ($.trim(feedbackText.val()) === "") {
+        textError.show();
+        isValid = false;
+    } else {
+        textError.hide();
+    }
+
+    if (!isValid) return;
+
+    feedbackSubmitBtn.prop("disabled", true);
+    spinner.show();
+
+    // ✅ Send feedback to PHP
+    $.post("feedback_process.php", { 
+        rating: selectedRating, 
+        feedback: feedbackText.val().trim() 
+    }, function(response){
+        try {
+            let res = JSON.parse(response);
+            if(res.status === "success"){
+                spinner.hide();
+                feedbackForm.hide();
+                thankYouMessage.show();
+
                 setTimeout(() => {
-                    spinner.style.display = 'none';
-                    feedbackForm.style.display = 'none';
-                    thankYouMessage.style.display = 'block';
-                    
-                    setTimeout(() => {
-                        feedbackModal.style.display = 'none';
-                        feedbackForm.style.display = 'block';
-                        thankYouMessage.style.display = 'none';
-                        feedbackText.value = '';
-                        emojiOptions.forEach(opt => opt.classList.remove('selected'));
-                        selectedRating = 0;
-                        feedbackSubmitBtn.disabled = false;
-                    }, 3000);
-                }, 1500);
-            });
-            
-            feedbackBtn.addEventListener('click', () => {
-                feedbackModal.style.display = 'flex';
-            });
-            
-            feedbackCloseBtn.addEventListener('click', closeFeedbackModal);
-            
-            window.addEventListener('click', (event) => {
-                if (event.target === feedbackModal) {
-                    closeFeedbackModal();
-                }
-            });
-            
-            function closeFeedbackModal() {
-                feedbackModal.style.display = 'none';
-                feedbackForm.style.display = 'block';
-                thankYouMessage.style.display = 'none';
-                feedbackText.value = '';
-                emojiOptions.forEach(opt => opt.classList.remove('selected'));
-                selectedRating = 0;
-                ratingError.style.display = 'none';
-                textError.style.display = 'none';
-                feedbackSubmitBtn.disabled = false;
-                spinner.style.display = 'none';
+                    feedbackModal.hide();
+                    feedbackForm.show();
+                    thankYouMessage.hide();
+                    feedbackText.val("");
+                    emojiOptions.removeClass("selected");
+                    selectedRating = 0;
+                    feedbackSubmitBtn.prop("disabled", false);
+                }, 3000);
+            } else {
+                alert(res.message || "Something went wrong.");
+                spinner.hide();
+                feedbackSubmitBtn.prop("disabled", false);
+            }
+        } catch(e) {
+            console.error("Invalid JSON response:", response);
+            spinner.hide();
+            feedbackSubmitBtn.prop("disabled", false);
+        }
+    });
+});
+        
+        // Open modal
+        feedbackBtn.on("click", () => feedbackModal.css("display", "flex"));
+
+        // Close modal
+        feedbackCloseBtn.on("click", closeFeedbackModal);
+        $(window).on("click", function(event) {
+            if (event.target === feedbackModal[0]) {
+                closeFeedbackModal();
             }
         });
-    </script>
+
+        function closeFeedbackModal() {
+            feedbackModal.hide();
+            feedbackForm.show();
+            thankYouMessage.hide();
+            feedbackText.val("");
+            emojiOptions.removeClass("selected");
+            selectedRating = 0;
+            ratingError.hide();
+            textError.hide();
+            feedbackSubmitBtn.prop("disabled", false);
+            spinner.hide();
+        }
+    });
+    
+</script>
 </body>
 </html>

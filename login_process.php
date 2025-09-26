@@ -24,7 +24,7 @@ if (!$email || empty($password)) {
 try {
     error_log("Trying to log in with email: $email");
     $conn = getDBConnection();
-    $stmt = $conn->prepare("SELECT user_id, email, password_hash, first_name FROM users WHERE email = ?");
+    $stmt = $conn->prepare("SELECT user_id, email, password_hash, first_name, last_name FROM users WHERE email = ?");
     if (!$stmt) {
         error_log("Prepare failed: " . $conn->error);
         $_SESSION['login_error'] = 'Database error.';
@@ -64,6 +64,7 @@ try {
     $_SESSION['user_id'] = $user['user_id'];
     $_SESSION['email'] = $user['email'];
     $_SESSION['first_name'] = $user['first_name'];
+    $_SESSION['last_name'] = $user['last_name'];
 
     // Remember me functionality
     if ($remember) {

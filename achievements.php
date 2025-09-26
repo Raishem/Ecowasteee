@@ -698,8 +698,9 @@ while ($row = $result->fetch_assoc()) $tasks[] = $row;
             </div>
         </div>
     </div>
+
+
 <script>
-document.addEventListener('DOMContentLoaded', function() {
     // ===== Profile Dropdown =====
     const userProfile = document.getElementById('userProfile');
     const profileDropdown = userProfile.querySelector('.profile-dropdown');
@@ -753,91 +754,96 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // ===== Feedback Modal =====
-    const feedbackBtn = document.getElementById('feedbackBtn');
-    const feedbackModal = document.getElementById('feedbackModal');
-    const feedbackCloseBtn = document.getElementById('feedbackCloseBtn');
-    const emojiOptions = document.querySelectorAll('.emoji-option');
-    const feedbackForm = document.getElementById('feedbackForm');
-    const thankYouMessage = document.getElementById('thankYouMessage');
-    const feedbackSubmitBtn = document.getElementById('feedbackSubmitBtn');
-    const spinner = document.getElementById('spinner');
-    const ratingError = document.getElementById('ratingError');
-    const textError = document.getElementById('textError');
-    const feedbackText = document.getElementById('feedbackText');
+    document.addEventListener("DOMContentLoaded", function () {
+    // Grab elements
+    const feedbackBtn = document.getElementById("feedbackBtn");
+    const feedbackModal = document.getElementById("feedbackModal");
+    const feedbackCloseBtn = document.getElementById("feedbackCloseBtn");
+    const emojiOptions = feedbackModal ? feedbackModal.querySelectorAll(".emoji-option") : [];
+    const feedbackSubmitBtn = document.getElementById("feedbackSubmitBtn");
+    const feedbackText = document.getElementById("feedbackText");
+    const ratingError = document.getElementById("ratingError");
+    const textError = document.getElementById("textError");
+    const thankYouMessage = document.getElementById("thankYouMessage");
+    const feedbackForm = document.getElementById("feedbackForm");
+    const spinner = document.getElementById("spinner");
+
+    if (!feedbackBtn || !feedbackModal || !feedbackSubmitBtn || !feedbackText) return;
+
     let selectedRating = 0;
 
+    // Open modal
+    feedbackBtn.addEventListener("click", () => {
+        feedbackModal.style.display = "flex";
+        feedbackForm.style.display = "block";
+        thankYouMessage.style.display = "none";
+    });
+
+    // Close modal
+    feedbackCloseBtn?.addEventListener("click", () => feedbackModal.style.display = "none");
+    window.addEventListener("click", e => {
+        if (e.target === feedbackModal) feedbackModal.style.display = "none";
+    });
+
+    // Emoji rating selection
     emojiOptions.forEach(option => {
-        option.addEventListener('click', () => {
-            emojiOptions.forEach(opt => opt.classList.remove('selected'));
-            option.classList.add('selected');
-            selectedRating = option.getAttribute('data-rating');
-            ratingError.style.display = 'none';
+        option.addEventListener("click", () => {
+            emojiOptions.forEach(o => o.classList.remove("selected"));
+            option.classList.add("selected");
+            selectedRating = option.getAttribute("data-rating");
+            ratingError.style.display = "none";
         });
     });
 
-    feedbackForm.addEventListener('submit', function(e) {
+    // Submit feedback
+    feedbackSubmitBtn.addEventListener("click", e => {
         e.preventDefault();
-        let isValid = true;
 
-        if (selectedRating === 0) {
-            ratingError.style.display = 'block';
-            isValid = false;
-        } else {
-            ratingError.style.display = 'none';
-        }
+        let valid = true;
+        if (selectedRating === 0) { ratingError.style.display = "block"; valid = false; }
+        if (feedbackText.value.trim() === "") { textError.style.display = "block"; valid = false; }
+        else { textError.style.display = "none"; }
 
-        if (feedbackText.value.trim() === '') {
-            textError.style.display = 'block';
-            isValid = false;
-        } else {
-            textError.style.display = 'none';
-        }
+        if (!valid) return;
 
-        if (!isValid) return;
-
+        spinner.style.display = "inline-block";
         feedbackSubmitBtn.disabled = true;
-        spinner.style.display = 'block';
 
-        setTimeout(() => {
-            spinner.style.display = 'none';
-            feedbackForm.style.display = 'none';
-            thankYouMessage.style.display = 'block';
+        // AJAX POST
+        fetch("feedback_process.php", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: `rating=${selectedRating}&feedback=${encodeURIComponent(feedbackText.value)}`
+        })
+        .then(res => res.json())
+        .then(data => {
+            spinner.style.display = "none";
+            feedbackSubmitBtn.disabled = false;
 
-            setTimeout(() => {
-                feedbackModal.style.display = 'none';
-                feedbackForm.style.display = 'block';
-                thankYouMessage.style.display = 'none';
-                feedbackText.value = '';
-                emojiOptions.forEach(opt => opt.classList.remove('selected'));
-                selectedRating = 0;
-                feedbackSubmitBtn.disabled = false;
-            }, 3000);
-        }, 1500);
+            if (data.status === "success") {
+                feedbackForm.style.display = "none";
+                thankYouMessage.style.display = "block";
+
+                // Reset after 3 seconds
+                setTimeout(() => {
+                    feedbackModal.style.display = "none";
+                    feedbackForm.style.display = "block";
+                    thankYouMessage.style.display = "none";
+                    feedbackText.value = "";
+                    selectedRating = 0;
+                    emojiOptions.forEach(o => o.classList.remove("selected"));
+                }, 3000);
+            } else {
+                alert(data.message || "Failed to submit feedback.");
+            }
+        })
+        .catch(err => {
+            spinner.style.display = "none";
+            feedbackSubmitBtn.disabled = false;
+            alert("Failed to submit feedback. Please try again.");
+            console.error(err);
+        });
     });
-
-    feedbackBtn.addEventListener('click', () => {
-        feedbackModal.style.display = 'flex';
-    });
-
-    feedbackCloseBtn.addEventListener('click', closeFeedbackModal);
-    window.addEventListener('click', (event) => {
-        if (event.target === feedbackModal) {
-            closeFeedbackModal();
-        }
-    });
-
-    function closeFeedbackModal() {
-        feedbackModal.style.display = 'none';
-        feedbackForm.style.display = 'block';
-        thankYouMessage.style.display = 'none';
-        feedbackText.value = '';
-        emojiOptions.forEach(opt => opt.classList.remove('selected'));
-        selectedRating = 0;
-        ratingError.style.display = 'none';
-        textError.style.display = 'none';
-        feedbackSubmitBtn.disabled = false;
-        spinner.style.display = 'none';
-    }
 });
 </script>
 
