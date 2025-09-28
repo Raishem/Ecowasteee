@@ -9,16 +9,37 @@ if (!isset($_SESSION['user_id'])) {
 
 $conn = getDBConnection();
 $donor_id = $_SESSION['user_id'];
-$image_paths_json = null; // Default to null if no images are uploaded
+$image_paths_json = null;
 
-// Handle form submission (POST request)
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Check if required fields are set
+// Prepare statement to fetch donor information
+$donor_stmt = $conn->prepare("SELECT user_id, first_name FROM users WHERE user_id = ?");
+
+// Handle comment submission
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['comment_text']) && isset($_POST['donation_id'])) {
+    $comment_text = htmlspecialchars($_POST['comment_text']);
+    $donation_id = (int)$_POST['donation_id'];
+    $user_id = $_SESSION['user_id'];
+    $created_at = date('Y-m-d H:i:s');
+    
+    // Insert comment into database
+    $stmt = $conn->prepare("INSERT INTO comments (donation_id, user_id, comment_text, created_at) VALUES (?, ?, ?, ?)");
+    
+    try {
+        $stmt->execute([$donation_id, $user_id, $comment_text, $created_at]);
+        // Refresh the page to show the new comment
+        header('Location: ' . $_SERVER['PHP_SELF']);
+        exit();
+    } catch (PDOException $e) {
+        die('Error: Failed to post comment. ' . $e->getMessage());
+    }
+}
+
+// Handle donation form submission
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['wasteType'])) {
     if (empty($_POST['wasteType']) || empty($_POST['quantity']) || empty($_POST['description'])) {
         die('Error: All fields are required.');
     }
     
-    // Sanitize and assign form data
     $item_name = htmlspecialchars($_POST['wasteType']);
     $quantity = (int) $_POST['quantity'];
     $category = htmlspecialchars($_POST['wasteType']);
@@ -35,7 +56,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             mkdir($upload_dir, 0777, true);
         }
 
+        $file_count = 0;
         foreach ($_FILES['photos']['name'] as $key => $file_name) {
+            if ($file_count >= 4) {
+                break;
+            }
+            
+            if (empty($file_name)) {
+                continue;
+            }
+            
             if ($_FILES['photos']['error'][$key] === UPLOAD_ERR_OK) {
                 $file_tmp = $_FILES['photos']['tmp_name'][$key];
                 $file_type = mime_content_type($file_tmp);
@@ -49,37 +79,122 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $target_file = $upload_dir . $unique_file_name;
 
                 if (move_uploaded_file($file_tmp, $target_file)) {
-                    $image_paths[] = $target_file; // Save the file path
+                    $image_paths[] = $target_file;
+                    $file_count++;
                 } else {
                     die('Failed to upload image: ' . $file_name);
                 }
             }
         }
         
-        // Convert image paths array to JSON for storage
         if (!empty($image_paths)) {
             $image_paths_json = json_encode($image_paths);
         }
     }
 
     // Insert donation into the database
-    $stmt = $conn->prepare("INSERT INTO donations (item_name, quantity, category, description, donor_id, donated_at, status, image_path) VALUES (?, ?, ?, ?, ?, ?, 'Available', ?)");
-    if (!$stmt) {
-        die('Error: Failed to prepare statement. ' . $conn->error);
+    try {
+        $stmt = $conn->prepare("INSERT INTO donations (item_name, quantity, category, description, donor_id, donated_at, status, image_path) VALUES (?, ?, ?, ?, ?, ?, 'Available', ?)");
+        $stmt->execute([$item_name, $quantity, $category, $description, $donor_id, $donated_at, $image_paths_json]);
+    } catch (PDOException $e) {
+        die('Error: Failed to insert donation. ' . $e->getMessage());
     }
 
-    if (!$stmt->bind_param("sisssss", $item_name, $quantity, $category, $description, $donor_id, $donated_at, $image_paths_json)) {
-        die('Error: Failed to bind parameters. ' . $stmt->error);
+    // UPDATE USER STATS - Check if columns exist before updating
+    // Check if user_stats record exists
+    $stats_check = $conn->prepare("SELECT COUNT(*) as count FROM user_stats WHERE user_id = ?");
+    $stats_check->execute([$donor_id]);
+    $stats_count = $stats_check->fetch(PDO::FETCH_ASSOC);
+    
+    if ($stats_count['count'] === 0) {
+        // Check which columns exist in user_stats table
+        $columns_stmt = $conn->prepare("SHOW COLUMNS FROM user_stats");
+        $columns_stmt->execute();
+        $columns = [];
+        while ($row = $columns_stmt->fetch(PDO::FETCH_ASSOC)) {
+            $columns[] = $row['Field'];
+        }
+        
+        // Build insert query based on available columns
+        $insert_columns = ['user_id'];
+        $insert_values = [$donor_id];
+        
+        if (in_array('items_donated', $columns)) {
+            $insert_columns[] = 'items_donated';
+            $insert_values[] = $quantity;
+        } else {
+            $insert_columns[] = 'items_donated';
+            $insert_values[] = $quantity;
+        }
+        
+        if (in_array('items_recycled', $columns)) {
+            $insert_columns[] = 'items_recycled';
+            $insert_values[] = 0;
+        }
+        
+        if (in_array('projects_completed', $columns)) {
+            $insert_columns[] = 'projects_completed';
+            $insert_values[] = 0;
+        }
+        
+        if (in_array('achievements_earned', $columns)) {
+            $insert_columns[] = 'achievements_earned';
+            $insert_values[] = 0;
+        }
+        
+        if (in_array('badges_earned', $columns)) {
+            $insert_columns[] = 'badges_earned';
+            $insert_values[] = 0;
+        }
+        
+        if (in_array('total_points', $columns)) {
+            $insert_columns[] = 'total_points';
+            $insert_values[] = $quantity * 2;
+        }
+        
+        $placeholders = implode(',', array_fill(0, count($insert_values), '?'));
+        
+        $insert_stmt = $conn->prepare("INSERT INTO user_stats (" . implode(',', $insert_columns) . ") VALUES ($placeholders)");
+        $insert_stmt->execute($insert_values);
+    } else {
+        // Update existing user_stats record
+        // Check if items_donated column exists
+        $column_check = $conn->prepare("SHOW COLUMNS FROM user_stats LIKE 'items_donated'");
+        $column_check->execute();
+        $column_result = $column_check->get_result();
+        if ($column_result->num_rows > 0) {
+            $update_stmt = $conn->prepare("UPDATE user_stats SET items_donated = items_donated + ? WHERE user_id = ?");
+            $update_stmt->bind_param("ii", $quantity, $donor_id);
+            $update_stmt->execute();
+        }
+        
+        // Check if total_points column exists
+        $points_column_check = $conn->prepare("SHOW COLUMNS FROM user_stats LIKE 'total_points'");
+        $points_column_check->execute();
+        $points_column_result = $points_column_check->get_result();
+        if ($points_column_result->num_rows > 0) {
+            $points_earned = $quantity * 2;
+            $update_points_stmt = $conn->prepare("UPDATE user_stats SET total_points = total_points + ? WHERE user_id = ?");
+            $update_points_stmt->bind_param("ii", $points_earned, $donor_id);
+            $update_points_stmt->execute();
+        }
+    }
+    
+    // Also update the main users table points if that column exists
+    $points_column = $conn->prepare("SHOW COLUMNS FROM users LIKE 'points'");
+    $points_column->execute();
+    $points_result = $points_column->get_result();
+    if ($points_result->num_rows > 0) {
+        $points_earned = $quantity * 2;
+        $update_user_points = $conn->prepare("UPDATE users SET points = points + ? WHERE user_id = ?");
+        $update_user_points->bind_param("ii", $points_earned, $donor_id);
+        $update_user_points->execute();
     }
 
-    if (!$stmt->execute()) {
-        die('Error: Failed to execute statement. ' . $stmt->error);
-    }
-
-    // Refresh the page to show the new donation instead of redirecting
     header('Location: ' . $_SERVER['PHP_SELF']);
     exit();
 }
+
 
 // Check login status
 if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true || empty($_SESSION['user_id'])) {
@@ -87,11 +202,33 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true || empty($
     exit();
 }
 
+// Function to calculate time ago
+function getTimeAgo($timestamp) {
+    $currentTime = time();
+    $timeDiff = $currentTime - strtotime($timestamp);
+    
+    if ($timeDiff < 60) {
+        return 'just now';
+    } elseif ($timeDiff < 3600) {
+        $minutes = floor($timeDiff / 60);
+        return $minutes . ' min ago';
+    } elseif ($timeDiff < 86400) {
+        $hours = floor($timeDiff / 3600);
+        return $hours . ' hour' . ($hours > 1 ? 's' : '') . ' ago';
+    } elseif ($timeDiff < 2592000) {
+        $days = floor($timeDiff / 86400);
+        return $days . ' day' . ($days > 1 ? 's' : '') . ' ago';
+    } else {
+        return date('M d, Y', strtotime($timestamp));
+    }
+}
+
 // Fetch user data
 $stmt = $conn->prepare("SELECT * FROM users WHERE user_id = ?");
 $stmt->bind_param("i", $_SESSION['user_id']);
 $stmt->execute();
-$user = $stmt->get_result()->fetch_assoc();
+$result = $stmt->get_result();
+$user = $result->fetch_assoc();
 
 if (!$user) {
     session_destroy();
@@ -101,25 +238,55 @@ if (!$user) {
 
 // Fetch available donations
 $donations = [];
-$result = $conn->query("SELECT * FROM donations WHERE status='Available' ORDER BY donated_at DESC LIMIT 5");
+$stmt = $conn->prepare("SELECT * FROM donations WHERE status='Available' ORDER BY donated_at DESC LIMIT 5");
+$stmt->execute();
+$result = $stmt->get_result();
 while ($row = $result->fetch_assoc()) $donations[] = $row;
+
+// Fetch comments for each donation
+$comments = [];
+foreach ($donations as $donation) {
+    $donation_id = $donation['donation_id'];
+    $comment_stmt = $conn->prepare("SELECT c.*, u.first_name FROM comments c 
+                                   JOIN users u ON c.user_id = u.user_id 
+                                   WHERE c.donation_id = ? 
+                                   ORDER BY c.created_at DESC");
+    $comment_stmt->bind_param("i", $donation_id);
+    $comment_stmt->execute();
+    $comment_result = $comment_stmt->get_result();
+    $comments[$donation_id] = [];
+    while ($comment_row = $comment_result->fetch_assoc()) {
+        $comments[$donation_id][] = $comment_row;
+    }
+}
 
 // Fetch recycled ideas
 $ideas = [];
-$result = $conn->query("SELECT * FROM recycled_ideas ORDER BY posted_at DESC LIMIT 5");
+$stmt = $conn->prepare("SELECT * FROM recycled_ideas ORDER BY posted_at DESC LIMIT 5");
+$stmt->execute();
+$result = $stmt->get_result();
 while ($row = $result->fetch_assoc()) $ideas[] = $row;
 
 // Fetch user stats
-$stats = $conn->query("SELECT * FROM user_stats WHERE user_id = {$user['user_id']}")->fetch_assoc();
+$stmt = $conn->prepare("SELECT * FROM user_stats WHERE user_id = ?");
+$stmt->bind_param("i", $user['user_id']);
+$stmt->execute();
+$result = $stmt->get_result();
+$stats = $result->fetch_assoc();
 
 // Fetch user projects
 $projects = [];
-$result = $conn->query("SELECT * FROM projects WHERE user_id = {$user['user_id']} ORDER BY created_at DESC LIMIT 3");
+$stmt = $conn->prepare("SELECT * FROM projects WHERE user_id = ? ORDER BY created_at DESC LIMIT 3");
+$stmt->bind_param("i", $user['user_id']);
+$stmt->execute();
+$result = $stmt->get_result();
 while ($row = $result->fetch_assoc()) $projects[] = $row;
 
 // Fetch leaderboard
 $leaders = [];
-$result = $conn->query("SELECT first_name, points FROM users ORDER BY points DESC LIMIT 10");
+$stmt = $conn->prepare("SELECT first_name, points FROM users ORDER BY points DESC LIMIT 10");
+$stmt->execute();
+$result = $stmt->get_result();
 while ($row = $result->fetch_assoc()) $leaders[] = $row;
 ?>
 <!DOCTYPE html>
@@ -129,9 +296,261 @@ while ($row = $result->fetch_assoc()) $leaders[] = $row;
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Home | EcoWaste</title>
     <link rel="stylesheet" href="assets/css/homepage.css">
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&family=Open+Sans&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/css/header.css">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&family=Open Sans&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .file-count-message {
+            font-size: 14px;
+            color: #666;
+            margin-top: 5px;
+            font-weight: 500;
+        }
+        
+        .donation-post {
+            padding: 20px;
+            border: 1px solid #e8e8e8;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            background-color: #fff;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        
+        .donation-user-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: #3d6a06;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 12px;
+            flex-shrink: 0;
+        }
+        
+        .user-info {
+            flex: 1;
+        }
+        
+        .user-name {
+            font-weight: 600;
+            font-size: 16px;
+            color: #333;
+            margin-bottom: 4px;
+        }
+        
+        .donation-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            font-size: 13px;
+            color: #666;
+        }
+        
+        .category {
+            font-weight: 500;
+        }
+        
+        .time-ago {
+            color: #999;
+        }
+        
+        .quantity-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+        
+        .quantity-label {
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .quantity-unit {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .donation-description {
+            margin-bottom: 15px;
+            padding: 12px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+        }
+        
+        .donation-description p {
+            margin: 0;
+            color: #444;
+            line-height: 1.5;
+        }
+        
+        .donation-images {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .donation-image {
+            width: 80px;
+            height: 80px;
+            object-fit: cover;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        
+        .donation-image:hover {
+            transform: scale(1.05);
+        }
+        
+        .donation-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+        
+        .request-btn {
+            padding: 10px 20px;
+            background-color: #2e8b57;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        
+        .request-btn:hover {
+            background-color: #3cb371;
+        }
 
+        .comments-btn {
+            padding: 10px 20px;
+            background-color: #6c757d;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        
+        .comments-btn:hover {
+            background-color: #5a6268;
+        }
+
+        .profile-link {
+            color: #333;
+            text-decoration: none;
+            transition: color 0.3s;
+            font-weight: 600;
+        }
+
+        .profile-link:hover {
+            color: #2e8b57;
+            text-decoration: underline;
+        }
+
+        /* Comments Section Styles */
+        .comments-section {
+            margin-top: 15px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+        }
+
+        .comments-list {
+            margin-bottom: 15px;
+        }
+
+        .comment {
+            padding: 12px;
+            margin-bottom: 10px;
+            background-color: white;
+            border-radius: 6px;
+            border-left: 3px solid #2e8b57;
+        }
+
+        .comment-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .comment-author {
+            font-weight: 600;
+            color: #2e8b57;
+        }
+
+        .comment-time {
+            font-size: 12px;
+            color: #6c757d;
+        }
+
+        .comment-text {
+            color: #333;
+            margin: 0;
+            line-height: 1.4;
+        }
+
+        .add-comment {
+            margin-top: 15px;
+        }
+
+        .comment-textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ced4da;
+            border-radius: 6px;
+            resize: vertical;
+            min-height: 80px;
+            font-family: 'Open Sans', sans-serif;
+            margin-bottom: 10px;
+        }
+
+        .comment-textarea:focus {
+            outline: none;
+            border-color: #2e8b57;
+            box-shadow: 0 0 0 3px rgba(46, 139, 87, 0.1);
+        }
+
+        .post-comment-btn {
+            padding: 8px 16px;
+            background-color: #2e8b57;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background-color 0.3s;
+        }
+
+        .post-comment-btn:hover {
+            background-color: #3cb371;
+        }
+
+        .no-comments {
+            text-align: center;
+            color: #6c757d;
+            font-style: italic;
+            padding: 20px;
+        }
+    </style>
 </head>
 <body>
         <header>
@@ -141,11 +560,13 @@ while ($row = $result->fetch_assoc()) $leaders[] = $row;
                 </div>
                 <h1>EcoWaste</h1>
             </div>
-            <div class="user-profile" id="userProfile">
-                <div class="profile-pic">
-                    <?= strtoupper(substr(htmlspecialchars($user['first_name']), 0, 1)) ?>
-                </div>
-                <span class="profile-name"><?= htmlspecialchars($user['first_name']) ?></span>
+            <div class="header-actions">
+                <?php include 'includes/notifications.php'; ?>
+                <div class="user-profile" id="userProfile">
+                    <div class="profile-pic">
+                        <?= strtoupper(substr(htmlspecialchars($user['first_name']), 0, 1)) ?>
+                    </div>
+                    <span class="profile-name"><?= htmlspecialchars($user['first_name']) ?></span>
                 <i class="fas fa-chevron-down dropdown-arrow"></i>
                 <div class="profile-dropdown">
                     <a href="profile.php" class="dropdown-item"><i class="fas fa-user"></i> My Profile</a>
@@ -157,8 +578,7 @@ while ($row = $result->fetch_assoc()) $leaders[] = $row;
         </header>
 
     <div class="container">
-
-          <aside class="sidebar">
+        <aside class="sidebar">
             <nav>
                 <ul>
                     <li><a href="homepage.php" style="color: rgb(4, 144, 4);"><i class="fas fa-home"></i>Home</a></li>
@@ -171,19 +591,16 @@ while ($row = $result->fetch_assoc()) $leaders[] = $row;
             </nav>
         </aside>
         <main class="main-content">
-            <!-- Welcome Card -->
             <div class="welcome-card">
                 <h2>WELCOME TO ECOWASTE</h2>
                 <div class="divider"></div>
                 <p>Join our community in making the world a cleaner place</p>
                 <div class="btn-container">
-                  <!-- Added role and tabindex for accessibility -->
-<button type="button" class="btn" id="donateWasteBtn" role="button" tabindex="0">Donate Waste</button>
+                    <button type="button" class="btn" id="donateWasteBtn" role="button" tabindex="0">Donate Waste</button>
                     <a href="start_project.php" class="btn">Start Recycling</a>
                     <a href="learn_more.php" class="btn" style="background-color: #666;">Learn More</a>
                 </div>
             </div>
-            <!-- Tab Navigation -->
             <div class="tab-container">
                 <button class="tab-btn active" onclick="openTab('donations')">Donations</button>
                 <button class="tab-btn" onclick="openTab('recycled-ideas')">Recycled Ideas</button>
@@ -199,53 +616,87 @@ while ($row = $result->fetch_assoc()) $leaders[] = $row;
                 <p>No donations available.</p>
             <?php else: ?>
                 <?php foreach ($donations as $donation): ?>
-<div class="donation-post">
-    <div class="donation-header">
-        <h4><?= htmlspecialchars($donation['item_name']) ?></h4>
-        <div class="donation-meta">
-            <span class="category">Category: <?= htmlspecialchars($donation['category']) ?></span>
-            <span class="quantity">Quantity: <?= htmlspecialchars($donation['quantity']) ?></span>
-            <span class="time-ago"><?= htmlspecialchars(date('M d, Y', strtotime($donation['donated_at']))) ?></span>
+                <div class="donation-post">
+    <div class="donation-user-header">
+        <div class="user-avatar">
+            <?php 
+                $donor_stmt = $conn->prepare("SELECT user_id, first_name FROM users WHERE user_id = ?");
+                $donor_stmt->bind_param("i", $donation['donor_id']);
+                $donor_stmt->execute();
+                $donor_result = $donor_stmt->get_result();
+                $donor = $donor_result->fetch_assoc();
+                $donor_initial = strtoupper(substr(htmlspecialchars($donor['first_name']), 0, 1));
+            ?>
+            <?= $donor_initial ?>
+        </div>
+        <div class="user-info">
+            <div class="user-name">
+                <a href="profile_view.php?user_id=<?= $donor['user_id'] ?>" class="profile-link">
+                    <?= htmlspecialchars($donor['first_name']) ?>
+                </a>
+            </div>
+            <div class="donation-meta">
+                <span class="category">Category: <?= htmlspecialchars($donation['category']) ?></span>
+                <span class="time-ago"><?= getTimeAgo($donation['donated_at']) ?></span>
+            </div>
         </div>
     </div>
-                
+    
+    <div class="quantity-info">
+        <div class="quantity-label">Quantity: <?= htmlspecialchars($donation['quantity']) ?>/<?= htmlspecialchars($donation['quantity']) ?></div>
+        <div class="quantity-unit">Units</div>
+    </div>
+    
+    <?php if (!empty($donation['description'])): ?>
     <div class="donation-description">
-        <p><?= nl2br(htmlspecialchars($donation['description'] ?? '')) ?></p>
+        <p><?= nl2br(htmlspecialchars($donation['description'])) ?></p>
     </div>
-
-<?php if (!empty($donation['image_path'])): ?>
-    <?php
-    $images = json_decode($donation['image_path'], true);
-    if (is_array($images) && !empty($images)): ?>
-        <div class="donation-images">
-            <?php foreach ($images as $image): ?>
-                <img src="<?= htmlspecialchars($image) ?>" alt="<?= htmlspecialchars($donation['item_name']) ?>" class="donation-image" onclick="openPhotoZoom('<?= htmlspecialchars($image) ?>')">
-            <?php endforeach; ?>
-        </div>
     <?php endif; ?>
-<?php endif; ?>
-
-
+    
+    <?php if (!empty($donation['image_path'])): ?>
+        <?php
+        $images = json_decode($donation['image_path'], true);
+        if (is_array($images) && !empty($images)): ?>
+            <div class="donation-images">
+                <?php foreach ($images as $image): ?>
+                    <img src="<?= htmlspecialchars($image) ?>" alt="<?= htmlspecialchars($donation['item_name']) ?>" class="donation-image" onclick="openPhotoZoom('<?= htmlspecialchars($image) ?>')">
+                <?php endforeach; ?>
+            </div>
+        <?php endif; ?>
+    <?php endif; ?>
     
     <div class="donation-actions">
         <button class="request-btn">Request Donation</button>
-                        <div class="donation-stats">
-                            <a href="#" class="comments-toggle">0 Comments</a>
+        <button class="comments-btn" onclick="toggleComments(this, <?= $donation['donation_id'] ?>)">
+            <i class="fas fa-comment"></i> Comments
+        </button>
+    </div>
+    
+    <div class="comments-section" id="comments-<?= $donation['donation_id'] ?>" style="display: none;">
+        <div class="comments-list">
+            <?php if (isset($comments[$donation['donation_id']]) && count($comments[$donation['donation_id']]) > 0): ?>
+                <?php foreach ($comments[$donation['donation_id']] as $comment): ?>
+                    <div class="comment">
+                        <div class="comment-header">
+                            <span class="comment-author"><?= htmlspecialchars($comment['first_name']) ?></span>
+                            <span class="comment-time"><?= getTimeAgo($comment['created_at']) ?></span>
                         </div>
+                        <p class="comment-text"><?= nl2br(htmlspecialchars($comment['comment_text'])) ?></p>
                     </div>
-                   
-                    <!-- Comments Section -->
-                    <div class="comments-section" style="display: none;">
-                        <div class="comments-list">
-                            <!-- Comments will be loaded here -->
-                            <p class="no-comments">No comments yet. Be the first to comment!</p>
-                        </div>
-                        <div class="add-comment">
-                            <textarea id="addComment1" name="addComment1" placeholder="Add a comment..." class="comment-text"></textarea>
-                            <button class="post-comment-btn">Post Comment</button>
-                        </div>
-                    </div>
-                </div>
+                <?php endforeach; ?>
+            <?php else: ?>
+                <div class="no-comments">No comments yet. Be the first to comment!</div>
+            <?php endif; ?>
+        </div>
+        <div class="add-comment">
+            <form method="POST" action="homepage.php">
+                <textarea name="comment_text" class="comment-textarea" placeholder="Add a comment..." required></textarea>
+                <input type="hidden" name="donation_id" value="<?= $donation['donation_id'] ?>">
+                <button type="submit" class="post-comment-btn">Post Comment</button>
+            </form>
+        </div>
+    </div>
+</div>
                 <?php endforeach; ?>
             <?php endif; ?>
         </div>
@@ -326,12 +777,12 @@ while ($row = $result->fetch_assoc()) $leaders[] = $row;
             </div>
         </div>
     </div>
+   
    <!-- Donation Popup Form -->
 <div id="donationPopup" class="popup-container" style="display:none;">
     <div class="popup-content" id="donationFormContainer">
         <h2>Post Donation</h2>
         <form id="donationForm" action="homepage.php" method="POST" enctype="multipart/form-data">
-            <!-- FIXED: Added missing div for form-group -->
             <div class="form-group">
                 <label for="wasteType">Type of Waste:</label>
                 <select id="wasteType" name="wasteType" required>
@@ -348,22 +799,26 @@ while ($row = $result->fetch_assoc()) $leaders[] = $row;
             </div>
             <div class="form-group">
                 <label for="quantity">Quantity:</label>
-                <input type="text" id="quantity" name="quantity" placeholder="Enter quantity" required>
-            </div>
+                <input type="number" id="quantity" name="quantity" placeholder="Enter quantity" 
+                    min="1" required>
+                </div>
+
             <div class="form-group">
                 <label for="description">Description:</label>
                 <textarea id="description" name="description" placeholder="Describe your donation..." rows="4" required></textarea>
             </div>
+            
             <div class="form-group">
-                <label for="photos">Attach Photos (up to 5):</label>
+                <label for="photos">Attach Photos (up to 4):</label>
                 <div class="file-upload">
                     <input type="file" id="photos" name="photos[]" accept="image/*" multiple>
                     <label for="photos" class="file-upload-label">Choose Files</label>
                     <span id="file-chosen">No files chosen</span>
                 </div>
-                <small class="form-hint">You can upload up to 5 photos.</small>
+                <small class="form-hint">You can upload up to 4 photos. Only JPG, PNG, and GIF files are allowed.</small>
                 
-                <!-- Scrollable image preview container -->
+                <div id="file-count-message" class="file-count-message" style="display: none;"></div>
+                
                 <div id="photoPreviewContainer" class="photo-preview-container">
                     <div id="photoPreview" class="photo-preview"></div>
                 </div>
@@ -372,8 +827,7 @@ while ($row = $result->fetch_assoc()) $leaders[] = $row;
         </form>
         <button class="close-btn">&times;</button>
     </div>
-     <!-- Success Popup (inside the same container) -->
-    <div class="popup-content success-popup" id="successPopup" style="display: none;">
+     <div class="popup-content success-popup" id="successPopup" style="display: none;">
         <h2>Congratulations!</h2>
         <p>You have<br>now donated your waste. Wait<br>for others to claim yours.</p>
         <button class="continue-btn" id="continueBtn">Continue</button>
@@ -420,7 +874,16 @@ while ($row = $result->fetch_assoc()) $leaders[] = $row;
         </div>
     </div>
 <script>
-    // Tab Functionality
+    function toggleComments(button, donationId) {
+        const commentsSection = document.getElementById('comments-' + donationId);
+        const isVisible = commentsSection.style.display === 'block';
+        commentsSection.style.display = isVisible ? 'none' : 'block';
+        
+        button.innerHTML = isVisible ? 
+            '<i class="fas fa-comment"></i> Comments' : 
+            '<i class="fas fa-times"></i> Close Comments';
+    }
+
     function openTab(tabName) {
         document.getElementById('donations').style.display = tabName === 'donations' ? 'block' : 'none';
         document.getElementById('recycled-ideas').style.display = tabName === 'recycled-ideas' ? 'block' : 'none';
@@ -429,7 +892,6 @@ while ($row = $result->fetch_assoc()) $leaders[] = $row;
         else document.querySelectorAll('.tab-btn')[1].classList.add('active');
     }
     
-    // User Profile Dropdown
     document.getElementById('userProfile').addEventListener('click', function() {
         this.classList.toggle('active');
     });
@@ -440,7 +902,6 @@ while ($row = $result->fetch_assoc()) $leaders[] = $row;
         }
     });
     
-    // Donation Popup Functionality
     document.addEventListener('DOMContentLoaded', function () {
         const donateWasteBtn = document.getElementById('donateWasteBtn');
         const donationPopup = document.getElementById('donationPopup');
@@ -452,34 +913,29 @@ while ($row = $result->fetch_assoc()) $leaders[] = $row;
             return;
         }
 
-        // Add event listener to the "Donate Waste" button
         donateWasteBtn.addEventListener('click', function (e) {
-            e.preventDefault(); // Prevent default behavior
+            e.preventDefault();
             console.log('Donate Waste button clicked');
-            donationPopup.style.display = 'flex'; // Show the popup
-            donationFormContainer.style.display = 'block'; // Ensure the form is visible
-            successPopup.style.display = 'none'; // Hide the success popup
+            donationPopup.style.display = 'flex';
+            donationFormContainer.style.display = 'block';
+            successPopup.style.display = 'none';
         });
 
-        // Close the popup when clicking outside the form
         donationPopup.addEventListener('click', function (e) {
             if (e.target === donationPopup) {
-                donationPopup.style.display = 'none'; // Hide the popup
+                donationPopup.style.display = 'none';
             }
         });
 
-        // Close the popup when clicking the close button
         document.querySelectorAll('.close-btn').forEach(btn => {
             btn.addEventListener('click', function () {
-                donationPopup.style.display = 'none'; // Hide the popup
+                donationPopup.style.display = 'none';
             });
         });
 
-        // Form submission handling
         document.getElementById('donationForm').addEventListener('submit', function(e) {
             e.preventDefault();
             
-            // Basic form validation
             const wasteType = document.getElementById('wasteType').value;
             const quantity = document.getElementById('quantity').value;
             const description = document.getElementById('description').value;
@@ -489,11 +945,9 @@ while ($row = $result->fetch_assoc()) $leaders[] = $row;
                 return;
             }
             
-            // Submit the form programmatically
             this.submit();
         });
 
-        // Continue button in success popup
         const continueBtn = document.getElementById('continueBtn');
         if (continueBtn) {
             continueBtn.addEventListener('click', function() {
@@ -501,37 +955,36 @@ while ($row = $result->fetch_assoc()) $leaders[] = $row;
                 document.getElementById('donationForm').reset();
                 document.getElementById('file-chosen').textContent = 'No files chosen';
                 document.getElementById('photoPreview').innerHTML = '';
+                document.getElementById('file-count-message').style.display = 'none';
                 selectedFiles = [];
                 donationFormContainer.style.display = 'block';
                 successPopup.style.display = 'none';
             });
         }
 
-        // Fix for multiple image upload - store selected files
         let selectedFiles = [];
         const photoInput = document.getElementById('photos');
+        const maxFiles = 4;
         
         photoInput.addEventListener('change', function() {
             const newFiles = Array.from(this.files);
             
-            // Add new files to selectedFiles array
             newFiles.forEach(file => {
-                // Check if file is already selected
-                const isDuplicate = selectedFiles.some(
-                    selectedFile => selectedFile.name === file.name && selectedFile.size === file.size
-                );
-                
-                if (!isDuplicate && selectedFiles.length < 5) {
-                    selectedFiles.push(file);
+                if (selectedFiles.length < maxFiles) {
+                    const isDuplicate = selectedFiles.some(
+                        selectedFile => selectedFile.name === file.name && selectedFile.size === file.size
+                    );
+                    
+                    if (!isDuplicate) {
+                        selectedFiles.push(file);
+                    }
                 }
             });
             
-            // Update the file input with all selected files
             const dataTransfer = new DataTransfer();
             selectedFiles.forEach(file => dataTransfer.items.add(file));
             photoInput.files = dataTransfer.files;
             
-            // Update UI
             updateFileDisplay();
         });
         
@@ -542,20 +995,10 @@ while ($row = $result->fetch_assoc()) $leaders[] = $row;
                 
             document.getElementById('file-chosen').textContent = fileNames;
             
-            // Preview images
             const photoPreview = document.getElementById('photoPreview');
             photoPreview.innerHTML = '';
             
             if (selectedFiles.length > 0) {
-                // Show message about selected files
-                const fileCount = document.createElement('p');
-                fileCount.textContent = `Selected ${selectedFiles.length} file(s)`;
-                fileCount.style.marginBottom = '10px';
-                fileCount.style.fontSize = '14px';
-                fileCount.style.color = '#666';
-                fileCount.style.width = '100%';
-                photoPreview.appendChild(fileCount);
-                
                 selectedFiles.forEach((file, index) => {
                     if (file.type.match('image.*')) {
                         const reader = new FileReader();
@@ -568,7 +1011,6 @@ while ($row = $result->fetch_assoc()) $leaders[] = $row;
                             img.alt = file.name;
                             img.title = file.name;
                             
-                            // Add hover effect
                             img.addEventListener('mouseover', function() {
                                 this.style.opacity = '0.8';
                             });
@@ -580,7 +1022,6 @@ while ($row = $result->fetch_assoc()) $leaders[] = $row;
                                 openPhotoZoom(e.target.result);
                             });
                             
-                            // Add remove button
                             const removeBtn = document.createElement('button');
                             removeBtn.className = 'remove-image-btn';
                             removeBtn.innerHTML = '&times;';
@@ -588,15 +1029,12 @@ while ($row = $result->fetch_assoc()) $leaders[] = $row;
                             
                             removeBtn.addEventListener('click', function(e) {
                                 e.stopPropagation();
-                                // Remove file from selectedFiles
                                 selectedFiles.splice(index, 1);
                                 
-                                // Update the file input
                                 const dataTransfer = new DataTransfer();
                                 selectedFiles.forEach(file => dataTransfer.items.add(file));
                                 photoInput.files = dataTransfer.files;
                                 
-                                // Update UI
                                 updateFileDisplay();
                             });
                             
@@ -609,193 +1047,31 @@ while ($row = $result->fetch_assoc()) $leaders[] = $row;
                 });
             }
             
-            // Show warning if more than 5 files selected
-            if (selectedFiles.length > 5) {
+            const fileCountElement = document.getElementById('file-count-message');
+            if (selectedFiles.length > 0) {
+                fileCountElement.textContent = `Selected ${selectedFiles.length} of ${maxFiles} files`;
+                fileCountElement.style.display = 'block';
+            } else {
+                fileCountElement.style.display = 'none';
+            }
+            
+            if (selectedFiles.length > maxFiles) {
                 const warning = document.createElement('p');
-                warning.textContent = 'Maximum 5 files allowed. Only the first 5 will be uploaded.';
+                warning.textContent = `Maximum ${maxFiles} files allowed. Only the first ${maxFiles} will be uploaded.`;
                 warning.style.color = 'red';
                 warning.style.fontSize = '12px';
                 warning.style.marginTop = '10px';
                 warning.style.width = '100%';
                 photoPreview.appendChild(warning);
                 
-                // Keep only first 5 files
-                selectedFiles = selectedFiles.slice(0, 5);
+                selectedFiles = selectedFiles.slice(0, maxFiles);
                 
-                // Update the file input
                 const dataTransfer = new DataTransfer();
                 selectedFiles.forEach(file => dataTransfer.items.add(file));
                 photoInput.files = dataTransfer.files;
                 
-                // Update UI again
                 updateFileDisplay();
             }
-        }
-    });
-
-    // Comment functionality
-    document.addEventListener('DOMContentLoaded', function() {
-        // Toggle comments visibility
-        document.querySelectorAll('.comments-toggle').forEach(toggle => {
-            toggle.addEventListener('click', function(e) {
-                e.preventDefault();
-                const commentsSection = this.closest('.donation-post').querySelector('.comments-section');
-                const isVisible = commentsSection.style.display === 'block';
-                
-                commentsSection.style.display = isVisible ? 'none' : 'block';
-                
-                if (!isVisible) {
-                    // Load comments if not already loaded
-                    loadComments(this.closest('.donation-post'));
-                }
-            });
-        });
-        
-        // Post comment functionality
-        document.querySelectorAll('.post-comment-btn').forEach(btn => {
-            btn.addEventListener('click', function (e) {
-                e.preventDefault(); // Prevent the default form submission behavior
-                const commentText = this.closest('.add-comment').querySelector('.comment-text');
-                const comment = commentText.value.trim();
-
-                if (comment) {
-                    postComment(this.closest('.donation-post'), comment);
-                    commentText.value = ''; // Clear the comment input field
-                }
-            });
-        });
-        
-        // Allow pressing Enter to post comment (while holding Shift for new line)
-        document.querySelectorAll('.comment-text').forEach(textarea => {
-            textarea.addEventListener('keydown', function(e) {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    this.closest('.add-comment').querySelector('.post-comment-btn').click();
-                }
-            });
-        });
-    });
-
-    function loadComments(donationPost) {
-        const commentsList = donationPost.querySelector('.comments-list');
-        const noComments = donationPost.querySelector('.no-comments');
-        
-        // Simulate loading comments (replace with actual API call)
-        setTimeout(() => {
-            // In a real application, you would fetch comments from your server
-            // For now, we'll just show the "no comments" message
-            noComments.style.display = 'block';
-        }, 500);
-    }
-
-    function postComment(donationPost, commentText) {
-        const commentsList = donationPost.querySelector('.comments-list');
-        const noComments = donationPost.querySelector('.no-comments');
-        const commentsToggle = donationPost.querySelector('.comments-toggle');
-
-        // Hide "no comments" message
-        noComments.style.display = 'none';
-
-        // Create new comment element
-        const commentDiv = document.createElement('div');
-        commentDiv.className = 'comment';
-        commentDiv.innerHTML = `
-            <div class="comment-author">You</div>
-            <p class="comment-text">${commentText}</p>
-        `;
-
-        // Add comment to list
-        commentsList.appendChild(commentDiv);
-
-        // Update comments count
-        const currentCount = parseInt(commentsToggle.textContent) || 0;
-        commentsToggle.textContent = `${currentCount + 1} Comments`;
-
-        // Scroll to the new comment
-        commentDiv.scrollIntoView({ behavior: 'smooth' });
-    }
-
-    // Feedback system JavaScript
-    document.addEventListener('DOMContentLoaded', function() {
-        const feedbackBtn = document.getElementById('feedbackBtn');
-        const feedbackModal = document.getElementById('feedbackModal');
-        const feedbackCloseBtn = document.getElementById('feedbackCloseBtn');
-        const emojiOptions = document.querySelectorAll('.emoji-option');
-        const feedbackForm = document.getElementById('feedbackForm');
-        const thankYouMessage = document.getElementById('thankYouMessage');
-        const feedbackSubmitBtn = document.getElementById('feedbackSubmitBtn');
-        const spinner = document.getElementById('spinner');
-        const ratingError = document.getElementById('ratingError');
-        const textError = document.getElementById('textError');
-        const feedbackText = document.getElementById('feedbackText');
-        let selectedRating = 0;
-        
-        emojiOptions.forEach(option => {
-            option.addEventListener('click', () => {
-                emojiOptions.forEach(opt => opt.classList.remove('selected'));
-                option.classList.add('selected');
-                selectedRating = option.getAttribute('data-rating');
-                ratingError.style.display = 'none';
-            });
-        });
-        
-        feedbackForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            let isValid = true;
-            if (selectedRating === 0) {
-                ratingError.style.display = 'block';
-                isValid = false;
-            } else {
-                ratingError.style.display = 'none';
-            }
-            if (feedbackText.value.trim() === '') {
-                textError.style.display = 'block';
-                isValid = false;
-            } else {
-                textError.style.display = 'none';
-            }
-            if (!isValid) return;
-            feedbackSubmitBtn.disabled = true;
-            spinner.style.display = 'block';
-            setTimeout(() => {
-                spinner.style.display = 'none';
-                feedbackForm.style.display = 'none';
-                thankYouMessage.style.display = 'block';
-                setTimeout(() => {
-                    feedbackModal.style.display = 'none';
-                    feedbackForm.style.display = 'block';
-                    thankYouMessage.style.display = 'none';
-                    feedbackText.value = '';
-                    emojiOptions.forEach(opt => opt.classList.remove('selected'));
-                    selectedRating = 0;
-                    feedbackSubmitBtn.disabled = false;
-                }, 3000);
-            }, 1500);
-        });
-        
-        feedbackBtn.addEventListener('click', () => {
-            feedbackModal.style.display = 'flex';
-        });
-        
-        feedbackCloseBtn.addEventListener('click', closeFeedbackModal);
-        
-        window.addEventListener('click', (event) => {
-            if (event.target === feedbackModal) {
-                closeFeedbackModal();
-            }
-        });
-        
-        function closeFeedbackModal() {
-            feedbackModal.style.display = 'none';
-            feedbackForm.style.display = 'block';
-            thankYouMessage.style.display = 'none';
-            feedbackText.value = '';
-            emojiOptions.forEach(opt => opt.classList.remove('selected'));
-            selectedRating = 0;
-            ratingError.style.display = 'none';
-            textError.style.display = 'none';
-            feedbackSubmitBtn.disabled = false;
-            spinner.style.display = 'none';
         }
     });
 

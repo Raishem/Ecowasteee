@@ -11,21 +11,28 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true || empty($
 // Get user data from database
 $user_id = $_SESSION['user_id'];
 $conn = getDBConnection();
+if (!$conn) {
+    die("Database connection failed.");
+}
+
 $user_query = $conn->prepare("SELECT * FROM users WHERE user_id = ?");
 $user_query->bind_param("i", $user_id);
 $user_query->execute();
-$user_result = $user_query->get_result();
-$user_data = $user_result->fetch_assoc();
+$result = $user_query->get_result();
+$user_data = $result->fetch_assoc();
+if (!$user_data) {
+    $user_data = [];
+}
 
 // Handle form submission
 $success_message = '';
 $error_message = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_project'])) {
-    $project_name = trim($_POST['project_name']);
-    $project_description = trim($_POST['project_description']);
-    $materials = $_POST['materials'] ?? [];
-    $quantities = $_POST['quantities'] ?? [];
+    $project_name = isset($_POST['project_name']) ? trim($_POST['project_name']) : '';
+    $project_description = isset($_POST['project_description']) ? trim($_POST['project_description']) : '';
+    $materials = isset($_POST['materials']) ? (array)$_POST['materials'] : [];
+    $quantities = isset($_POST['quantities']) ? (array)$_POST['quantities'] : [];
     
     // Validate inputs
     if (empty($project_name)) {
@@ -42,35 +49,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_project'])) {
             // Insert project
             $project_stmt = $conn->prepare("INSERT INTO projects (user_id, project_name, description) VALUES (?, ?, ?)");
             $project_stmt->bind_param("iss", $user_id, $project_name, $project_description);
+            if (!$project_stmt->execute()) {
+                throw new Exception("Failed to create project");
+            }
             
-            if ($project_stmt->execute()) {
-                $project_id = $conn->insert_id;
-                
-                // Insert materials
-                $material_stmt = $conn->prepare("INSERT INTO project_materials (project_id, material_name, quantity) VALUES (?, ?, ?)");
-                
-                foreach ($materials as $index => $material) {
-                    if (!empty($material) && !empty($quantities[$index])) {
-                        $quantity = (int)$quantities[$index];
-                        if ($quantity > 0) {
-                            $material_stmt->bind_param("isi", $project_id, $material, $quantity);
-                            $material_stmt->execute();
+            $project_id = $conn->insert_id;
+            
+            // Insert materials
+            $material_stmt = $conn->prepare("INSERT INTO project_materials (project_id, material_name, quantity) VALUES (?, ?, ?)");
+            if (!$material_stmt) {
+                throw new Exception("Failed to prepare material statement");
+            }
+            
+            $material_stmt->bind_param("isi", $project_id, $material, $quantity);
+            
+            foreach ($materials as $index => $material) {
+                if (!empty($material) && isset($quantities[$index])) {
+                    $quantity = (int)$quantities[$index];
+                    if ($quantity > 0) {
+                        if (!$material_stmt->execute()) {
+                            throw new Exception("Failed to insert material");
                         }
                     }
                 }
-                
-                // Commit transaction
-                $conn->commit();
-                $success_message = "Project created successfully!";
-                
-                // Clear form
-                $_POST = array();
-            } else {
-                throw new Exception("Error creating project: " . $conn->error);
             }
+            
+            // Commit transaction
+            $conn->commit();
+            $success_message = "Project created successfully!";
+            
+            // Clear form
+            $_POST = array();
+            
         } catch (Exception $e) {
             // Rollback transaction on error
-            $conn->rollback();
+            if ($conn) {
+                $conn->rollback();
+            }
             $error_message = "Error creating project: " . $e->getMessage();
         }
     }
@@ -113,16 +128,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_project'])) {
             color: #2e8b57;
             font-weight: 600;
             padding: 8px 16px;
-            border-radius: 4px;
-            transition: background-color 0.3s;
+            border-radius: 6px;
+            transition: all 0.3s ease;
+            background-color: #f0f7e8;
+            border: 1px solid #2e8b57;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            font-size: 14px;
         }
         
         .back-button:hover {
-            background-color: #f0f7e8;
+            background-color: #2e8b57;
+            color: white;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
         }
         
         .back-button i {
-            margin-right: 8px;
+            margin-right: 6px;
+            transition: transform 0.3s ease;
+        }
+        
+        .back-button:hover i {
+            transform: translateX(-3px);
         }
         
         .page-header {

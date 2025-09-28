@@ -284,6 +284,18 @@ header {
             background-color: #f0f7e8;
         }
 
+/* Responsive: stack view-details link as full-width button on small screens */
+@media (max-width: 768px) {
+    .view-details {
+        display: block;
+        width: 100%;
+        box-sizing: border-box;
+        text-align: center;
+        padding: 10px 12px;
+        margin-top: 8px;
+    }
+}
+
         /* feedback system */
         .feedback-btn {
             position: fixed;

@@ -2,203 +2,342 @@
 session_start();
 require_once 'config.php';
 
+// Set JSON content type for all responses
+header('Content-Type: application/json');
+
 // Check if user is logged in
-if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true || empty($_SESSION['user_id'])) {
-    echo json_encode(['success' => false, 'message' => 'Not authorized']);
-    exit();
+if (!isset($_SESSION['user_id'])) {
+    echo json_encode(['success' => false, 'message' => 'Not authenticated']);
+    exit;
 }
 
-// Get database connection
 $conn = getDBConnection();
 
-// Function to check if project belongs to user
-function verifyProjectOwnership($conn, $projectId, $userId) {
-    $stmt = $conn->prepare("SELECT user_id FROM projects WHERE project_id = ?");
-    $stmt->execute([$projectId]);
-    $project = $stmt->fetch();
-    return $project && $project['user_id'] == $userId;
+// Handle GET requests for project details
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['action']) && $_GET['action'] === 'get_project_details') {
+    $project_id = filter_input(INPUT_GET, 'project_id', FILTER_VALIDATE_INT);
+    
+    if (!$project_id) {
+        echo json_encode(['success' => false, 'message' => 'Invalid project ID']);
+        exit;
+    }
+
+    try {
+        // Get project details
+        $stmt = $conn->prepare("
+            SELECT p.*, 
+                   pm.material_id,
+                   pm.material_name,
+                   pm.quantity,
+                   pm.unit,
+                   pm.is_found,
+                   COALESCE(p.status, 'planning') as status
+            FROM projects p
+            LEFT JOIN project_materials pm ON p.project_id = pm.project_id
+            WHERE p.project_id = ? AND p.user_id = ?
+        ");
+        $stmt->execute([$project_id, $_SESSION['user_id']]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        if (empty($rows)) {
+            echo json_encode(['success' => false, 'message' => 'Project not found']);
+            exit;
+        }
+
+        // Get project steps
+        $steps_stmt = $conn->prepare("
+            SELECT ps.*, GROUP_CONCAT(sp.photo_path) as photos
+            FROM project_steps ps
+            LEFT JOIN step_photos sp ON ps.step_id = sp.step_id
+            WHERE ps.project_id = ?
+            GROUP BY ps.step_id
+            ORDER BY ps.step_number
+        ");
+        $steps_stmt->execute([$project_id]);
+        $steps = $steps_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Format the response
+        $project = [
+            'project_id' => $rows[0]['project_id'],
+            'project_name' => $rows[0]['project_name'],
+            'status' => $rows[0]['status'],
+            'description' => $rows[0]['description'],
+            'created_at' => $rows[0]['created_at']
+        ];
+
+        $materials = [];
+        foreach ($rows as $row) {
+            if ($row['material_id']) {
+                $materials[] = [
+                    'id' => $row['material_id'],
+                    'name' => $row['material_name'],
+                    'quantity' => $row['quantity'],
+                    'unit' => $row['unit']
+                ];
+            }
+        }
+
+        echo json_encode([
+            'success' => true,
+            'project' => $project,
+            'materials' => $materials,
+            'steps' => $steps
+        ]);
+        exit;
+    } catch (PDOException $e) {
+        echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
+        exit;
+    }
 }
 
-// Function to fetch project materials
-function getProjectMaterials($conn, $projectId) {
-    $stmt = $conn->prepare("SELECT * FROM project_materials WHERE project_id = ? ORDER BY created_at");
-    $stmt->execute([$projectId]);
-    return $stmt->fetchAll(PDO::FETCH_ASSOC);
-}
+// Handle POST requests for updates
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!isset($_POST['action']) || !isset($_POST['project_id'])) {
+        echo json_encode(['success' => false, 'message' => 'Missing parameters']);
+        exit;
+    }
 
-// Function to fetch project photos
-function getProjectPhotos($conn, $projectId) {
-    $stmt = $conn->prepare("SELECT * FROM project_photos WHERE project_id = ? ORDER BY created_at DESC");
-    $stmt->execute([$projectId]);
-    return $stmt->fetchAll(PDO::FETCH_ASSOC);
-}
+    $project_id = filter_input(INPUT_POST, 'project_id', FILTER_VALIDATE_INT);
+    if (!$project_id) {
+        echo json_encode(['success' => false, 'message' => 'Invalid project ID']);
+        exit;
+    }
 
-// Get action from request
-$action = $_GET['action'] ?? '';
+    // Verify project belongs to user
+    $check_query = $conn->prepare("SELECT user_id FROM projects WHERE project_id = ?");
+    $check_query->execute([$project_id]);
+    $project = $check_query->fetch();
 
-// Process the action
-try {
-    switch ($action) {
-        case 'get_project_details':
-            $projectId = $_GET['project_id'] ?? '';
-            if (!$projectId || !verifyProjectOwnership($conn, $projectId, $_SESSION['user_id'])) {
-                throw new Exception('Invalid project');
+    if (!$project || $project['user_id'] !== $_SESSION['user_id']) {
+        echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+        exit;
+    }
+
+    // Handle different actions
+    switch ($_POST['action']) {
+        case 'add_material':
+            if (!isset($_POST['name']) || !isset($_POST['unit'])) {
+                echo json_encode(['success' => false, 'message' => 'Missing material details']);
+                exit;
             }
 
-            $stmt = $conn->prepare("
-                SELECT p.*, 
-                       COUNT(DISTINCT m.material_id) as total_materials,
-                       COUNT(DISTINCT CASE WHEN m.is_found = 1 THEN m.material_id END) as found_materials,
-                       COUNT(DISTINCT ph.photo_id) as photo_count
-                FROM projects p 
-                LEFT JOIN project_materials m ON p.project_id = m.project_id
-                LEFT JOIN project_photos ph ON p.project_id = ph.project_id
-                WHERE p.project_id = ?
-                GROUP BY p.project_id
-            ");
-            $stmt->execute([$projectId]);
-            $project = $stmt->fetch();
+            try {
+                $material_stmt = $conn->prepare("
+                    INSERT INTO project_materials (project_id, material_name, unit, created_at)
+                    VALUES (?, ?, ?, NOW())
+                ");
+                $material_stmt->execute([
+                    $project_id,
+                    $_POST['name'],
+                    $_POST['unit']
+                ]);
 
-            $materials = getProjectMaterials($conn, $projectId);
-            $photos = getProjectPhotos($conn, $projectId);
+                echo json_encode(['success' => true, 'material_id' => $conn->lastInsertId()]);
+                exit;
 
-            echo json_encode([
-                'success' => true,
-                'project' => $project,
-                'materials' => $materials,
-                'photos' => $photos
-            ]);
+            } catch (PDOException $e) {
+                echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
+                exit;
+            }
             break;
 
-        case 'add_material':
-            $data = json_decode(file_get_contents('php://input'), true);
-            $projectId = $data['project_id'] ?? '';
-            $name = $data['name'] ?? '';
-            $unit = $data['unit'] ?? '';
-
-            if (!$projectId || !$name || !verifyProjectOwnership($conn, $projectId, $_SESSION['user_id'])) {
-                throw new Exception('Invalid request');
+        case 'add_step':
+            // Validate required fields
+            if (!isset($_POST['title']) || !isset($_POST['instructions'])) {
+                echo json_encode(['success' => false, 'message' => 'Missing step details']);
+                exit;
             }
 
-            $stmt = $conn->prepare("INSERT INTO project_materials (project_id, name, unit) VALUES (?, ?, ?)");
-            $stmt->execute([$projectId, $name, $unit]);
-            
-            $materials = getProjectMaterials($conn, $projectId);
-            echo json_encode(['success' => true, 'materials' => $materials]);
+            try {
+                $conn->beginTransaction();
+
+                // Get next step number
+                $step_num_stmt = $conn->prepare("
+                    SELECT COALESCE(MAX(step_number), 0) + 1 as next_step
+                    FROM project_steps
+                    WHERE project_id = ?
+                ");
+                $step_num_stmt->execute([$project_id]);
+                $next_step = $step_num_stmt->fetch()['next_step'];
+
+                // Insert step
+                $step_stmt = $conn->prepare("
+                    INSERT INTO project_steps (project_id, step_number, title, instructions)
+                    VALUES (?, ?, ?, ?)
+                ");
+                $step_stmt->execute([
+                    $project_id,
+                    $next_step,
+                    $_POST['title'],
+                    $_POST['instructions']
+                ]);
+                $step_id = $conn->lastInsertId();
+
+                // Handle photo uploads
+                if (!empty($_FILES['photos']['name'][0])) {
+                    $upload_dir = 'assets/uploads/';
+                    foreach ($_FILES['photos']['tmp_name'] as $key => $tmp_name) {
+                        $file_name = uniqid() . '_' . basename($_FILES['photos']['name'][$key]);
+                        $target_file = $upload_dir . $file_name;
+
+                        if (move_uploaded_file($tmp_name, $target_file)) {
+                            $photo_stmt = $conn->prepare("
+                                INSERT INTO step_photos (step_id, photo_path)
+                                VALUES (?, ?)
+                            ");
+                            $photo_stmt->execute([$step_id, $file_name]);
+                        }
+                    }
+                }
+
+                $conn->commit();
+                echo json_encode(['success' => true, 'step_id' => $step_id]);
+                exit;
+
+            } catch (PDOException $e) {
+                $conn->rollBack();
+                echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
+                exit;
+            }
+            break;
+
+        case 'update_project_status':
+            if (!isset($_POST['status'])) {
+                echo json_encode(['success' => false, 'message' => 'Missing status']);
+                exit;
+            }
+
+            $allowed_statuses = ['planning', 'collecting', 'in_progress', 'completed'];
+            if (!in_array($_POST['status'], $allowed_statuses)) {
+                echo json_encode(['success' => false, 'message' => 'Invalid status']);
+                exit;
+            }
+
+            try {
+                $status_stmt = $conn->prepare("
+                    UPDATE projects 
+                    SET status = ?, 
+                        completion_date = CASE WHEN ? = 'completed' THEN NOW() ELSE NULL END,
+                        updated_at = NOW()
+                    WHERE project_id = ?
+                ");
+                $status_stmt->execute([$_POST['status'], $_POST['status'], $project_id]);
+
+                break;
+
+            } catch (PDOException $e) {
+                echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
+                exit;
+            }
             break;
 
         case 'mark_material_found':
-            $data = json_decode(file_get_contents('php://input'), true);
-            $projectId = $data['project_id'] ?? '';
-            $materialId = $data['material_id'] ?? '';
-
-            if (!$projectId || !$materialId || !verifyProjectOwnership($conn, $projectId, $_SESSION['user_id'])) {
-                throw new Exception('Invalid request');
+            if (!isset($_POST['material_id'])) {
+                echo json_encode(['success' => false, 'message' => 'Missing material ID']);
+                exit;
             }
 
-            $stmt = $conn->prepare("UPDATE project_materials SET is_found = 1 WHERE material_id = ? AND project_id = ?");
-            $stmt->execute([$materialId, $projectId]);
-            
-            $materials = getProjectMaterials($conn, $projectId);
-            echo json_encode(['success' => true, 'materials' => $materials]);
+            try {
+                $material_stmt = $conn->prepare("
+                    UPDATE project_materials 
+                    SET is_found = TRUE 
+                    WHERE project_id = ? AND material_id = ?
+                ");
+                $material_stmt->execute([$project_id, $_POST['material_id']]);
+
+                echo json_encode(['success' => true]);
+                exit;
+
+            } catch (PDOException $e) {
+                echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
+                exit;
+            }
             break;
 
-        case 'delete_material':
-            $data = json_decode(file_get_contents('php://input'), true);
-            $projectId = $data['project_id'] ?? '';
-            $materialId = $data['material_id'] ?? '';
-
-            if (!$projectId || !$materialId || !verifyProjectOwnership($conn, $projectId, $_SESSION['user_id'])) {
-                throw new Exception('Invalid request');
-            }
-
-            $stmt = $conn->prepare("DELETE FROM project_materials WHERE material_id = ? AND project_id = ?");
-            $stmt->execute([$materialId, $projectId]);
-            
-            $materials = getProjectMaterials($conn, $projectId);
-            echo json_encode(['success' => true, 'materials' => $materials]);
-            break;
-
-        case 'update_status':
-            $data = json_decode(file_get_contents('php://input'), true);
-            $projectId = $data['project_id'] ?? '';
-            $status = $data['status'] ?? '';
-
-            if (!$projectId || !$status || !verifyProjectOwnership($conn, $projectId, $_SESSION['user_id'])) {
-                throw new Exception('Invalid request');
-            }
-
-            $stmt = $conn->prepare("
-                UPDATE projects 
-                SET status = ?,
-                    completion_date = CASE WHEN ? = 'completed' THEN NOW() ELSE NULL END,
-                    updated_at = NOW()
-                WHERE project_id = ?
-            ");
-            $stmt->execute([$status, $status, $projectId]);
-            echo json_encode(['success' => true]);
-            break;
-
-        case 'add_photo':
-            $projectId = $_POST['project_id'] ?? '';
-            if (!$projectId || !verifyProjectOwnership($conn, $projectId, $_SESSION['user_id'])) {
-                throw new Exception('Invalid request');
-            }
-
-            if (!isset($_FILES['photo']) || $_FILES['photo']['error'] !== UPLOAD_ERR_OK) {
-                throw new Exception('No photo uploaded');
-            }
-
-            $file = $_FILES['photo'];
-            $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-            $allowedTypes = ['jpg', 'jpeg', 'png', 'gif'];
-            
-            if (!in_array($ext, $allowedTypes)) {
-                throw new Exception('Invalid file type');
-            }
-
-            $newFileName = uniqid() . '_' . date('Ymd') . '.' . $ext;
-            $uploadPath = 'assets/uploads/' . $newFileName;
-
-            if (move_uploaded_file($file['tmp_name'], $uploadPath)) {
-                $stmt = $conn->prepare("INSERT INTO project_photos (project_id, photo_url) VALUES (?, ?)");
-                $stmt->execute([$projectId, $uploadPath]);
+        case 'generate_share_link':
+            try {
+                $share_token = bin2hex(random_bytes(16));
                 
-                $photos = getProjectPhotos($conn, $projectId);
-                echo json_encode(['success' => true, 'photos' => $photos]);
-            } else {
-                throw new Exception('Error uploading file');
+                $share_stmt = $conn->prepare("
+                    INSERT INTO project_shares (project_id, share_token, created_at)
+                    VALUES (?, ?, NOW())
+                    ON DUPLICATE KEY UPDATE share_token = VALUES(share_token)
+                ");
+                $share_stmt->execute([$project_id, $share_token]);
+
+                $share_url = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") 
+                            . "://$_SERVER[HTTP_HOST]/shared_project.php?token=" . $share_token;
+
+                echo json_encode(['success' => true, 'share_url' => $share_url]);
+                exit;
+
+            } catch (Exception $e) {
+                echo json_encode(['success' => false, 'message' => 'Error generating share link']);
+                exit;
             }
-            break;
-
-        case 'delete_photo':
-            $data = json_decode(file_get_contents('php://input'), true);
-            $projectId = $data['project_id'] ?? '';
-            $photoId = $data['photo_id'] ?? '';
-
-            if (!$projectId || !$photoId || !verifyProjectOwnership($conn, $projectId, $_SESSION['user_id'])) {
-                throw new Exception('Invalid request');
-            }
-
-            // Get photo URL before deleting
-            $stmt = $conn->prepare("SELECT photo_url FROM project_photos WHERE photo_id = ? AND project_id = ?");
-            $stmt->execute([$photoId, $projectId]);
-            $photo = $stmt->fetch();
-            
-            if ($photo && file_exists($photo['photo_url'])) {
-                unlink($photo['photo_url']); // Delete the file
-            }
-
-            $stmt = $conn->prepare("DELETE FROM project_photos WHERE photo_id = ? AND project_id = ?");
-            $stmt->execute([$photoId, $projectId]);
-            
-            $photos = getProjectPhotos($conn, $projectId);
-            echo json_encode(['success' => true, 'photos' => $photos]);
             break;
 
         default:
-            throw new Exception('Invalid action');
+            echo json_encode(['success' => false, 'message' => 'Invalid action']);
+            exit;
     }
-} catch (Exception $e) {
-    echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+
+    try {
+        switch ($_POST['action']) {
+            case 'update_title':
+                $title = trim(filter_input(INPUT_POST, 'title', FILTER_SANITIZE_STRING));
+                if (empty($title)) {
+                    throw new Exception('Title is required');
+                }
+                $stmt = $conn->prepare("UPDATE projects SET project_name = ? WHERE project_id = ?");
+                $stmt->execute([$title, $project_id]);
+                break;
+
+            case 'update_description':
+                $description = trim(filter_input(INPUT_POST, 'description', FILTER_SANITIZE_STRING));
+                if (empty($description)) {
+                    throw new Exception('Description is required');
+                }
+                $stmt = $conn->prepare("UPDATE projects SET description = ? WHERE project_id = ?");
+                $stmt->execute([$description, $project_id]);
+                break;
+
+            case 'add_material':
+                $name = trim(filter_input(INPUT_POST, 'name', FILTER_SANITIZE_STRING));
+                $quantity = filter_input(INPUT_POST, 'quantity', FILTER_VALIDATE_INT);
+                $unit = trim(filter_input(INPUT_POST, 'unit', FILTER_SANITIZE_STRING));
+
+                if (empty($name) || empty($unit) || !$quantity) {
+                    throw new Exception('Invalid material data');
+                }
+
+                $stmt = $conn->prepare("
+                    INSERT INTO project_materials (project_id, material_name, quantity, unit)
+                    VALUES (?, ?, ?, ?)
+                ");
+                $stmt->execute([$project_id, $name, $quantity, $unit]);
+                break;
+
+            case 'delete_material':
+                $material_id = filter_input(INPUT_POST, 'material_id', FILTER_VALIDATE_INT);
+                if (!$material_id) {
+                    throw new Exception('Invalid material ID');
+                }
+
+                $stmt = $conn->prepare("
+                    DELETE FROM project_materials 
+                    WHERE material_id = ? AND project_id = ?
+                ");
+                $stmt->execute([$material_id, $project_id]);
+                break;
+
+            default:
+                throw new Exception('Invalid action');
+        }
+
+        echo json_encode(['success' => true]);
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+    }
+    exit;
 }

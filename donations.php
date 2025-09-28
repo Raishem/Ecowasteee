@@ -14,26 +14,20 @@ $user_id = $_SESSION['user_id'];
 // Fetch My Donations
 $myDonations = [];
 $stmt = $conn->prepare("SELECT * FROM donations WHERE donor_id = ?");
-$stmt->bind_param("i", $user_id);
-$stmt->execute();
-$result = $stmt->get_result();
-while ($row = $result->fetch_assoc()) $myDonations[] = $row;
+$stmt->execute([$user_id]);
+while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) $myDonations[] = $row;
 
 // Fetch Requested Donations
 $requestedDonations = [];
 $stmt = $conn->prepare("SELECT * FROM donations WHERE requested_by = ?");
-$stmt->bind_param("i", $user_id);
-$stmt->execute();
-$result = $stmt->get_result();
-while ($row = $result->fetch_assoc()) $requestedDonations[] = $row;
+$stmt->execute([$user_id]);
+while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) $requestedDonations[] = $row;
 
 // Fetch Received Donations
 $receivedDonations = [];
 $stmt = $conn->prepare("SELECT * FROM donations WHERE receiver_id = ?");
-$stmt->bind_param("i", $user_id);
-$stmt->execute();
-$result = $stmt->get_result();
-while ($row = $result->fetch_assoc()) $receivedDonations[] = $row;
+$stmt->execute([$user_id]);
+while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) $receivedDonations[] = $row;
 ?>
 <!DOCTYPE html>
 <html lang="en">

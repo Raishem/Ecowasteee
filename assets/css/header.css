@@ -1,0 +1,30 @@
+.user-profile {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-left: auto; /* Push to the right */
+}
+
+/* Style for header actions container */
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+/* Link styles */
+.link-fontawesome {
+    font-size: 1.1em;
+    padding: 8px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    transition: background-color 0.2s, transform 0.2s;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.link-fontawesome:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: scale(1.05);
+}
