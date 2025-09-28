@@ -21,12 +21,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $password = $_POST['password'] ?? '';
     $contactNumber = htmlspecialchars($_POST['contact-number'] ?? '');
     $address = htmlspecialchars($_POST['address'] ?? '');
-    $city = htmlspecialchars($_POST['city'] ?? '');
     $zipCode = htmlspecialchars($_POST['zip-code'] ?? '');
 
     // Validate input
     if (empty($firstName) || empty($lastName) || empty($email) || empty($password) || 
-        empty($contactNumber) || empty($address) || empty($city) || empty($zipCode)) {
+        empty($contactNumber) || empty($address) || empty($zipCode)) {
         $error_message = "All required fields must be filled";
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $error_message = "Invalid email format";
@@ -61,7 +60,7 @@ if (false === $stmt) {
 
 $bindResult = $stmt->bind_param("sssssssss", 
     $email, $passwordHash, $firstName, $middleName, $lastName,
-    $contactNumber, $address, $city, $zipCode);
+    $contactNumber, $address, $zipCode);
 
 if (false === $bindResult) {
     die("Bind failed: " . $stmt->error);
@@ -137,27 +136,27 @@ if ($stmt->execute()) {
                         <div class="form-group full-name-container">
                             <label for="full-name" class="required">Full Name</label>
                             <input type="text" id="full-name" name="full-name" class="full-name-input" required
-                                   placeholder="Enter Full Name" readonly
-                                   onclick="toggleNameDetails()">
+                                placeholder="Enter Full Name" readonly
+                                onclick="toggleNameDetails()">
                             
                             <div class="name-details" id="name-details">
                                 <div class="form-group">
                                     <label for="first-name" class="required">First Name</label>
                                     <input type="text" id="first-name" name="first-name" required 
-                                           value="<?= htmlspecialchars($firstName ?? '') ?>" 
-                                           placeholder="Enter First Name">
+                                        value="<?= htmlspecialchars($firstName ?? '') ?>" 
+                                        placeholder="Enter First Name">
                                 </div>
                                 <div class="form-group">
                                     <label for="middle-name">Middle Name</label>
                                     <input type="text" id="middle-name" name="middle-name" 
-                                           value="<?= htmlspecialchars($middleName ?? '') ?>" 
-                                           placeholder="Enter Middle Name">
+                                        value="<?= htmlspecialchars($middleName ?? '') ?>" 
+                                        placeholder="Enter Middle Name">
                                 </div>
                                 <div class="form-group">
                                     <label for="last-name" class="required">Last Name</label>
                                     <input type="text" id="last-name" name="last-name" required 
-                                           value="<?= htmlspecialchars($lastName ?? '') ?>" 
-                                           placeholder="Enter Last Name">
+                                        value="<?= htmlspecialchars($lastName ?? '') ?>" 
+                                        placeholder="Enter Last Name">
                                 </div>
                             </div>
                         </div>
@@ -165,48 +164,41 @@ if ($stmt->execute()) {
                         <div class="form-group">
                             <label for="contact-number" class="required">Contact Number</label>
                             <input type="tel" id="contact-number" name="contact-number" required
-                                   value="<?= htmlspecialchars($contactNumber ?? '') ?>" 
-                                   placeholder="Enter Contact Number">
+                                value="<?= htmlspecialchars($contactNumber ?? '') ?>" 
+                                placeholder="Enter Contact Number">
                         </div>
                         
                         <div class="form-group">
                             <label for="email" class="required">Email address</label>
                             <input type="email" id="email" name="email" required
-                                   value="<?= htmlspecialchars($email ?? '') ?>" 
-                                   placeholder="email@gmail.com">
+                                value="<?= htmlspecialchars($email ?? '') ?>" 
+                                placeholder="email@gmail.com">
                         </div>
                         
                         <div class="form-group">
                             <label for="address" class="required">Full Address</label>
                             <input type="text" id="address" name="address" required
-                                   value="<?= htmlspecialchars($address ?? '') ?>" 
-                                   placeholder="Enter Full Address">
+                                value="<?= htmlspecialchars($address ?? '') ?>" 
+                                placeholder="Enter Full Address">
                         </div>
                         
                         <div class="form-group">
                             <label for="password" class="required">Password</label>
                             <input type="password" id="password" name="password" required minlength="8" 
-                                   placeholder="Enter Password">
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="city" class="required">City</label>
-                            <input type="text" id="city" name="city" required
-                                   value="<?= htmlspecialchars($city ?? '') ?>" 
-                                   placeholder="Enter City">
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="confirm-password" class="required">Confirm Password</label>
-                            <input type="password" id="confirm-password" name="confirm-password" required 
-                                   placeholder="Re-enter Password">
+                                placeholder="Enter Password">
                         </div>
                         
                         <div class="form-group">
                             <label for="zip-code" class="required">Zip Code</label>
                             <input type="text" id="zip-code" name="zip-code" required
-                                   value="<?= htmlspecialchars($zipCode ?? '') ?>" 
-                                   placeholder="Enter Zip Code">
+                                value="<?= htmlspecialchars($zipCode ?? '') ?>" 
+                                placeholder="Enter Zip Code">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="confirm-password" class="required">Confirm Password</label>
+                            <input type="password" id="confirm-password" name="confirm-password" required 
+                                placeholder="Re-enter Password">
                         </div>
                     </div>
                     
@@ -238,6 +230,9 @@ if ($stmt->execute()) {
                 <div class="green-curve green-curve-1"></div>
                 <div class="green-curve green-curve-2"></div>
                 <div class="green-curve green-curve-3"></div>
+                <div class="floating-element floating-element-1"></div>
+                <div class="floating-element floating-element-2"></div>
+                <div class="floating-element floating-element-3"></div>
             </div>
         </div>
     </div>

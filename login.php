@@ -66,13 +66,15 @@ if (isset($_SESSION['login_error'])) {
                         <input type="password" id="password" name="password" placeholder="Enter your password" required>
                     </div>
 
-                    <div class="remember-me">
-                        <input type="checkbox" id="remember" name="remember">
-                        <label for="remember">Remember me</label>
-                    </div>
-
-                    <div class="forgot-password">
-                        <a href="forgot_password.php">Forgot password?</a>
+                    <div class="form-options">
+                        <div class="remember-me">
+                            <input type="checkbox" id="remember" name="remember">
+                            <label for="remember">Remember me</label>
+                        </div>
+                        
+                        <div class="forgot-password">
+                            <a href="forgot_password.php">Forgot password?</a>
+                        </div>
                     </div>
 
                     <button type="submit" class="login-btn">Login</button>
@@ -98,6 +100,9 @@ if (isset($_SESSION['login_error'])) {
                 <div class="green-curve green-curve-1"></div>
                 <div class="green-curve green-curve-2"></div>
                 <div class="green-curve green-curve-3"></div>
+                <div class="floating-element floating-element-1"></div>
+                <div class="floating-element floating-element-2"></div>
+                <div class="floating-element floating-element-3"></div>
             </div>
         </div>
     </div>
