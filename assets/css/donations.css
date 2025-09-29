@@ -131,12 +131,24 @@ header {
     margin: 5px 0;
 }
 
+/* Enhanced Sidebar Styles */
+:root {
+    --primary-green: #82AA52;
+    --dark-green: #6d8f45;
+    --light-green: #F6FFEB;
+    --accent-green: #2e8b57;
+}
+
 .sidebar {
-    background-color: #F6FFEB;
+    background: linear-gradient(180deg, var(--light-green) 0%, #e8f5e8 100%);
     padding: 30px 20px;
-    box-shadow: 3px 0 10px rgba(0,0,0,0.1);
-    height: 100%;
+    box-shadow: 5px 0 25px rgba(0,0,0,0.08);
+    position: sticky;
+    top: 80px;
+    align-self: start;
+    height: calc(100vh - 10px);
     overflow-y: auto;
+    border: 1px solid rgba(130, 170, 82, 0.2);
 }
 
 .sidebar nav ul {
@@ -144,25 +156,29 @@ header {
 }
 
 .sidebar nav li {
-    margin-bottom: 15px;
+    margin-bottom: 12px;
 }
 
 .sidebar nav a {
     text-decoration: none;
     color: #333;
-    font-weight: 500;
+    font-weight: 600;
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 8px 12px;
-    border-radius: 5px;
+    gap: 15px;
+    padding: 12px 15px;
+    border-radius: 12px;
     transition: all 0.3s ease;
+    background: #F6FFEB;
+    border: 1px solid rgba(130, 170, 82, 0.1);
 }
 
 .sidebar nav a.active,
 .sidebar nav a:hover {
-    background-color: #e0f0d8;
-    color: #2e8b57;
+    background: linear-gradient(135deg, var(--primary-green) 0%, var(--accent-green) 100%);
+    color:#F6FFEB;
+    transform: translateX(5px);
+    box-shadow: 0 5px 15px rgba(130, 170, 82, 0.3);
 }
 
 .sidebar nav a i {
@@ -171,9 +187,34 @@ header {
     font-size: 18px;
 }
 
+/* Enhanced Sidebar Scrollbar */
+.sidebar::-webkit-scrollbar {
+    width: 8px;
+}
+
+.sidebar::-webkit-scrollbar-track {
+    background: rgba(130, 170, 82, 0.1);
+    border-radius: 10px;
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, var(--primary-green) 0%, var(--dark-green) 100%);
+    border-radius: 10px;
+}
+
+.sidebar::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(135deg, var(--dark-green) 0%, #5a7537 100%);
+}
+
+/* For Firefox */
+.sidebar {
+    scrollbar-width: thin;
+    scrollbar-color: var(--primary-green) rgba(130, 170, 82, 0.1);
+}
+
 .main-content {
     grid-column: 2;
-    padding: 20px 0;
+    padding: 15px 0;
     height: 100%;
     display: flex;
     flex-direction: column;
