@@ -618,7 +618,7 @@ while ($row = $result->fetch_assoc()) $tasks[] = $row;
     <div class="task-categories">
         <?php foreach ($grouped_tasks as $type => $task_list): ?>
             <div class="task-category">
-                <div class="category-header" onclick="toggleCategory(this)">
+                <div class="category-header">
                     <h4><?= $category_labels[$type] ?? ucfirst($type) ?></h4>
                     <i class="fas fa-chevron-down"></i>
                 </div>
