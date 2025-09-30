@@ -48,9 +48,23 @@ if (isset($_SESSION['login_error'])) {
                 <h1>Welcome Back!</h1>
                 <p class="subtitle">Login to continue supporting sustainable waste donations.</p>
                 
-                <?php if ($error): ?>
-                    <div class="alert error"><?php echo htmlspecialchars($error); ?></div>
+                <?php if (isset($_SESSION['reset_message'])): ?>
+                    <div class="success-banner">
+                        <i class="fas fa-check-circle"></i>
+                        <?= $_SESSION['reset_message']; ?>
+                        <span class="close-btn">&times;</span>
+                    </div>
+                    <?php unset($_SESSION['reset_message']); ?>
                 <?php endif; ?>
+
+                <?php if ($error): ?>
+                    <div class="error-banner">
+                        <i class="fas fa-exclamation-circle"></i>
+                        <?= htmlspecialchars($error); ?>
+                        <span class="close-btn">&times;</span>
+                    </div>
+                <?php endif; ?>
+
                 
                 <form action="login_process.php" method="POST">
                     <input type="hidden" name="csrf_token" value="<?php echo $csrf_token; ?>">
@@ -106,5 +120,50 @@ if (isset($_SESSION['login_error'])) {
             </div>
         </div>
     </div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const banners = document.querySelectorAll('.success-banner, .error-banner');
+        if (banners.length > 0) {
+            setTimeout(() => {
+                banners.forEach(banner => {
+                    banner.classList.add('banner-hidden');
+                });
+            }, 5000); // wait 5 seconds before fade out
+        }
+    });
+
+
+document.addEventListener("DOMContentLoaded", function() {
+    const banners = document.querySelectorAll('.success-banner, .error-banner');
+
+    banners.forEach(banner => {
+        // Auto dismiss after 20 seconds
+        let autoTimer = setTimeout(() => {
+            banner.classList.add('banner-hidden');
+        }, 20000);
+
+        // Manual close (×)
+        const closeBtn = banner.querySelector('.close-btn');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                clearTimeout(autoTimer);      // stop auto timer
+                // start fade out immediately
+                banner.classList.add('banner-hidden');
+            });
+        }
+
+        // Only remove from DOM when fadeOut animation completes
+        banner.addEventListener('animationend', (e) => {
+            // make sure it's the fadeOut animation, not slideDown
+            if (e.animationName === 'fadeOut') {
+                banner.remove();
+            }
+        });
+    });
+});
+</script>
+
+
 </body>
 </html>

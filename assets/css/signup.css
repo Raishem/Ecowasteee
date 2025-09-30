@@ -641,3 +641,32 @@ body::-webkit-scrollbar-thumb {
             background: #006400;
             transform: translateY(-2px);
         }
+
+/* Success & Error banners inside signup card */
+.success-banner, .error-banner {
+    padding: 12px 15px;
+    border-radius: 6px;
+    margin: 15px 0;
+    font-size: 14px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    animation: slideDown 0.4s ease;
+}
+
+.success-banner {
+    background-color: #e8f5e9;
+    color: #2e7d32;
+    border-left: 4px solid #4caf50;
+}
+
+.error-banner {
+    background-color: #ffebee;
+    color: #c62828;
+    border-left: 4px solid #e53935;
+}
+
+.success-banner i, .error-banner i {
+    font-size: 16px;
+}

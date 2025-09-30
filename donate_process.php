@@ -1,75 +1,220 @@
 <?php
 session_start();
 require_once 'config.php';
+$conn = getDBConnection();
 
-if (!isset($_SESSION['user_id'])) {
-    header('Location: login.php');
-    exit();
+$action = $_REQUEST['action'] ?? '';
+
+if ($action === 'view_donation' && $_SERVER['REQUEST_METHOD'] === 'GET') {
+    $donation_id = intval($_GET['donation_id'] ?? 0);
+    if ($donation_id <= 0) {
+        echo "<p>Invalid donation ID.</p>";
+        exit;
+    }
+
+    // Fetch donation with donor info
+    $stmt = $conn->prepare("
+        SELECT d.*, 
+               donor.first_name as donor_first_name, 
+               donor.last_name as donor_last_name,
+               receiver.first_name as receiver_first_name,
+               receiver.last_name as receiver_last_name
+        FROM donations d
+        LEFT JOIN users donor ON d.donor_id = donor.user_id
+        LEFT JOIN users receiver ON d.receiver_id = receiver.user_id
+        WHERE d.donation_id = ?
+    ");
+    $stmt->bind_param("i", $donation_id);
+    $stmt->execute();
+    $donation = $stmt->get_result()->fetch_assoc();
+
+    if (!$donation) {
+        echo "<p>Donation not found.</p>";
+        exit;
+    }
+
+    // Fetch comments
+    $stmt = $conn->prepare("
+        SELECT c.comment_id, c.comment_text, c.created_at, u.first_name, u.last_name
+        FROM comments c
+        JOIN users u ON c.user_id = u.user_id
+        WHERE c.donation_id = ?
+        ORDER BY c.created_at DESC
+    ");
+    $stmt->bind_param("i", $donation_id);
+    $stmt->execute();
+    $comments = $stmt->get_result();
+
+    // Fetch requests for this donation
+    $stmt = $conn->prepare("
+        SELECT dr.*, u.first_name, u.last_name, p.project_name
+        FROM donation_requests dr
+        JOIN users u ON dr.user_id = u.user_id
+        LEFT JOIN projects p ON dr.project_id = p.project_id
+        WHERE dr.donation_id = ?
+        ORDER BY dr.requested_at DESC
+    ");
+    $stmt->bind_param("i", $donation_id);
+    $stmt->execute();
+    $requests = $stmt->get_result();
+    
+    $request_count = $requests->num_rows;
+
+    ?>
+    <div class="donation-post">
+        <h3><?= htmlspecialchars($donation['item_name']); ?></h3>
+        
+        <div class="donation-description">
+            <p><?= nl2br(htmlspecialchars($donation['description'] ?? 'No description provided')); ?></p>
+        </div>
+
+        <?php if (!empty($donation['image_path'])):
+            $images = json_decode($donation['image_path'], true);
+            if (is_array($images)): ?>
+                <div class="donation-images">
+                    <?php foreach ($images as $img): ?>
+                        <img src="<?= htmlspecialchars($img); ?>" class="donation-image" alt="">
+                    <?php endforeach; ?>
+                </div>
+            <?php endif;
+        endif; ?>
+
+        <!-- Donation Information Grid -->
+        <div class="donation-info-grid">
+            <div class="info-item">
+                <strong>Donated:</strong>
+                <span><?= $donation['donated_at'] ? date("M d, Y", strtotime($donation['donated_at'])) : '—' ?></span>
+            </div>
+            
+            <div class="info-item">
+                <strong>Types of waste:</strong>
+                <span><?= htmlspecialchars($donation['category'] ?? '—') ?></span>
+            </div>
+            
+            <div class="info-item">
+                <strong>Quantity:</strong>
+                <span><?= $donation['quantity'] ?>/<?= $donation['total_quantity'] ?> Units</span>
+            </div>
+            
+            <div class="info-item">
+                <strong>Requested by:</strong>
+                <span>
+                    <?php if ($request_count > 0): ?>
+                        <?= $request_count ?> person(s)
+                    <?php else: ?>
+                        None yet
+                    <?php endif; ?>
+                </span>
+            </div>
+            
+            <div class="info-item">
+                <strong>Delivered:</strong>
+                <span class="status-badge <?= $donation['delivered_at'] ? 'status-completed' : 'status-pending' ?>">
+                    <?= $donation['delivered_at'] ? 'Delivered' : 'Pending' ?>
+                </span>
+            </div>
+            
+            <div class="info-item">
+                <strong>Status:</strong>
+                <span class="status-badge 
+                    <?= strtolower($donation['status']) == 'pending' ? 'status-pending' :
+                    (strtolower($donation['status']) == 'completed' ? 'status-completed' :
+                    (strtolower($donation['status']) == 'available' ? 'status-available' : 'status-pending')) ?>">
+                    <?= htmlspecialchars($donation['status']) ?>
+                </span>
+            </div>
+        </div>
+        
+        <!-- Comments Section -->
+        <div class="comments-section">
+            <h4>Comments</h4>
+            
+            <?php if ($comments->num_rows > 0): ?>
+                <?php while ($c = $comments->fetch_assoc()): ?>
+                    <div class="comment">
+                        <strong><?= htmlspecialchars($c['first_name'] . ' ' . $c['last_name']); ?></strong>
+                        <p><?= htmlspecialchars($c['comment_text']); ?></p>
+                        <div class="comment-time"><?= date("M d, Y H:i", strtotime($c['created_at'])); ?></div>
+                    </div>
+                <?php endwhile; ?>
+            <?php else: ?>
+                <div class="no-comments">
+                    <p>No comments yet. Be the first to comment!</p>
+                </div>
+            <?php endif; ?>
+
+            <?php if (isset($_SESSION['user_id'])): ?>
+                <form class="add-comment-form" data-id="<?= $donation_id; ?>">
+                    <textarea name="comment_text" placeholder="Write a comment..." required></textarea>
+                    <button type="submit">Post Comment</button>
+                </form>
+            <?php else: ?>
+                <p><em>You must be logged in to comment.</em></p>
+            <?php endif; ?>
+        </div>
+        
+    </div>
+    <?php
+    exit;
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (empty($_POST['wasteType']) || empty($_POST['quantity']) || empty($_POST['description'])) {
-        die('Error: All fields are required.');
+// Add new comment
+if ($action === 'add_comment' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!isset($_SESSION['user_id'])) {
+        echo json_encode(["status" => "error", "message" => "Not logged in"]);
+        exit;
     }
 
-    $conn = getDBConnection();
-    $item_name = htmlspecialchars($_POST['wasteType']);
-    $quantity = (int) $_POST['quantity'];
-    $category = htmlspecialchars($_POST['wasteType']);
-    $description = htmlspecialchars($_POST['description']);
-    $donor_id = $_SESSION['user_id'];
-    $donated_at = date('Y-m-d H:i:s');
-    $image_paths = []; // Array to store uploaded image paths
+    $donation_id = intval($_POST['donation_id'] ?? 0);
+    $comment_text = trim($_POST['comment_text'] ?? '');
+    $user_id = $_SESSION['user_id'];
 
-    // Handle multiple photo uploads
-    if (isset($_FILES['photos']) && count($_FILES['photos']['name']) > 0) {
-        $upload_dir = 'assets/uploads/';
-        if (!is_dir($upload_dir)) {
-            mkdir($upload_dir, 0777, true);
-        }
-
-        foreach ($_FILES['photos']['name'] as $key => $file_name) {
-            if ($_FILES['photos']['error'][$key] === UPLOAD_ERR_OK) {
-                $file_type = mime_content_type($_FILES['photos']['tmp_name'][$key]);
-                $allowed_types = ['image/jpeg', 'image/png', 'image/gif'];
-
-                if (!in_array($file_type, $allowed_types)) {
-                    die('Error: Only JPG, PNG, and GIF files are allowed.');
-                }
-
-                $unique_file_name = uniqid() . '_' . basename($file_name);
-                $target_file = $upload_dir . $unique_file_name;
-
-                if (move_uploaded_file($_FILES['photos']['tmp_name'][$key], $target_file)) {
-                    $image_paths[] = $target_file; // Save the file path
-                } else {
-                    die('Failed to upload image: ' . $file_name);
-                }
-            }
-        }
+    if ($donation_id <= 0 || $comment_text === '') {
+        echo json_encode(["status" => "error", "message" => "Invalid input"]);
+        exit;
     }
 
-    // Convert image paths array to JSON for storage
-    $image_paths_json = json_encode($image_paths);
+    $stmt = $conn->prepare("INSERT INTO comments (donation_id, user_id, comment_text) VALUES (?, ?, ?)");
+    $stmt->bind_param("iis", $donation_id, $user_id, $comment_text);
+    
+    if ($stmt->execute()) {
+        echo json_encode(["status" => "success"]);
+    } else {
+        echo json_encode(["status" => "error", "message" => "Failed to add comment"]);
+    }
+    exit;
+}
 
-    // Insert donation into the database
-    $stmt = $conn->prepare("INSERT INTO donations (item_name, quantity, category, donor_id, donated_at, status, image_path, description) VALUES (?, ?, ?, ?, ?, 'Available', ?, ?)");
-    if (!$stmt) {
-        die('Error: Failed to prepare statement. ' . $conn->error);
+// Delete donation (add this if not exists)
+if ($action === 'delete_donation' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!isset($_SESSION['user_id'])) {
+        echo json_encode(["status" => "error", "message" => "Not logged in"]);
+        exit;
     }
 
-    // Corrected bind_param() with 8 variables
-    if (!$stmt->bind_param("sisdsss", $item_name, $quantity, $category, $donor_id, $donated_at, $image_paths_json, $description)) {
-        die('Error: Failed to bind parameters. ' . $stmt->error);
+    $donation_id = intval($_POST['donation_id'] ?? 0);
+    
+    // Verify ownership before deletion
+    $stmt = $conn->prepare("SELECT donor_id FROM donations WHERE donation_id = ?");
+    $stmt->bind_param("i", $donation_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $donation = $result->fetch_assoc();
+    
+    if (!$donation || $donation['donor_id'] != $_SESSION['user_id']) {
+        echo json_encode(["status" => "error", "message" => "Unauthorized"]);
+        exit;
     }
 
-    if (!$stmt->execute()) {
-        die('Error: Failed to execute statement. ' . $stmt->error);
+    // Delete the donation
+    $stmt = $conn->prepare("DELETE FROM donations WHERE donation_id = ?");
+    $stmt->bind_param("i", $donation_id);
+    
+    if ($stmt->execute()) {
+        echo json_encode(["status" => "success"]);
+    } else {
+        echo json_encode(["status" => "error", "message" => "Failed to delete donation"]);
     }
-
-    header('Location: donations.php');
-    exit();
-} else {
-    die('Invalid request method.');
+    exit;
 }
 ?>

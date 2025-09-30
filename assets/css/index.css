@@ -31,8 +31,8 @@ body {
     }
 
     .logo-img {
-        width: 100px;
-        height: 100px;
+        width: 120px;
+        height: 120px;
         object-fit: contain;
         transition: transform 0.3s ease;
     }

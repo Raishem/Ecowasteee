@@ -529,3 +529,100 @@
 @keyframes spin {
     to { transform: rotate(360deg); }
 }
+
+/* Success banner after password reset */
+.success-banner {
+    background-color: #e8f5e9;
+    color: #2e7d32;
+    padding: 14px 18px;
+    border-radius: 8px;
+    border-left: 5px solid #4caf50;
+    margin: 15px 0;
+    font-size: 15px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    box-shadow: 0 3px 10px rgba(76, 175, 80, 0.15);
+    animation: slideDown 0.4s ease;
+}
+
+.success-banner i {
+    font-size: 18px;
+    color: #4caf50;
+}
+
+/* Error banner for login issues */
+.error-banner {
+    background-color: #ffebee;
+    color: #c62828;
+    padding: 14px 18px;
+    border-radius: 8px;
+    border-left: 5px solid #e53935;
+    margin: 15px 0;
+    font-size: 15px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    box-shadow: 0 3px 10px rgba(229, 57, 53, 0.15);
+    animation: slideDown 0.5s ease;
+}
+
+.error-banner i {
+    font-size: 18px;
+    color: #e53935;
+}
+
+.success-banner, .error-banner {
+    animation: slideDown 0.45s ease;
+    position: relative;
+}
+
+.close-btn {
+    margin-left: auto;
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
+    color: inherit;
+    transition: color 0.2s;
+}
+
+.close-btn:hover {
+    color: #000;
+}
+
+
+/* Slide down animation */
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-12px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Fade-out and slide-up */
+@keyframes fadeOut {
+    from {
+        opacity: 1;
+        transform: translateY(0);
+        max-height: 100px;
+        margin: 15px 0;
+    }
+    to {
+        opacity: 0;
+        transform: translateY(-15px);
+        max-height: 0;
+        margin: 0;
+        padding: 0;
+    }
+}
+
+/* Hidden state triggers fade animation */
+.banner-hidden {
+    animation: fadeOut 0.5s ease forwards;
+}

@@ -86,6 +86,7 @@ $result = $stmt->get_result();
 while ($row = $result->fetch_assoc()) {
     $receivedDonations[] = $row;
 }
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -647,6 +648,16 @@ while ($row = $result->fetch_assoc()) {
         </main>
     </div>
 
+    <!-- Details Modal -->
+<div id="details-modal">
+    <div class="modal-content">
+        <span class="close-btn">&times;</span>
+        <div id="details-body"></div>
+    </div>
+</div>
+
+
+
     <div class="feedback-btn" id="feedbackBtn">💬</div>
 <div class="feedback-modal" id="feedbackModal">
     <div class="feedback-content">
@@ -746,6 +757,44 @@ while ($row = $result->fetch_assoc()) {
         let id = $(this).data("id");
         window.location.href = "edit_request.php?id=" + id;
     });
+
+    // Close details modal
+    $(document).on("click", ".close-btn", function() {
+        $("#details-modal").hide();
+    });
+    $(window).on("click", function(e) {
+        if (e.target === document.getElementById("details-modal")) {
+            $("#details-modal").hide();
+        }
+    });
+
+    // Handle add comment
+$(document).on("submit", ".add-comment-form", function(e) {
+    e.preventDefault();
+    let form = $(this);
+    let donationId = form.data("id");
+    let commentText = form.find("textarea[name='comment_text']").val();
+
+    $.post("donate_process.php", {
+        action: "add_comment",
+        donation_id: donationId,
+        comment_text: commentText
+    }, function(response) {
+        try {
+            let res = JSON.parse(response);
+            if (res.status === "success") {
+                // Reload details to show new comment
+                $.get("donate_process.php", { action: "view_donation", donation_id: donationId }, function(data) {
+                    $("#details-body").html(data);
+                });
+            } else {
+                alert(res.message);
+            }
+        } catch (e) {
+            console.error("Invalid response:", response);
+        }
+    });
+});
 
     // Feedback modal
     $(document).ready(function() {
@@ -853,6 +902,7 @@ feedbackForm.on("submit", function(e) {
             spinner.hide();
         }
     });
+
     
 </script>
 </body>

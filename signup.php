@@ -1,4 +1,32 @@
 <?php
+require_once "config.php";
+$conn = getDBConnection();
+
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
+    $email = trim($_POST["email"]);
+
+    // Check if email exists
+    $stmt = $conn->prepare("SELECT user_id FROM users WHERE email = ?");
+    $stmt->bind_param("s", $email);
+    $stmt->execute();
+    $stmt->store_result();
+
+    if ($stmt->num_rows > 0) {
+        $_SESSION['signup_error'] = "Email already exists. Please use another one.";
+        header("Location: signup.php");
+        exit();
+    }
+
+    // If not exists → continue inserting new user
+    $password = password_hash($_POST["password"], PASSWORD_DEFAULT);
+    $stmt = $conn->prepare("INSERT INTO users (first_name, last_name, email, password) VALUES (?, ?, ?, ?)");
+    $stmt->bind_param("ssss", $_POST["first_name"], $_POST["last_name"], $email, $password);
+    $stmt->execute();
+
+    $_SESSION['signup_success'] = "Account created successfully! You can now log in.";
+    header("Location: login.php");
+    exit();
+}
 
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
@@ -128,6 +156,23 @@ if ($stmt->execute()) {
                 <div class="curve curve-small"></div>
             </div>
             <div class="content-container">
+
+            <?php if (isset($_SESSION['signup_error'])): ?>
+                <div class="error-banner">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <?= $_SESSION['signup_error']; ?>
+                </div>
+                <?php unset($_SESSION['signup_error']); ?>
+            <?php endif; ?>
+
+            <?php if (isset($_SESSION['signup_success'])): ?>
+                <div class="success-banner">
+                    <i class="fas fa-check-circle"></i>
+                    <?= $_SESSION['signup_success']; ?>
+                </div>
+                <?php unset($_SESSION['signup_success']); ?>
+            <?php endif; ?>
+
                 <h1>Get Started Now</h1>
                 <p class="subtitle">Create your account to start donating waste sustainably.</p>
                 
