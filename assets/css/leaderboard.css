@@ -191,12 +191,12 @@ header {
     font-weight: 600;
     display: flex;
     align-items: center;
-    gap: 15px;
+    gap: 20px;
     padding: 12px 15px;
     border-radius: 12px;
     transition: all 0.3s ease;
-    background: #F6FFEB;
-    border: 1px solid rgba(130, 170, 82, 0.1);
+    background: #f4fce8;
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .sidebar nav a.active,
@@ -205,6 +205,12 @@ header {
     color:#F6FFEB;
     transform: translateX(5px);
     box-shadow: 0 5px 15px rgba(130, 170, 82, 0.3);
+}
+
+/* Active States */
+.sidebar nav a.active,
+.sidebar nav a[href="leaderboard.php"] {
+    color: #faffe8;
 }
 
 .sidebar nav a i {

@@ -586,7 +586,7 @@ function render_comments($comments, $donation_id, $parent_id = NULL) {
         <aside class="sidebar">
             <nav>
                 <ul>
-                    <li><a href="homepage.php" style="color: rgb(4, 144, 4);"><i class="fas fa-home"></i>Home</a></li>
+                    <li><a href="homepage.php" class="active"><i class="fas fa-home"></i>Home</a></li>
                     <li><a href="browse.php" ><i class="fas fa-search"></i>Browse</a></li>
                     <li><a href="achievements.php"><i class="fas fa-star"></i>Achievements</a></li>
                     <li><a href="leaderboard.php"><i class="fas fa-trophy"></i>Leaderboard</a></li>
@@ -793,9 +793,14 @@ function render_comments($comments, $donation_id, $parent_id = NULL) {
     </div>
    
    <!-- Donation Popup Form -->
-<div id="donationPopup" class="popup-container" style="display:none;">
+<!-- Donation Popup Form -->
+<div id="donationPopup" class="popup-container">
     <div class="popup-content" id="donationFormContainer">
-        <h2>Post Donation</h2>
+        <div class=popup-header>
+            <h2>Post Donation</h2>
+            <button class="close-btn">&times;</button>
+        </div>
+
         <form id="donationForm" action="homepage.php" method="POST" enctype="multipart/form-data">
             <div class="form-group">
                 <label for="wasteType">Type of Waste:</label>
@@ -811,11 +816,11 @@ function render_comments($comments, $donation_id, $parent_id = NULL) {
                     <option value="Electronic">Electronic</option>
                 </select>
             </div>
+
             <div class="form-group">
                 <label for="quantity">Quantity:</label>
-                <input type="number" id="quantity" name="quantity" placeholder="Enter quantity" 
-                    min="1" required>
-                </div>
+                <input type="number" id="quantity" name="quantity" placeholder="Enter quantity" min="1" required>
+            </div>
 
             <div class="form-group">
                 <label for="description">Description:</label>
@@ -837,10 +842,13 @@ function render_comments($comments, $donation_id, $parent_id = NULL) {
                     <div id="photoPreview" class="photo-preview"></div>
                 </div>
             </div>
-            <button type="submit" class="btn submit-btn">Post Donation</button>
+
+            <button type="submit" class="submit-btn">Post Donation</button>
         </form>
-        <button class="close-btn">&times;</button>
     </div>
+</div>
+
+
      <div class="popup-content success-popup" id="successPopup" style="display: none;">
         <h2>Congratulations!</h2>
         <p>You have<br>now donated your waste. Wait<br>for others to claim yours.</p>
@@ -1021,7 +1029,7 @@ function render_comments($comments, $donation_id, $parent_id = NULL) {
         if (donationPopup && donationFormContainer && successPopup) {
             donationPopup.style.display = 'flex';
             donationFormContainer.style.display = 'none';
-            successPopup.style.display = 'block';
+            successPopup.style.display = 'flex';
         } else {
             alert('Donation posted successfully.');
         }
@@ -1043,17 +1051,26 @@ function render_comments($comments, $donation_id, $parent_id = NULL) {
             successPopup.style.display = 'none';
         });
 
+        function closeDonationPopup() {
+            donationPopup.classList.add('closing');
+            setTimeout(() => {
+                donationPopup.style.display = 'none';
+                donationPopup.classList.remove('closing');
+            }, 300); // match animation duration
+        }
+
         donationPopup.addEventListener('click', function (e) {
             if (e.target === donationPopup) {
-                donationPopup.style.display = 'none';
+                closeDonationPopup();
             }
         });
 
         document.querySelectorAll('.close-btn').forEach(btn => {
             btn.addEventListener('click', function () {
-                donationPopup.style.display = 'none';
+                closeDonationPopup();
             });
         });
+
 
         document.getElementById('donationForm').addEventListener('submit', function(e) {
             e.preventDefault();
@@ -1238,15 +1255,45 @@ function updateQuantity(change) {
 
 
     function openPhotoZoom(photoSrc) {
-        const modal = document.getElementById('photoZoomModal');
-        const zoomedPhoto = document.getElementById('zoomedPhoto');
-        zoomedPhoto.src = photoSrc;
-        modal.style.display = 'flex';
+    const modal = document.getElementById('photoZoomModal');
+    const zoomedPhoto = document.getElementById('zoomedPhoto');
+    const donationPopup = document.getElementById('donationPopup');
+
+    zoomedPhoto.src = photoSrc;
+    modal.style.display = 'flex';
+
+    // Blur the donation popup
+    donationPopup.classList.add('blurred');
     }
 
+    // Close when clicking X
     document.querySelector('.close-modal').addEventListener('click', function () {
-        document.getElementById('photoZoomModal').style.display = 'none';
+        closePhotoZoom();
     });
+
+    // Close when clicking outside
+    document.getElementById('photoZoomModal').addEventListener('click', function (e) {
+        if (e.target === this) {
+            closePhotoZoom();
+        }
+    });
+
+    // Close with ESC
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closePhotoZoom();
+        }
+    });
+
+    function closePhotoZoom() {
+        const modal = document.getElementById('photoZoomModal');
+        const donationPopup = document.getElementById('donationPopup');
+        modal.style.display = 'none';
+
+        // Remove blur
+        donationPopup.classList.remove('blurred');
+    }
+
 
     //Feedback Modal
 document.addEventListener("DOMContentLoaded", function () {

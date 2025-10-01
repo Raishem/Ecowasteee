@@ -462,7 +462,7 @@ while ($row = $result->fetch_assoc()) {
                     <li><a href="achievements.php"><i class="fas fa-star"></i>Achievements</a></li>
                     <li><a href="leaderboard.php"><i class="fas fa-trophy"></i>Leaderboard</a></li>
                     <li><a href="projects.php"><i class="fas fa-recycle"></i>Projects</a></li>
-                    <li><a href="donations.php" style="color: #2e8b57;"><i class="fas fa-box"></i>Donations</a></li>
+                    <li><a href="donations.php" class="active"><i class="fas fa-box"></i>Donations</a></li>
                 </ul>
             </nav>
         </aside>

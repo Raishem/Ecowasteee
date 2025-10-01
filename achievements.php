@@ -525,7 +525,7 @@ while ($row = $result->fetch_assoc()) $tasks[] = $row;
                 <ul>
                     <li><a href="homepage.php"><i class="fas fa-home"></i>Home</a></li>
                     <li><a href="browse.php"><i class="fas fa-search"></i>Browse</a></li>
-                    <li><a href="achievements.php" style="color: rgb(4, 144, 4);"><i class="fas fa-star"></i>Achievements</a></li>
+                    <li><a href="achievements.php" class="active"><i class="fas fa-star"></i>Achievements</a></li>
                     <li><a href="leaderboard.php"><i class="fas fa-trophy"></i>Leaderboard</a></li>
                     <li><a href="projects.php"><i class="fas fa-recycle"></i>Projects</a></li>
                     <li><a href="donations.php"><i class="fas fa-box"></i>Donations</a></li>
