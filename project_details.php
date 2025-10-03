@@ -294,6 +294,49 @@ document.addEventListener("DOMContentLoaded", function() {
                 desc.classList.add('collapsed');
                 toggle.textContent = 'See more';
                 toggle.setAttribute('aria-expanded', 'false');
+                // Smoothly scroll the description back into view when collapsing.
+                // Wait for the collapse transition to finish (reliable) then scroll.
+                const header = document.querySelector('header');
+                const headerHeight = header ? header.getBoundingClientRect().height : 0;
+
+                const doScroll = function() {
+                    // Compute a target that centers the description vertically in the
+                    // visible viewport area (accounting for fixed header).
+                    const rect = desc.getBoundingClientRect();
+                    const elemHeight = rect.height;
+                    const viewportHeight = window.innerHeight;
+                    const available = Math.max(0, viewportHeight - headerHeight);
+
+                    // extra space to position element in the middle of the available area
+                    const extra = Math.max(0, Math.floor((available - elemHeight) / 2));
+
+                    // element top relative to the document
+                    const elemTopDoc = window.pageYOffset + rect.top;
+
+                    // target = element top minus header minus extra padding so it sits centered
+                    const target = elemTopDoc - headerHeight - extra;
+
+                    window.scrollTo({ top: Math.max(0, Math.floor(target)), behavior: 'smooth' });
+                };
+
+                // If the element has a CSS transition on max-height, wait for it; otherwise fallback after 300ms
+                let handled = false;
+                const onTransEnd = function(ev) {
+                    if (ev.propertyName && ev.propertyName.indexOf('max-height') === -1) return;
+                    if (handled) return;
+                    handled = true;
+                    desc.removeEventListener('transitionend', onTransEnd);
+                    doScroll();
+                };
+
+                desc.addEventListener('transitionend', onTransEnd);
+                // Fallback in case transitionend doesn't fire
+                setTimeout(function() {
+                    if (handled) return;
+                    handled = true;
+                    desc.removeEventListener('transitionend', onTransEnd);
+                    doScroll();
+                }, 100);
             }
         });
     } else {

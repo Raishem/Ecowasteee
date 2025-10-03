@@ -4,7 +4,8 @@
     line-height: 1.8;
     font-size: 1.05rem;
     position: relative;
-    transition: max-height 0.3s ease-out;
+    /* faster collapse/expand transition */
+    transition: max-height 0.2s ease-out;
     overflow: hidden;
 }
 
