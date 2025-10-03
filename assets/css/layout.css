@@ -1,0 +1,255 @@
+/* Main Layout */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Open Sans', sans-serif;
+}
+
+body {
+    background-color: #f5f5f5;
+    color: #333;
+    line-height: 1.6;
+}
+
+.container {
+    display: grid;
+    grid-template-columns: 250px 1fr;
+    gap: 30px;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 30px;
+}
+
+/* Header */
+header {
+    background-color: #82AA52;
+    padding: 15px 30px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.logo-container {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.logo-container img {
+    height: 40px;
+    width: 40px;
+    object-fit: contain;
+}
+
+.logo-container h1 {
+    color: white;
+    font-size: 24px;
+    font-weight: bold;
+}
+
+/* User Profile */
+.user-profile {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    cursor: pointer;
+    position: relative;
+}
+
+.profile-pic {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #3d6a06;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: bold;
+    font-size: 18px;
+    overflow: hidden;
+}
+
+.profile-name {
+    color: white;
+    font-weight: 500;
+}
+
+/* Sidebar */
+.sidebar {
+    background-color: white;
+    border-radius: 8px;
+    padding: 20px;
+}
+
+.side-navigation {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.nav-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 15px;
+    color: #666;
+    text-decoration: none;
+    border-radius: 6px;
+    transition: all 0.3s ease;
+}
+
+.nav-item:hover {
+    background-color: #f5f5f5;
+    color: #82AA52;
+}
+
+.nav-item.active {
+    background-color: #82AA52;
+    color: white;
+}
+
+.nav-item i {
+    font-size: 18px;
+    width: 20px;
+    text-align: center;
+}
+
+/* Project Details */
+.project-details {
+    background: white;
+    border-radius: 8px;
+    padding: 30px;
+}
+
+.back-button {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #666;
+    text-decoration: none;
+    margin-bottom: 30px;
+}
+
+.back-button:hover {
+    color: #82AA52;
+}
+
+.project-title-section {
+    margin-bottom: 30px;
+}
+
+.section-label {
+    color: #666;
+    font-size: 14px;
+    margin-bottom: 8px;
+    display: block;
+}
+
+.project-title {
+    font-size: 28px;
+    color: #333;
+    margin-bottom: 20px;
+}
+
+.project-meta {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    color: #666;
+    font-size: 14px;
+}
+
+.project-description {
+    color: #333;
+    line-height: 1.6;
+    margin-bottom: 30px;
+}
+
+/* Edit Button */
+.edit-project {
+    padding: 10px 20px;
+    background: #82AA52;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.3s ease;
+}
+
+.edit-project:hover {
+    background: #6b8d43;
+}
+
+/* Materials Section */
+.materials-section {
+    background: #f9f9f9;
+    border-radius: 8px;
+    padding: 20px;
+    margin-top: 30px;
+}
+
+.materials-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.materials-title {
+    font-size: 20px;
+    color: #333;
+}
+
+.add-material {
+    background: #82AA52;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.materials-list {
+    display: grid;
+    gap: 15px;
+}
+
+.material-item {
+    background: white;
+    padding: 15px;
+    border-radius: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+    .container {
+        grid-template-columns: 200px 1fr;
+        padding: 20px;
+    }
+}
+
+@media (max-width: 768px) {
+    .container {
+        grid-template-columns: 1fr;
+    }
+    
+    .sidebar {
+        display: none;
+    }
+    
+    .project-meta {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}

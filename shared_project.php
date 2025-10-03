@@ -1,4 +1,134 @@
 <?php
+session_start();
+require_once 'config.php';
+
+$shared_id = isset($_GET['id']) ? (int)$_GET['id'] : null;
+if (!$shared_id) {
+    echo "<p>Invalid shared project</p>";
+    exit;
+}
+
+$conn = getDBConnection();
+
+$stmt = $conn->prepare("SELECT sp.*, u.username FROM shared_projects sp LEFT JOIN users u ON u.user_id = sp.user_id WHERE sp.shared_id = ?");
+$stmt->execute([$shared_id]);
+$proj = $stmt->fetch(PDO::FETCH_ASSOC);
+if (!$proj) {
+    echo "<p>Shared project not found</p>";
+    exit;
+}
+
+$mstmt = $conn->prepare("SELECT * FROM shared_materials WHERE shared_id = ?");
+$mstmt->execute([$shared_id]);
+$materials = $mstmt->fetchAll(PDO::FETCH_ASSOC);
+
+$sstmt = $conn->prepare("SELECT * FROM shared_steps WHERE shared_id = ? ORDER BY step_number");
+$sstmt->execute([$shared_id]);
+$steps = $sstmt->fetchAll(PDO::FETCH_ASSOC);
+
+?><!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title><?php echo htmlspecialchars($proj['title']); ?> - Shared</title>
+    <link rel="stylesheet" href="assets/css/common.css">
+    <link rel="stylesheet" href="assets/css/project-details.css">
+    <script>
+    function postActivity(type, data, cb) {
+        var fd = new FormData();
+        fd.append('action', 'shared_activity');
+        fd.append('shared_id', <?php echo $shared_id; ?>);
+        fd.append('activity_type', type);
+        for (var k in data) fd.append(k, data[k]);
+
+        fetch('update_project.php', { method: 'POST', body: fd })
+        .then(r => r.json()).then(cb).catch(e => console.error(e));
+    }
+
+    function toggleLike(el){
+        postActivity('like', {}, function(res){
+            if (res.success) {
+                el.textContent = res.liked ? 'Unlike' : 'Like';
+            } else {
+                alert(res.message || 'Error');
+            }
+        });
+    }
+
+    function submitComment(){
+        var txt = document.getElementById('comment_text').value;
+        postActivity('comment', { comment: txt }, function(res){
+            if (res.success) {
+                var list = document.getElementById('comments');
+                var li = document.createElement('li');
+                li.textContent = txt;
+                list.insertBefore(li, list.firstChild);
+                document.getElementById('comment_text').value = '';
+            } else alert(res.message || 'Error');
+        });
+    }
+    </script>
+</head>
+<body>
+    <div class="container">
+        <h1><?php echo htmlspecialchars($proj['title']); ?></h1>
+        <p>By <?php echo htmlspecialchars($proj['username'] ?? 'Unknown'); ?> on <?php echo $proj['created_at']; ?></p>
+        <?php if ($proj['cover_photo']): ?>
+            <img src="uploads/<?php echo htmlspecialchars($proj['cover_photo']); ?>" alt="cover" style="max-width:100%;">
+        <?php endif; ?>
+        <div class="description"><?php echo nl2br(htmlspecialchars($proj['description'])); ?></div>
+
+        <h3>Materials</h3>
+        <ul>
+        <?php foreach ($materials as $m): ?>
+            <li><?php echo htmlspecialchars($m['name']); ?> - <?php echo htmlspecialchars($m['quantity']); ?></li>
+        <?php endforeach; ?>
+        </ul>
+
+        <h3>Steps</h3>
+        <ol>
+        <?php foreach ($steps as $s): ?>
+            <li><?php echo htmlspecialchars($s['title']); ?><?php if ($s['instructions']): ?><div><?php echo nl2br(htmlspecialchars($s['instructions'])); ?></div><?php endif; ?></li>
+        <?php endforeach; ?>
+        </ol>
+
+        <div>
+            <button onclick="toggleLike(this)" id="likeBtn">Like</button>
+            <?php if (isset($_SESSION['user_id']) && $_SESSION['user_id'] == $proj['user_id']): ?>
+                <button id="unpublishBtn" style="margin-left:8px;background:#d9534f;color:#fff;">Unpublish</button>
+            <?php endif; ?>
+        </div>
+
+        <div>
+            <h4>Comments</h4>
+            <input id="comment_text" placeholder="Write a comment">
+            <button onclick="submitComment()">Post</button>
+            <ul id="comments"></ul>
+        </div>
+    </div>
+    <script>
+    const unpublishBtn = document.getElementById('unpublishBtn');
+    if (unpublishBtn) {
+        unpublishBtn.addEventListener('click', function(){
+            if (!confirm('Unpublish this shared project? This action cannot be undone.')) return;
+            const fd = new FormData();
+            fd.append('action', 'unpublish_shared_project');
+            fd.append('shared_id', <?php echo $shared_id; ?>);
+            fetch('update_project.php', { method: 'POST', body: fd })
+            .then(r => r.json()).then(res => {
+                if (res.success) {
+                    alert('Unpublished');
+                    window.location.href = 'shared_feed.php';
+                } else {
+                    alert(res.message || 'Failed to unpublish');
+                }
+            }).catch(err => { console.error(err); alert('Error'); });
+        });
+    }
+    </script>
+</body>
+</html>
+<?php
 require_once 'config.php';
 session_start();
 

@@ -29,6 +29,7 @@ if (!$user) {
     <title>Projects | EcoWaste</title>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&family=Open+Sans&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="assets/css/header.css">
     <link rel="stylesheet" href="assets/css/projects.css">
     <style>
         .profile-dropdown {
@@ -38,34 +39,7 @@ if (!$user) {
             right: 0;
             background-color: white;
             border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            z-index: 1000;
-            min-width: 200px;
-            padding: 8px 0;
-        }
-
-        .dropdown-item {
-            display: flex;
-            align-items: center;
-            padding: 8px 16px;
-            color: #333;
-            text-decoration: none;
-            transition: background-color 0.3s;
-        }
-
-        .dropdown-item:hover {
-            background-color: #f0f7e8;
-            color: #2e8b57;
-        }
-
-        .dropdown-item i {
-            margin-right: 8px;
-            width: 20px;
-            text-align: center;
-        }
-
-        .dropdown-divider {
-            height: 1px;
+                    
             background-color: #eee;
             margin: 8px 0;
         }
@@ -216,10 +190,8 @@ if (!$user) {
                                     </ul>
                                 </div>
                                 <div class="project-actions">
-                                    <button class="action-btn view-details" onclick="viewProjectDetails(<?= $project['project_id'] ?>)">
-                                        <i class="fas fa-eye"></i> View Details
-                                    </button>
-                                </div>
+                                        <a href="project_details.php?id=<?php echo $project['project_id']; ?>" class="action-btn view-details" data-project-id="<?php echo $project['project_id']; ?>"><i class="fas fa-eye"></i> View Details</a>
+                                    </div>
                             </div>
                             <?php
                         }
@@ -337,21 +309,21 @@ if (!$user) {
                         <!-- Add Step Form -->
                         <div id="addStepForm" class="add-step-form" style="display: none;">
                             <div class="form-group">
-                                <label>Step Title</label>
+                                <label for="stepTitle">Step Title</label>
                                 <input type="text" id="stepTitle" class="edit-input" placeholder="e.g., Prepare materials">
                             </div>
                             <div class="form-group">
-                                <label>Instructions</label>
+                                <label for="stepInstructions">Instructions</label>
                                 <textarea id="stepInstructions" class="edit-input" placeholder="Describe the step in detail..."></textarea>
                             </div>
                             <div class="form-group">
-                                <label>Add Photos (optional)</label>
+                                <label for="stepPhotos">Add Photos (optional)</label>
                                 <input type="file" id="stepPhotos" multiple accept="image/*" class="file-input">
                                 <div class="photo-preview"></div>
                             </div>
                             <div class="edit-actions">
-                                <button class="save-btn" onclick="saveProjectStep()">Add Step</button>
-                                <button class="cancel-btn" onclick="hideAddStepForm()">Cancel</button>
+                                <button type="button" class="save-btn" onclick="saveProjectStep()">Add Step</button>
+                                <button type="button" class="cancel-btn" onclick="hideAddStepForm()">Cancel</button>
                             </div>
                         </div>
                     </div>
@@ -519,22 +491,22 @@ if (!$user) {
                         </div>
                         <div class="material-actions">
                             ${!material.is_found ? `
-                                <button class="check-btn" 
-                                    onclick="markMaterialFound(${material.id})" 
-                                    title="Mark as obtained">
+                                <button class="check-btn" data-action="mark-found" data-material-id="${material.id}" title="Mark as obtained">
                                     <i class="fas fa-check"></i>
                                 </button>
                             ` : ''}
-                            <button class="delete-btn" onclick="deleteMaterial(${material.id})" title="Delete">
+                            <button class="delete-btn" data-action="delete-material" data-material-id="${material.id}" title="Delete">
                                 <i class="fas fa-trash"></i>
                             </button>
                         </div>`;
                     materialsContainer.appendChild(materialDiv);
                 });
-            } else {
-                materialsContainer.innerHTML = '<p class="no-materials">No materials added yet.</p>';
+                } else {
+                    materialsContainer.innerHTML = '<p class="no-materials">No materials added yet.</p>';
+                }
             }
-        
+
+        }
 
         // Functions for managing materials
         function showAddMaterialForm() {
@@ -849,10 +821,12 @@ if (!$user) {
             })
             .then(response => response.json())
             .then(data => {
-                if (data.success) {
+                    if (data.success) {
                     updateProjectStatus(newStatus);
                     if (newStatus === 'completed') {
-                        showShareModal();
+                        // Do not auto-open the Share modal. Sharing is a manual action available
+                        // from the Project Details page when the project is completed.
+                        showToast('Project marked as completed — you can share it from the details page', 'success');
                     }
                 } else {
                     alert('Error updating project status');
@@ -901,45 +875,7 @@ if (!$user) {
             }
         }
 
-        function showShareModal() {
-            const modal = document.getElementById('shareProjectModal');
-            modal.style.display = 'flex';
-            generateShareLink();
-        }
-
-        function closeShareModal() {
-            document.getElementById('shareProjectModal').style.display = 'none';
-        }
-
-        function generateShareLink() {
-            const formData = new FormData();
-            formData.append('action', 'generate_share_link');
-            formData.append('project_id', currentProjectId);
-
-            fetch('update_project.php', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    document.querySelector('.copy-link').setAttribute('data-url', data.share_url);
-                }
-            });
-        }
-
-        function shareOnFacebook() {
-            const url = document.querySelector('.copy-link').getAttribute('data-url');
-            window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`, 
-                       'facebook-share', 'width=580,height=296');
-        }
-
-        function shareOnTwitter() {
-            const url = document.querySelector('.copy-link').getAttribute('data-url');
-            const text = 'Check out my recycling project on EcoWaste!';
-            window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`,
-                       'twitter-share', 'width=550,height=235');
-        }
+        
 
         function copyShareLink() {
             const url = document.querySelector('.copy-link').getAttribute('data-url');
@@ -1057,10 +993,107 @@ if (!$user) {
             });
         });
 
-        // View Details Button Functionality
-        function viewProjectDetails(projectId) {
-            window.location.href = `project_details.php?id=${projectId}`;
+        // Delegated handlers for view-details and material actions
+        document.addEventListener('click', function (e) {
+            const vd = e.target.closest('.view-details');
+            if (vd) {
+                const pid = vd.dataset.projectId;
+                if (pid) window.location.href = `project_details.php?id=${pid}`;
+                return;
+            }
+
+            const markBtn = e.target.closest('[data-action="mark-found"]');
+            if (markBtn) {
+                const mid = markBtn.dataset.materialId;
+                if (!mid || !currentProjectId) return;
+                markMaterialFound(mid);
+                return;
+            }
+
+            const delBtn = e.target.closest('[data-action="delete-material"]');
+            if (delBtn) {
+                const mid = delBtn.dataset.materialId;
+                if (!mid || !currentProjectId) return;
+                if (confirm('Are you sure you want to delete this material?')) {
+                    deleteMaterial(mid);
+                }
+                return;
+            }
+        });
+
+        // showToast helper used across this page
+        function showToast(message, type = 'info', timeout = 3500) {
+            let container = document.getElementById('toastContainer');
+            if (!container) {
+                container = document.createElement('div');
+                container.id = 'toastContainer';
+                container.style.position = 'fixed';
+                container.style.right = '20px';
+                container.style.top = '20px';
+                container.style.zIndex = 9999;
+                document.body.appendChild(container);
+            }
+
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+            toast.style.marginBottom = '8px';
+            toast.style.padding = '10px 14px';
+            toast.style.borderRadius = '8px';
+            toast.style.boxShadow = '0 2px 10px rgba(0,0,0,0.08)';
+            toast.style.color = '#fff';
+            toast.style.display = 'flex';
+            toast.style.alignItems = 'center';
+            toast.style.gap = '10px';
+
+            const icon = document.createElement('span');
+            icon.className = 'toast-icon';
+            icon.innerHTML = type === 'success' ? '✅' : type === 'error' ? '⚠️' : 'ℹ️';
+
+            const text = document.createElement('span');
+            text.textContent = message;
+
+            const close = document.createElement('button');
+            close.textContent = '✕';
+            close.style.marginLeft = '8px';
+            close.style.background = 'transparent';
+            close.style.border = 'none';
+            close.style.color = 'inherit';
+            close.style.cursor = 'pointer';
+
+            toast.appendChild(icon);
+            toast.appendChild(text);
+            toast.appendChild(close);
+
+            if (type === 'success') toast.style.background = '#2e8b57';
+            else if (type === 'error') toast.style.background = '#d9534f';
+            else toast.style.background = '#333';
+
+            container.appendChild(toast);
+
+            const removeToast = () => toast.remove();
+            close.addEventListener('click', removeToast);
+            setTimeout(removeToast, timeout);
         }
     </script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const userProfile = document.querySelector('.user-profile');
+    const dropdownMenu = document.querySelector('.dropdown-menu');
+
+    if (userProfile && dropdownMenu) {
+        userProfile.addEventListener('click', function(e) {
+            e.preventDefault();
+            dropdownMenu.classList.toggle('show');
+        });
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!userProfile.contains(e.target)) {
+                dropdownMenu.classList.remove('show');
+            }
+        });
+    }
+});
+</script>
 </body>
 </html>

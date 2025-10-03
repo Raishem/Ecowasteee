@@ -1,57 +1,148 @@
-body {
-    background-color: #f5f5f5;
-    min-height: 100vh;
-    padding: 20px 0;
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
     font-family: 'Open Sans', sans-serif;
 }
 
-/* Override homepage grid layout */
-.container {
-    display: block !important;
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 0 20px;
-    width: 100%;
-    grid-template-columns: unset !important;
-    gap: 0 !important;
+html, body {
+    max-width: 100%;
+    overflow-x: hidden; /* prevent horizontal scrolling caused by long words */
 }
 
-.project-details {
+/* sensible defaults to avoid overflow from long strings */
+body, p, h1, h2, h3, h4, a, span, .project-title, .material-name {
+    word-wrap: break-word;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+}
+
+body {
+    background-color: #f5f5f5;
+    color: #333;
+    line-height: 1.6;
+    min-height: 100vh;
+}
+
+h1, h2, h3, h4 {
+    font-family: 'Montserrat', sans-serif;
+}
+
+/* Header and sidebar moved to shared stylesheet: assets/css/header.css
+   Project-specific file should not duplicate header/sidebar rules to avoid
+   conflicting styles. Keep page-specific layout rules below. */
+
+/* ...existing rules for project header, project-info, materials, etc. ... */
+
+.project-header.card {
+    position: relative;
     background: white;
     border-radius: 16px;
-    padding: 30px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+    padding: 35px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.05);
     margin-bottom: 30px;
-    position: relative;
-    overflow: hidden;
-    width: 100%;
-    box-sizing: border-box;
 }
 
-.breadcrumb {
-    margin-bottom: 30px;
+.project-sections-container {
+    display: flex;
+    flex-direction: column;
+    gap: 40px;
+}
+
+.project-title-section,
+.project-description-section {
+    position: relative;
+    padding-top: 32px;
+}
+
+.project-section-label {
+    position: absolute;
+    top: 0;
+    left: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: #2e7d32;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    background: rgba(46, 125, 50, 0.08);
+    padding: 4px 12px;
+    border-radius: 4px;
+}
+
+.project-title {
+    font-size: 2.2em;
+    color: #2c3e50;
+    margin: 12px 0 8px;
+    line-height: 1.2;
+    font-weight: 700;
+}
+
+.project-subtitle {
+    color: #666;
+    font-size: 1.1em;
+    margin: 12px 0;
+    line-height: 1.5;
+}
+
+.project-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #666;
+    font-size: 0.9em;
+    margin-top: 12px;
+}
+
+.project-meta i {
+    color: #2e7d32;
+}
+
+.project-description {
+    color: #444;
+    line-height: 1.7;
+    font-size: 1.05em;
+    padding: 8px 0;
+    margin-top: 8px;
+}
 }
 
 .back-link {
-    color: #2e8b57;
-    text-decoration: none;
     display: inline-flex;
     align-items: center;
-    gap: 8px;
-    font-weight: 500;
-    transition: color 0.2s ease;
+    text-decoration: none;
+    color: #2e8b57;
+    font-weight: 600;
+    padding: 8px 16px;
+    border-radius: 6px;
+    transition: all 0.3s ease;
+    background-color: #f0f7e8;
+    border: 1px solid #2e8b57;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    font-size: 14px;
 }
 
 .back-link:hover {
-    color: #3cb371;
+    background-color: #2e8b57;
+    color: white;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+}
+
+.back-link i {
+    margin-right: 6px;
+    transition: transform 0.3s ease;
+}
+
+.back-link:hover i {
+    transform: translateX(-3px);
 }
 
 .details-header {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    margin-bottom: 40px;
-    padding-bottom: 25px;
+    margin-bottom: 28px;
+    padding-bottom: 18px;
     border-bottom: 3px solid #e9ecef;
     position: relative;
 }
@@ -89,16 +180,18 @@ body {
     background: #2e8b57;
     color: white;
     border: none;
-    padding: 12px 24px;
-    border-radius: 30px;
+    padding: 10px 16px;
+    border-radius: 6px;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: background-color 0.18s ease, transform 0.12s ease;
     font-weight: 600;
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    gap: 10px;
-    font-size: 0.95rem;
-    box-shadow: 0 4px 6px rgba(46, 139, 87, 0.2);
+    gap: 8px;
+    font-size: 15px;
+    /* place in flex flow (no absolute) */
+    position: relative;
+    margin-left: 18px;
 }
 
 .edit-btn:hover {
@@ -112,16 +205,6 @@ body {
     box-shadow: 0 2px 4px rgba(46, 139, 87, 0.2);
 }
 
-.project-info {
-    margin-bottom: 50px;
-    padding: 30px;
-    background: linear-gradient(145deg, #ffffff, #f8f9fa);
-    border-radius: 16px;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
-    border: 1px solid #e9ecef;
-    position: relative;
-    overflow: hidden;
-}
 
 .section-title {
     color: #2e8b57;
@@ -155,30 +238,188 @@ body {
 
 .project-title {
     color: #2e8b57;
-    margin: 0 0 20px 0;
-    font-size: 2.4em;
+    margin: 0 0 8px 0;
+    font-size: 1.9em;
     font-weight: 800;
     font-family: 'Montserrat', sans-serif;
     letter-spacing: -0.5px;
     position: relative;
-    padding-bottom: 15px;
-    display: inline-block;
+    padding-bottom: 4px;
+    max-width: 100%;
+    overflow: hidden;
+    /* allow title to wrap up to 2 lines and then ellipsize */
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    display: block;
+    line-clamp: 2;
+    overflow-wrap: anywhere; /* break long words to avoid horizontal scrolling */
+}
+
+/* Tweak project header card to match projects.php styling: center title/description
+   and position meta information at the bottom-left of the card. */
+.project-header.card {
+    text-align: center;
+    padding: 30px;
+    position: relative; /* allow absolute-positioned meta */
+    margin-left: 0; /* align with main content container */
+    margin-right: 0;
+}
+
+.project-header.card .project-title {
+    font-size: 2.1rem;
+    line-height: 1.2;
+    margin-bottom: 8px;
+}
+
+.project-header.card .project-subtitle {
+    color: #4a4a4a;
+    margin: 0 auto 18px;
+    max-width: 900px;
+    font-size: 1.05rem;
+}
+
+/* Creation date / meta moved to bottom-left inside the header card */
+.project-header.card .project-meta {
+    position: absolute;
+    left: 22px;
+    bottom: 14px;
+    color: #666;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Keep project actions centered under the title */
+.project-header.card .project-actions {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 12px;
+}
+
+/* Header actions and notification icon (if DOM includes them) */
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.notifications-icon {
+    position: relative;
+    color: white;
+    font-size: 1.1rem;
+    cursor: pointer;
+}
+
+.notification-badge {
+    position: absolute;
+    top: -6px;
+    right: -8px;
+    background: #e74c3c;
+    color: white;
+    font-size: 0.7rem;
+    padding: 2px 6px;
+    border-radius: 10px;
+}
+
+.header-notifications-panel {
+    position: absolute;
+    top: 36px;
+    right: -6px;
+    width: 320px;
+    max-height: 420px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.12);
+    overflow-y: auto;
+    padding: 8px;
+    display: none;
+    z-index: 1200;
+}
+
+.header-notifications-panel.open,
+.header-notifications-panel.open[aria-hidden="false"] {
+    display: block;
+}
+
+.header-notifications-panel .header-notif {
+    padding: 10px 12px;
+    border-radius: 6px;
+    border-bottom: 1px solid #f1f1f1;
+    background: white;
+}
+
+.header-notifications-panel .header-notif.unread {
+    background: linear-gradient(90deg, rgba(235,250,235,1), rgba(255,255,255,1));
+}
+
+.header-notif .hn-title { font-weight: 700; color: #2e8b57; margin-bottom: 6px; }
+.header-notif .hn-msg { color: #555; font-size: 0.95rem; margin-bottom: 6px; }
+.header-notif .hn-time { color: #888; font-size: 0.8rem; }
+
+/* Pulse animation for badge */
+.notification-badge.pulse {
+    animation: pulse 1.2s ease-out;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.6); }
+    70% { transform: scale(1.15); box-shadow: 0 0 0 10px rgba(231, 76, 60, 0); }
+    100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(231, 76, 60, 0); }
+}
+
+/* Responsive: on small screens fall back to stacked flow and move meta inline */
+@media (max-width: 880px) {
+    .project-header.card {
+        text-align: left;
+        padding: 20px;
+    }
+
+    .project-header.card .project-meta {
+        position: static;
+        margin-top: 10px;
+        order: 3;
+    }
+
+    .project-header.card .project-actions {
+        justify-content: flex-start;
+    }
 }
 
 .project-description {
     color: #4a4a4a;
     line-height: 1.8;
-    font-size: 1.1em;
-    max-width: 800px;
+    font-size: 1rem;
     margin: 0 auto;
+    padding-right: 10px;
+}
+
+/* Custom scrollbar for project info */
+.project-info::-webkit-scrollbar {
+    width: 8px;
+}
+
+.project-info::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.project-info::-webkit-scrollbar-thumb {
+    background: #82AA52;
+    border-radius: 4px;
+}
+
+.project-info::-webkit-scrollbar-thumb:hover {
+    background: #6b8c43;
 }
 
 .materials-section {
-    background: linear-gradient(145deg, #ffffff, #f8f9fa);
-    border-radius: 20px;
+    background-color: white;
+    border-radius: 10px;
     padding: 30px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
-    border: 1px solid #e9ecef;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
     position: relative;
     overflow: hidden;
     width: 100%;
@@ -200,9 +441,7 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 35px;
-    padding-bottom: 25px;
-    border-bottom: 2px solid #e9ecef;
+    margin-bottom: 18px;
 }
 
 .materials-header h2 {
@@ -222,27 +461,20 @@ body {
 }
 
 .add-material-btn {
-    background: linear-gradient(145deg, #2e8b57, #3cb371);
-    color: white;
-    border: none;
-    padding: 14px 28px;
-    border-radius: 30px;
+    background-color: #f0f7e8;
+    color: #2e8b57;
+    border: 1px dashed #2e8b57;
+    padding: 10px 15px;
+    border-radius: 6px;
     cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 10px;
     font-weight: 600;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 6px rgba(46, 139, 87, 0.2);
-    font-size: 1rem;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    transition: background-color 0.12s ease, transform 0.08s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
 }
 
-.add-material-btn:hover {
-    background: #3aa76c;
-    transform: translateY(-1px);
-}
+.add-material-btn:hover { background-color: #e8f2db; transform: translateY(-1px); }
 
 .materials-list {
     display: grid;
@@ -253,15 +485,15 @@ body {
 
 .material-item {
     background: white;
-    padding: 25px;
-    border-radius: 16px;
+    padding: 18px;
+    border-radius: 12px;
     display: grid;
-    grid-template-columns: 2fr 1fr auto auto;
+    grid-template-columns: 1fr auto auto;
     align-items: center;
-    gap: 25px;
+    gap: 18px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-    transition: all 0.3s ease;
-    border: 1px solid rgba(0, 0, 0, 0.05);
+    transition: all 0.25s ease;
+    border: 1px solid rgba(0, 0, 0, 0.04);
     position: relative;
     overflow: hidden;
     width: 100%;
@@ -290,10 +522,11 @@ body {
 }
 
 .material-name {
-    font-weight: 600;
+    font-weight: 700;
     color: #2d3436;
-    font-size: 1.2em;
-    letter-spacing: -0.3px;
+    font-size: 1.05rem;
+    letter-spacing: -0.2px;
+    overflow-wrap: anywhere;
 }
 
 .material-name::before {
@@ -391,23 +624,21 @@ body {
 
 .action-buttons {
     display: flex;
-    gap: 12px;
-    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
 }
 
 .action-btn {
-    padding: 10px 20px;
+    padding: 8px 14px;
     border: none;
-    border-radius: 25px;
+    border-radius: 6px;
+    font-weight: 600;
     cursor: pointer;
-    font-size: 0.95rem;
-    display: flex;
+    transition: background-color 0.2s;
+    font-size: 14px;
+    display: inline-flex;
     align-items: center;
     gap: 8px;
-    font-weight: 600;
-    transition: all 0.3s ease;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
     white-space: nowrap;
 }
 
@@ -474,13 +705,12 @@ body {
 
 .modal-content {
     background: white;
-    padding: 40px;
-    border-radius: 20px;
+    padding: 30px;
+    border-radius: 10px;
     width: 100%;
     max-width: 500px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
     position: relative;
-    overflow: hidden;
 }
 
 .modal-content::before {
@@ -515,24 +745,49 @@ body {
 }
 
 .form-group {
-    margin-bottom: 20px;
+    margin-bottom: 25px;
 }
 
 .form-group label {
     display: block;
     margin-bottom: 8px;
+    font-weight: 600;
     color: #333;
-    font-weight: 500;
 }
 
-.form-group input,
+.form-group input[type="text"],
+.form-group input[type="number"],
 .form-group textarea {
     width: 100%;
-    padding: 8px 12px;
+    padding: 12px 15px;
     border: 1px solid #ddd;
-    border-radius: 4px;
-    font-size: 1rem;
+    border-radius: 6px;
+    font-size: 16px;
+    font-family: 'Open Sans', sans-serif;
 }
+
+.form-group textarea {
+    min-height: 120px;
+    resize: vertical;
+}
+
+/* Completed step visual state */
+.step-card.step-done {
+    border: 2px solid rgba(46, 139, 87, 0.18);
+    background: linear-gradient(90deg, rgba(236,250,235,0.7), rgba(255,255,255,0.6));
+    opacity: 0.98;
+    box-shadow: 0 6px 18px rgba(46,139,87,0.06);
+}
+
+/* Toast styles (basic) */
+.toast {
+    font-family: 'Open Sans', sans-serif;
+    font-size: 14px;
+    opacity: 1;
+}
+.toast-success { background: #2e8b57; }
+.toast-error { background: #d9534f; }
+.toast-info { background: #333; }
 
 .form-group textarea {
     min-height: 100px;
@@ -560,8 +815,163 @@ body {
     border: 1px solid #c8e6c9;
 }
 
+/* Updated Material Styles */
+.materials-list {
+    margin-bottom: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.material-item {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+    padding: 15px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+}
+
+.add-material-btn {
+    background-color: #f0f7e8;
+    color: #2e8b57;
+    border: 1px dashed #2e8b57;
+    padding: 10px 15px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.add-material-btn:hover {
+    background-color: #e0f0d8;
+}
+
+.add-material-btn i {
+    margin-right: 5px;
+}
+
+/* Material Status Styles */
+.material-status {
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.status-needed {
+    background: #fff3e0;
+    color: #e65100;
+}
+
+.status-requested {
+    background: #e3f2fd;
+    color: #1565c0;
+}
+
+.status-completed {
+    background: #e8f5e9;
+    color: #2e7d32;
+}
+
 .error-message {
     background: #ffebee;
     color: #c62828;
     border: 1px solid #ffcdd2;
+}
+
+/* Sticky edit button on larger screens and responsive tweaks */
+@media (min-width: 992px) {
+    .details-header { align-items: flex-start; }
+    .edit-btn {
+        position: sticky;
+        top: 22px;
+        align-self: flex-start;
+        margin-left: 18px;
+    }
+}
+
+@media (max-width: 768px) {
+    .details-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+    }
+    .header-content { order: 1; }
+    .edit-btn { order: 2; justify-self: flex-end; align-self: flex-end; margin-left: 0; width: 48%; }
+    .project-title { font-size: 1.4em; -webkit-line-clamp: 3; line-clamp: 3; }
+    .add-material-btn { width: 100%; justify-content: center; }
+    .material-item { grid-template-columns: 1fr; gap: 12px; }
+
+   .project-info {
+    margin-bottom: 30px;
+    padding: 30px;
+    background-color: white;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    position: relative;
+    max-height: none;
+    overflow: visible;
+}
+
+}
+
+
+/* === See more / See less feature === */
+.project-description {
+    color: #4a4a4a;
+    line-height: 1.8;
+    font-size: 1.05em;
+    padding: 8px 0;
+    margin-top: 8px;
+
+    overflow: hidden;
+    transition: max-height 0.35s ease-in-out;
+}
+
+.project-description.collapsed {
+    max-height: 100px; /* preview */
+}
+
+.project-description.expanded {
+    max-height: none; /* full */
+}
+
+.see-more-btn {
+    display: inline-block;
+    margin-top: 8px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: #2e8b57;
+    cursor: pointer;
+    user-select: none;
+    transition: color 0.2s ease;
+    background: none;
+    border: none;
+    padding: 0;
+}
+
+.see-more-btn:hover {
+    color: #3cb371;
+}
+
+/* Ensure container doesn't clip description */
+.project-info {
+    margin-bottom: 30px;
+    padding: 30px;
+    background-color: white;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    position: relative;
+    max-height: none;
+    overflow: visible;
+}
+
+
+.project-description {
+    transition: max-height 0.3s ease;
 }
