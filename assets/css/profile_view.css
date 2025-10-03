@@ -221,11 +221,6 @@ header {
     font-size: 18px;
 }
 
-/* Active States */
-.sidebar nav a.active,
-.sidebar nav a[href="homepage.php"] {
-    color: #faffe8;
-}
 
 /* Enhanced Sidebar Scrollbar */
 .sidebar::-webkit-scrollbar {
@@ -252,19 +247,6 @@ header {
     scrollbar-color: var(--primary-green) rgba(130, 170, 82, 0.1);
 }
 
-/* Make right sidebar scrollable */
-.right-sidebar {
-    position: sticky;
-    top: 90px; /* Changed to match new header height */
-    align-self: start;
-    right: 0;
-    width: 300px;
-    height: calc(100vh - 90px); /* Adjust for new header height */
-    overflow-y: auto;
-    background: #F6FFEB;
-    padding: 20px;
-    box-shadow: inset 0 0 4px rgba(0,0,0,0.1);
-}
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
@@ -284,8 +266,7 @@ header {
         height: 40px;
     }
     
-    .sidebar,
-    .right-sidebar {
+    .sidebar {
         top: 70px;
         height: calc(100vh - 70px);
     }
@@ -317,8 +298,7 @@ header {
         font-size: 14px;
     }
     
-    .sidebar,
-    .right-sidebar {
+    .sidebar {
         top: 60px;
         height: calc(100vh - 60px);
     }
@@ -328,35 +308,6 @@ header {
     }
 }
 
-/* Optional: match scroll bar styling with left sidebar */
-.right-sidebar::-webkit-scrollbar {
-    width: 8px;
-}
-.right-sidebar::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 4px;
-}
-.right-sidebar::-webkit-scrollbar-thumb {
-    background: #888;
-    border-radius: 4px;
-}
-.right-sidebar::-webkit-scrollbar-thumb:hover {
-    background: #555;
-}
-
-
-.welcome-card {
-    padding: 20px;
-    background-color: #F6FFEB;
-    border-radius: 10px;
-    margin-bottom: 30px;
-    text-align: center;
-}
-
-.welcome-card h2 {
-    color: #82AA52;
-    margin-bottom: 10px;
-}
 
 .divider {
     height: 1px;
@@ -429,214 +380,6 @@ header {
     font-size: 18px;
 }
 
-/* New donation item layout */
-/* Donation Post Styling */
-.donation-post {
-    padding: 15px;
-    border: 1px solid #eee;
-    border-radius: 8px;
-    margin-bottom: 20px;
-    background-color: #fff;
-}
-
-.donation-header {
-    margin-bottom: 15px;
-}
-
-.donation-header h4 {
-    color: #2e8b57;
-    margin-bottom: 5px;
-    font-size: 18px;
-}
-
-.donation-meta {
-    display: flex;
-    justify-content: space-between;
-    color: #666;
-    font-size: 14px;
-}
-
-
-.donation-actions {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-top: 15px;
-    padding-top: 15px;
-    border-top: 1px solid #eee;
-}
-
-.request-btn {
-    padding: 10px 20px;
-    background-color: #2e8b57;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background-color 0.3s;
-}
-
-.request-btn:hover {
-    background-color: #3cb371;
-}
-
-.donation-stats {
-    display: flex;
-    align-items: center;
-    gap: 20px;
-}
-
-.quantity {
-    font-weight: 600;
-    color: #333;
-}
-
-.comments-toggle {
-    color: #2e8b57;
-    text-decoration: none;
-    cursor: pointer;
-    font-weight: 600;
-}
-
-.comments-toggle:hover {
-    text-decoration: underline;
-}
-
-/* Comments Section */
-.comments-section {
-    margin-top: 15px;
-    padding-top: 15px;
-    border-top: 1px solid #eee;
-}
-
-.comments-list {
-    margin-bottom: 15px;
-    max-height: 200px;
-    overflow-y: auto;
-}
-
-.comment {
-    padding: 10px;
-    margin-bottom: 10px;
-    background-color: #f9f9f9;
-    border-radius: 4px;
-}
-
-.comment-author {
-    font-weight: 600;
-    color: #2e8b57;
-    margin-bottom: 5px;
-}
-
-.comment-text {
-    color: #333;
-    margin: 0;
-}
-
-.no-comments {
-    color: #999;
-    font-style: italic;
-    text-align: center;
-    padding: 10px;
-}
-
-.add-comment {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-.comment-text {
-    width: 100%;
-    padding: 10px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    resize: vertical;
-    min-height: 60px;
-    font-family: 'Open Sans', sans-serif;
-}
-
-.post-comment-btn {
-    align-self: flex-end;
-    padding: 8px 16px;
-    background-color: #2e8b57;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-weight: 600;
-}
-
-.post-comment-btn:hover {
-    background-color: #3cb371;
-}
-
-.post-comment-btn:disabled {
-    background-color: #ccc;
-    cursor: not-allowed;
-}
-
-.donation-item {
-    padding: 15px 0;
-    border-bottom: 1px solid #eee;
-    display: flex;
-    flex-direction: column;
-}
-
-.donation-content {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    margin-top: 15px;
-}
-
-
-.donation-buttons {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 20px;
-    margin-top: 10px;
-}
-
-
-.comments {
-    font-size: 14px;
-    color: #666;
-}
-
-.donation-info h4 {
-    font-size: 16px;
-    margin-bottom: 5px;
-    color: #333;
-}
-
-.donation-info p {
-    font-size: 14px;
-    color: #666;
-    margin: 3px 0;
-}
-
-.time-ago {
-    font-size: 12px;
-    color: #999;
-}
-
-
-.action-btn {
-    padding: 6px 12px;
-    background-color: #2e8b57;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    font-size: 14px;
-    cursor: pointer;
-}
-
-.action-btn:hover {
-    background-color: #3cb371;
-}
 
 /* Progress Items */
 .progress-item {
@@ -1444,47 +1187,7 @@ input[type="file"] {
         background: #555;
     }
 
-    .project-item {
-    margin-bottom: 12px;
-    padding: 8px;
-    border-bottom: 1px solid #eee;
-    }
-
-    .project-link {
-        text-decoration: none;
-        color: #2e8b57;
-        font-weight: 600;
-        transition: color 0.3s ease;
-    }
-
-    .project-link:hover {
-        color: #1c5a39;
-        text-decoration: underline;
-    }
-
-
-    .projects-scroll {
-    max-height: 250px;  /* adjust as needed */
-    overflow-y: auto;
-    padding-right: 5px; /* spacing so scrollbar doesn’t overlap text */
-}
-
-/* Optional: custom scrollbar for better look */
-.projects-scroll::-webkit-scrollbar {
-    width: 6px;
-}
-
-.projects-scroll::-webkit-scrollbar-thumb {
-    background-color: #2e8b57;
-    border-radius: 4px;
-}
-
-.projects-scroll::-webkit-scrollbar-track {
-    background: #f1f1f1;
-}
-
-
-        /* Additional styles to fix text overflow issues */
+            /* Additional styles to fix text overflow issues */
         .donation-post, .idea-card, .card, .project-item, .leaderboard-item {
             overflow-wrap: break-word;
             word-wrap: break-word;

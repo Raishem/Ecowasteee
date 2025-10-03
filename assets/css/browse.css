@@ -260,8 +260,7 @@ header {
         height: 40px;
     }
     
-    .sidebar,
-    .right-sidebar {
+    .sidebar {
         top: 70px;
         height: calc(100vh - 70px);
     }
@@ -293,8 +292,7 @@ header {
         font-size: 14px;
     }
     
-    .sidebar,
-    .right-sidebar {
+    .sidebar {
         top: 60px;
         height: calc(100vh - 60px);
     }
@@ -746,3 +744,89 @@ header {
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
+
+ .item-donor {
+    font-size: 14px;
+    margin-top: 6px;
+    color: #555;
+    font-style: italic;
+}
+
+.donation-img {
+    max-width: 150px;
+    height: auto;
+    margin-top: 8px;
+    border-radius: 6px;
+    display: block;
+}
+
+.donation-user-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.user-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: #3d6a06;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    margin-right: 12px;
+    flex-shrink: 0;
+}
+
+.user-info {
+    flex: 1;
+}
+
+.user-name {
+    font-weight: 600;
+    font-size: 16px;
+    color: #333;
+    margin-bottom: 4px;
+}
+
+.profile-link {
+    color: #333;
+    text-decoration: none;
+    transition: color 0.3s;
+    font-weight: 600;
+}
+
+.profile-link:hover {
+    color: #2e8b57;
+    text-decoration: underline;
+}
+
+.donation-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    font-size: 13px;
+    color: #666;
+}
+
+.donation-images {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.donation-image {
+    width: 80px;
+    height: 80px;
+    object-fit: cover;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.donation-image:hover {
+    transform: scale(1.05);
+}

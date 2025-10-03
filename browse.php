@@ -26,6 +26,17 @@ while ($row = $result->fetch_assoc()) $donations[] = $row;
 $ideas = [];
 $result = $conn->query("SELECT * FROM recycled_ideas ORDER BY posted_at DESC");
 while ($row = $result->fetch_assoc()) $ideas[] = $row;
+
+$sql = "
+    SELECT d.*, u.first_name, u.last_name
+    FROM donations d
+    JOIN users u ON d.donor_id = u.user_id
+    WHERE d.status = 'Available'
+    ORDER BY d.donated_at DESC
+";
+$stmt = $conn->query($sql);
+$donations = $stmt->fetch_all(MYSQLI_ASSOC);
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -284,15 +295,62 @@ while ($row = $result->fetch_assoc()) $ideas[] = $row;
                         <?php else: ?>
                             <?php foreach ($donations as $donation): ?>
                             <div class="available-item">
-                                <div class="item-header">
-                                    <div class="item-title"><?= htmlspecialchars($donation['item_name']) ?></div>
-                                    <div class="item-category">Category: <?= htmlspecialchars($donation['category']) ?></div>
+                                <!-- Donor header (same style as homepage) -->
+                                <div class="donation-user-header">
+                                    <div class="user-avatar">
+                                        <?php 
+                                            $donor_stmt = $conn->prepare("SELECT user_id, first_name FROM users WHERE user_id = ?");
+                                            $donor_stmt->bind_param("i", $donation['donor_id']);
+                                            $donor_stmt->execute();
+                                            $donor_result = $donor_stmt->get_result();
+                                            $donor = $donor_result->fetch_assoc();
+                                            $donor_initial = strtoupper(substr(htmlspecialchars($donor['first_name']), 0, 1));
+                                        ?>
+                                        <?= $donor_initial ?>
+                                    </div>
+                                    <div class="user-info">
+                                        <div class="user-name">
+                                            <a href="profile_view.php?user_id=<?= $donor['user_id'] ?>" class="profile-link">
+                                                <?= htmlspecialchars($donor['first_name']) ?>
+                                            </a>
+                                        </div>
+                                        <div class="donation-meta">
+                                            <span class="category">Category: <?= htmlspecialchars($donation['category']) ?></span>
+                                            <span class="time-ago"><?= htmlspecialchars(date('M d, Y', strtotime($donation['donated_at']))) ?></span>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="item-time"><?= htmlspecialchars(date('M d, Y', strtotime($donation['donated_at']))) ?></div>
-                                <div class="item-quantity">Quantity: <?= htmlspecialchars($donation['quantity']) ?></div>
+
+                                <!-- Quantity -->
+                                <div class="item-quantity">Quantity: <?= htmlspecialchars($donation['quantity']) ?>/<?= htmlspecialchars($donation['total_quantity']) ?></div>
+
+                                <!-- Description -->
+                                <?php if (!empty($donation['description'])): ?>
+                                <div class="donation-description">
+                                    <p><?= nl2br(htmlspecialchars($donation['description'])) ?></p>
+                                </div>
+                                <?php endif; ?>
+
+                                <!-- Images -->
+                                <?php if (!empty($donation['image_path'])): ?>
+                                    <?php
+                                    $images = json_decode($donation['image_path'], true);
+                                    if (is_array($images) && !empty($images)): ?>
+                                        <div class="donation-images">
+                                            <?php foreach ($images as $image): ?>
+                                                <img src="<?= htmlspecialchars($image) ?>" 
+                                                    alt="<?= htmlspecialchars($donation['item_name']) ?>" 
+                                                    class="donation-image">
+                                            <?php endforeach; ?>
+                                        </div>
+                                    <?php endif; ?>
+                                <?php endif; ?>
+
                                 <button class="request-btn">Request Donation</button>
                             </div>
+
                             <?php endforeach; ?>
+
                         <?php endif; ?>
                     </div>
                 </div>

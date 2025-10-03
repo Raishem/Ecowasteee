@@ -97,7 +97,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_project'])) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Start Project | EcoWaste</title>
-    <link rel="stylesheet" href="assets/css/homepage.css">
+    <link rel="stylesheet" href="assets/css/start_project.css">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&family=Open+Sans&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -331,7 +331,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_project'])) {
                     <li><a href="browse.php"><i class="fas fa-search"></i>Browse</a></li>
                     <li><a href="achievements.php"><i class="fas fa-star"></i>Achievements</a></li>
                     <li><a href="leaderboard.php"><i class="fas fa-trophy"></i>Leaderboard</a></li>
-                    <li><a href="projects.php" style="color: rgb(4, 144, 4);"><i class="fas fa-recycle"></i>Projects</a></li>
+                    <li><a href="projects.php" class="active"><i class="fas fa-recycle"></i>Projects</a></li>
                     <li><a href="donations.php"><i class="fas fa-box"></i>Donations</a></li>
                 </ul>
             </nav>
