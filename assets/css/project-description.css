@@ -1,0 +1,73 @@
+/* Project Description Styles */
+.project-description {
+    color: var(--text-primary);
+    line-height: 1.8;
+    font-size: 1.05rem;
+    position: relative;
+    transition: max-height 0.3s ease-out;
+    overflow: hidden;
+}
+
+.project-description.collapsed {
+    max-height: 80px; /* Show about 3 lines of text */
+}
+
+.project-description.expanded {
+    max-height: 1000px; /* Allow plenty of room for content */
+}
+
+/* When expanded, ensure any earlier truncation styles (line-clamp or -webkit-box) are disabled */
+.project-description.expanded {
+    display: block !important;
+    -webkit-line-clamp: unset !important;
+    line-clamp: unset !important;
+    -webkit-box-orient: unset !important;
+    -webkit-box-orient: vertical;
+    overflow: visible !important;
+    max-height: none !important;
+}
+
+.project-description::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 40px;
+    background: linear-gradient(transparent, var(--primary-light));
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+}
+
+.project-description.collapsed::after {
+    opacity: 1;
+}
+
+.see-more-btn {
+    background: none;
+    border: none;
+    color: var(--primary-color);
+    font-weight: 600;
+    cursor: pointer;
+    padding: 8px 0;
+    margin-top: 8px;
+    display: inline-block;
+    transition: color 0.2s ease;
+}
+
+.see-more-btn:hover {
+    color: #3cb371;
+}
+
+.see-more-btn:focus {
+    outline: none;
+    text-decoration: underline;
+}
+
+.project-description-section {
+    background: var(--primary-light);
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+}

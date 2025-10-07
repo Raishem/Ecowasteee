@@ -254,6 +254,237 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             break;
 
+        case 'toggle_step':
+            // toggle or set a step as done/undone. Enforce sequential progression.
+            $step_id = filter_input(INPUT_POST, 'step_id', FILTER_VALIDATE_INT);
+            $set_done = isset($_POST['done']) ? (int)$_POST['done'] : 1;
+            if (!$step_id) {
+                echo json_encode(['success' => false, 'message' => 'Missing step id']);
+                exit;
+            }
+
+            try {
+                // Best-effort: create progress table if not exists
+                $conn->exec("CREATE TABLE IF NOT EXISTS project_step_progress (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    project_id INT NOT NULL,
+                    step_id INT NOT NULL,
+                    is_done TINYINT(1) DEFAULT 0,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+                // Get step info (number and project_id)
+                $s_stmt = $conn->prepare("SELECT project_id, step_number FROM project_steps WHERE step_id = ?");
+                $s_stmt->execute([$step_id]);
+                $sinfo = $s_stmt->fetch(PDO::FETCH_ASSOC);
+                if (!$sinfo) {
+                    echo json_encode(['success' => false, 'message' => 'Step not found']);
+                    exit;
+                }
+
+                $projectIdFromStep = (int)$sinfo['project_id'];
+                $stepNumber = (int)$sinfo['step_number'];
+
+                // Ensure the step belongs to the project provided in POST
+                if ($projectIdFromStep !== $project_id) {
+                    echo json_encode(['success' => false, 'message' => 'Step does not belong to this project']);
+                    exit;
+                }
+
+                // Enforce progression: if marking as done, previous step must be done
+                if ($set_done) {
+                    if ($stepNumber > 1) {
+                        $prev_stmt = $conn->prepare("SELECT psp.is_done FROM project_step_progress psp
+                            JOIN project_steps ps ON ps.step_id = psp.step_id
+                            WHERE ps.project_id = ? AND ps.step_number = ?");
+                        $prev_stmt->execute([$projectIdFromStep, $stepNumber - 1]);
+                        $prev = $prev_stmt->fetch(PDO::FETCH_ASSOC);
+                        if (!$prev || !(int)$prev['is_done']) {
+                            echo json_encode(['success' => false, 'message' => 'Complete previous step first']);
+                            exit;
+                        }
+                    }
+                }
+
+                // Insert or update progress
+                $up_stmt = $conn->prepare("SELECT id FROM project_step_progress WHERE project_id = ? AND step_id = ?");
+                $up_stmt->execute([$projectIdFromStep, $step_id]);
+                $exists = $up_stmt->fetch(PDO::FETCH_ASSOC);
+                if ($exists) {
+                    $u2 = $conn->prepare("UPDATE project_step_progress SET is_done = ? WHERE id = ?");
+                    $u2->execute([$set_done, $exists['id']]);
+                } else {
+                    $i2 = $conn->prepare("INSERT INTO project_step_progress (project_id, step_id, is_done) VALUES (?, ?, ?)");
+                    $i2->execute([$projectIdFromStep, $step_id, $set_done]);
+                }
+
+                echo json_encode(['success' => true]);
+                exit;
+
+            } catch (PDOException $e) {
+                echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
+                exit;
+            }
+            break;
+
+        case 'publish_shared_project':
+            // Snapshot project into shared_* tables (requires migration run)
+            try {
+                $conn->beginTransaction();
+
+                // Fetch project data (include status to enforce publish rule)
+                $pstmt = $conn->prepare("SELECT project_name, description, cover_photo, tags, status FROM projects WHERE project_id = ?");
+                $pstmt->execute([$project_id]);
+                $pdata = $pstmt->fetch(PDO::FETCH_ASSOC);
+                if (!$pdata) {
+                    throw new Exception('Project not found');
+                }
+
+                // Only allow publishing completed projects
+                if (!isset($pdata['status']) || $pdata['status'] !== 'completed') {
+                    throw new Exception('Only completed projects can be shared');
+                }
+
+                // Insert into shared_projects
+                $ins = $conn->prepare("INSERT INTO shared_projects (project_id, user_id, title, description, cover_photo, tags, privacy, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, 'public', NOW())");
+                $ins->execute([
+                    $project_id,
+                    $_SESSION['user_id'],
+                    $pdata['project_name'],
+                    $pdata['description'],
+                    $pdata['cover_photo'] ?? null,
+                    $pdata['tags'] ?? null
+                ]);
+                $shared_id = $conn->lastInsertId();
+
+                // Copy materials
+                $mstmt = $conn->prepare("SELECT material_name, quantity, unit, is_found FROM project_materials WHERE project_id = ?");
+                $mstmt->execute([$project_id]);
+                while ($m = $mstmt->fetch(PDO::FETCH_ASSOC)) {
+                    $extra = json_encode(['unit' => $m['unit'], 'is_found' => (int)$m['is_found']]);
+                    $c = $conn->prepare("INSERT INTO shared_materials (shared_id, name, quantity, extra) VALUES (?, ?, ?, ?)");
+                    $c->execute([$shared_id, $m['material_name'], $m['quantity'], $extra]);
+                }
+
+                // Copy steps and photos
+                $sstmt = $conn->prepare("SELECT step_id, step_number, title, instructions, IFNULL(is_done,0) as is_done FROM project_steps WHERE project_id = ? ORDER BY step_number");
+                $sstmt->execute([$project_id]);
+                $step_map = [];
+                while ($s = $sstmt->fetch(PDO::FETCH_ASSOC)) {
+                    $insStep = $conn->prepare("INSERT INTO shared_steps (shared_id, step_number, title, instructions, is_done) VALUES (?, ?, ?, ?, ?)");
+                    $insStep->execute([$shared_id, $s['step_number'], $s['title'], $s['instructions'], $s['is_done']]);
+                    $new_step_id = $conn->lastInsertId();
+                    $step_map[$s['step_id']] = $new_step_id;
+
+                    // copy photos
+                    $ph = $conn->prepare("SELECT photo_path FROM step_photos WHERE step_id = ?");
+                    $ph->execute([$s['step_id']]);
+                    while ($row = $ph->fetch(PDO::FETCH_ASSOC)) {
+                        $insP = $conn->prepare("INSERT INTO shared_step_photos (step_id, path) VALUES (?, ?)");
+                        $insP->execute([$new_step_id, $row['photo_path']]);
+                    }
+                }
+
+                // Record an activity that the project was published
+                $a = $conn->prepare("INSERT INTO shared_activities (shared_id, user_id, activity_type, data, created_at) VALUES (?, ?, 'publish', ?, NOW())");
+                $a->execute([$shared_id, $_SESSION['user_id'], json_encode(['project_id' => $project_id])]);
+
+                $conn->commit();
+
+                $share_url = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http")
+                    . "://$_SERVER[HTTP_HOST]/shared_project.php?id=" . $shared_id;
+
+                echo json_encode(['success' => true, 'shared_id' => $shared_id, 'share_url' => $share_url]);
+                exit;
+            } catch (Exception $e) {
+                if ($conn->inTransaction()) $conn->rollBack();
+                echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+                exit;
+            }
+            break;
+
+        case 'shared_activity':
+            // Record like/comment activities on a shared project
+            $shared_id = filter_input(INPUT_POST, 'shared_id', FILTER_VALIDATE_INT);
+            $atype = isset($_POST['activity_type']) ? $_POST['activity_type'] : null;
+            if (!$shared_id || !$atype) {
+                echo json_encode(['success' => false, 'message' => 'Missing parameters']);
+                exit;
+            }
+
+            try {
+                if ($atype === 'like') {
+                    // toggle like
+                    $likeStmt = $conn->prepare("SELECT id FROM shared_likes WHERE shared_id = ? AND user_id = ?");
+                    $likeStmt->execute([$shared_id, $_SESSION['user_id']]);
+                    $exists = $likeStmt->fetch(PDO::FETCH_ASSOC);
+                    if ($exists) {
+                        $d = $conn->prepare("DELETE FROM shared_likes WHERE id = ?");
+                        $d->execute([$exists['id']]);
+                        $liked = false;
+                    } else {
+                        $i = $conn->prepare("INSERT INTO shared_likes (shared_id, user_id) VALUES (?, ?)");
+                        $i->execute([$shared_id, $_SESSION['user_id']]);
+                        $liked = true;
+                    }
+                    $conn->prepare("INSERT INTO shared_activities (shared_id, user_id, activity_type, data) VALUES (?, ?, 'like', ?)")
+                        ->execute([$shared_id, $_SESSION['user_id'], json_encode(['liked' => $liked])]);
+                    echo json_encode(['success' => true, 'liked' => $liked]);
+                    exit;
+                }
+
+                if ($atype === 'comment') {
+                    $comment = trim(filter_input(INPUT_POST, 'comment', FILTER_SANITIZE_STRING));
+                    if (empty($comment)) {
+                        echo json_encode(['success' => false, 'message' => 'Empty comment']);
+                        exit;
+                    }
+                    $cstmt = $conn->prepare("INSERT INTO shared_comments (shared_id, user_id, comment, created_at) VALUES (?, ?, ?, NOW())");
+                    $cstmt->execute([$shared_id, $_SESSION['user_id'], $comment]);
+
+                    $conn->prepare("INSERT INTO shared_activities (shared_id, user_id, activity_type, data) VALUES (?, ?, 'comment', ?)")
+                        ->execute([$shared_id, $_SESSION['user_id'], json_encode(['comment_id' => $conn->lastInsertId()])]);
+
+                    echo json_encode(['success' => true, 'comment_id' => $conn->lastInsertId()]);
+                    exit;
+                }
+
+                echo json_encode(['success' => false, 'message' => 'Unknown activity type']);
+                exit;
+            } catch (Exception $e) {
+                echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+                exit;
+            }
+            break;
+
+        case 'unpublish_shared_project':
+            $shared_id = filter_input(INPUT_POST, 'shared_id', FILTER_VALIDATE_INT);
+            if (!$shared_id) {
+                echo json_encode(['success' => false, 'message' => 'Missing shared id']);
+                exit;
+            }
+
+            try {
+                // Verify ownership
+                $s = $conn->prepare("SELECT user_id FROM shared_projects WHERE shared_id = ?");
+                $s->execute([$shared_id]);
+                $owner = $s->fetch(PDO::FETCH_ASSOC);
+                if (!$owner || $owner['user_id'] != $_SESSION['user_id']) {
+                    echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+                    exit;
+                }
+
+                $d = $conn->prepare("DELETE FROM shared_projects WHERE shared_id = ?");
+                $d->execute([$shared_id]);
+                echo json_encode(['success' => true]);
+                exit;
+            } catch (Exception $e) {
+                echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+                exit;
+            }
+            break;
+
         case 'generate_share_link':
             try {
                 $share_token = bin2hex(random_bytes(16));

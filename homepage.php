@@ -10,7 +10,6 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true || empty($
     exit();
 }
 
-$user_id = (int) $_SESSION['user_id'];
 $donor_id = $_SESSION['user_id'];
 $image_paths_json = null;
 
@@ -39,17 +38,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['comment_text']) && is
 /* ----------------------------
    Handle donation form submission
 ---------------------------- */
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['wasteCategory']) && !isset($_POST['submit_request_donation'])) {
-    if (empty($_POST['wasteCategory']) || empty($_POST['quantity']) || empty($_POST['description'])) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['wasteType']) && !isset($_POST['submit_request_donation'])) {
+    if (empty($_POST['wasteType']) || empty($_POST['quantity']) || empty($_POST['description'])) {
         die('Error: All fields are required.');
     }
 
-    $category = htmlspecialchars($_POST['wasteCategory']);
-    $subcategory = !empty($_POST['wasteSubcategory']) ? htmlspecialchars($_POST['wasteSubcategory']) : null;
-
-    // Use subcategory as item_name if available, otherwise fallback to category
-    $item_name = $subcategory ?? $category;
-
+    $category = htmlspecialchars($_POST['wasteType']);
+    $subcategory = !empty($_POST['subcategory']) ? htmlspecialchars($_POST['subcategory']) : null;
+    $item_name = $subcategory ? "$subcategory ($category)" : $category;
     $quantity = (int) $_POST['quantity'];
     $description = htmlspecialchars($_POST['description']);
     $donor_id = $_SESSION['user_id'];
@@ -94,19 +90,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['wasteCategory']) && !
     // Insert donation into donations table
     $total_quantity = $quantity; // store the original amount
 
-    $stmt = $conn->prepare("INSERT INTO donations (item_name, quantity, total_quantity, category, description, donor_id, donated_at, image_path, status) 
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Available')");
-    if (!$stmt) {
-        die('Error: Failed to prepare statement. ' . $conn->error);
-    }
+    $stmt = $conn->prepare("INSERT INTO donations (item_name, quantity, total_quantity, category, subcategory, description, donor_id, donated_at, status, image_path) 
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Available', ?)");
+    $stmt->bind_param("sisssssss", $item_name, $quantity, $total_quantity, $category, $subcategory, $description, $donor_id, $donated_at, $image_paths_json);
 
-    if (!$stmt->bind_param("sissssss", $item_name, $quantity, $total_quantity, $category, $description, $donor_id, $donated_at, $image_paths_json)) {
-        die('Error: Failed to bind parameters. ' . $stmt->error);
-    }
-
-    if (!$stmt->execute()) {
-        die('Error: Failed to execute statement. ' . $stmt->error);
-    }
+    $stmt->execute();
 
     // Update USER STATS (only counts)
     $stats_check = $conn->query("SELECT * FROM user_stats WHERE user_id = $donor_id");
@@ -266,15 +254,8 @@ while ($row = $result->fetch_assoc()) {
 
 // Fetch user projects (sidebar)
 $projects = [];
-$stmt = $conn->prepare("SELECT * FROM projects WHERE user_id = ? ORDER BY created_at DESC");
-$stmt->bind_param("i", $user_id);
-$stmt->execute();
-$result = $stmt->get_result();
-while ($row = $result->fetch_assoc()) {
-    $projects[] = $row;
-}
-$stmt->close();
-
+$result = $conn->query("SELECT * FROM projects WHERE user_id = {$user['user_id']} ORDER BY created_at DESC");
+while ($row = $result->fetch_assoc()) $projects[] = $row;
 
 // Fetch leaderboard
 $leaders = [];
@@ -655,10 +636,9 @@ function render_comments($comments, $donation_id, $parent_id = NULL) {
                 </a>
             </div>
             <div class="donation-meta">
-                <span class="category">
-                    Category: <?= htmlspecialchars($donation['category']) ?>
-                    <?php if (!empty($donation['item_name']) && $donation['item_name'] !== $donation['category']): ?>
-                        > <?= htmlspecialchars($donation['item_name']) ?>
+                <span class="category">Category: <?= htmlspecialchars($donation['category']) ?>
+                    <?php if (!empty($donation['subcategory'])): ?>
+                        → <?= htmlspecialchars($donation['subcategory']) ?>
                     <?php endif; ?>
                 </span>
                 <span class="time-ago"><?= getTimeAgo($donation['donated_at']) ?></span>
@@ -763,8 +743,9 @@ function render_comments($comments, $donation_id, $parent_id = NULL) {
     <?php endif; ?>
 </div>
 
-</main>
-        <aside class="right-sidebar">
+        </main>
+        
+        <div class="right-sidebar">
             <div class="card">
                 <h2>Your Projects</h2>
                 <div class="divider"></div>
@@ -773,17 +754,18 @@ function render_comments($comments, $donation_id, $parent_id = NULL) {
                         <p>No Projects for now</p>
                     <?php else: ?>
                         <?php foreach ($projects as $project): ?>
-                            <div class="project-item">
-                                <a href="project.php?id=<?= $project['project_id'] ?>" class="project-link">
+                            <a href="project_details.php?id=<?= $project['project_id'] ?>" class="project-item-link">
+                                <div class="project-item">
                                     <strong><?= htmlspecialchars($project['project_name']) ?></strong>
-                                </a>
-                                <div><?= htmlspecialchars($project['description']) ?></div>
-                                <div class="project-date"><?= htmlspecialchars(date('M d, Y', strtotime($project['created_at']))) ?></div>
-                            </div>
+                                    <div><?= htmlspecialchars($project['description']) ?></div>
+                                    <div class="project-date"><?= htmlspecialchars(date('M d, Y', strtotime($project['created_at']))) ?></div>
+                                </div>
+                            </a>
                         <?php endforeach; ?>
                     <?php endif; ?>
                 </div>
             </div>
+
 
             <div class="card">
                 <h2>Quick Stats</h2>
@@ -811,153 +793,146 @@ function render_comments($comments, $donation_id, $parent_id = NULL) {
                 </div>
                 <?php endforeach; ?>
             </div>
-        </aside>
-   
-   
-        <!-- Donation Popup Form -->
-        <div id="donationPopup" class="popup-container">
-            <div class="popup-content" id="donationFormContainer">
-                <div class=popup-header>
-                    <h2>Post Donation</h2>
-                    <button class="close-btn">&times;</button>
-                </div>
-
-                <form id="donationForm" action="homepage.php" method="POST" enctype="multipart/form-data">
-                    <div class="form-group">
-                        <label for="wasteCategory">Select Category</label>
-                        <select id="wasteCategory" name="wasteCategory" required>
-                            <option value="">-- Select Waste Category --</option>
-                            <option value="Plastic">Plastic</option>
-                            <option value="Paper">Paper</option>
-                            <option value="Glass">Glass</option>
-                            <option value="Metal">Metal</option>
-                            <option value="Ewaste">E-Waste</option>
-                        </select>
-                    </div>
-
-                    <!-- Sub-category dropdown (appears dynamically) -->
-                    <div class="form-group" id="subcategory-group" style="display:none;">
-                        <label for="wasteSubcategory">Select Type</label>
-                        <select id="wasteSubcategory" name="wasteSubcategory">
-                            <option value="">-- Select Subcategory --</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="quantity">Quantity:</label>
-                        <input type="number" id="quantity" name="quantity" placeholder="Enter quantity" min="1" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="description">Description:</label>
-                        <textarea id="description" name="description" placeholder="Describe your donation..." rows="4" required></textarea>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="photos">Attach Photos (up to 4):</label>
-                        <div class="file-upload">
-                            <input type="file" id="photos" name="photos[]" accept="image/*" multiple>
-                            <label for="photos" class="file-upload-label">Choose Files</label>
-                            <span id="file-chosen">No files chosen</span>
-                        </div>
-                        <small class="form-hint">You can upload up to 4 photos. Only JPG, PNG, and GIF files are allowed.</small>
-                        
-                        <div id="file-count-message" class="file-count-message" style="display: none;"></div>
-                        
-                        <div id="photoPreviewContainer" class="photo-preview-container">
-                            <div id="photoPreview" class="photo-preview"></div>
-                        </div>
-                    </div>
-
-                    <button type="submit" class="submit-btn">Post Donation</button>
-                </form>
-            </div>
-
-            <!-- Success Popup -->
-            <div class="popup-content success-popup" id="successPopup" style="display: none;">
-                <h2 class="success-title">🎉 Congratulations!</h2>
-                <p class="success-message">
-                    You have now donated your waste.<br>
-                    Wait for others to claim yours.
-                </p>
-                <div class="success-actions">
-                    <button class="continue-btn" id="continueBtn">Continue</button>
-                    <button class="close-btn">&times;</button>
-            </div>
         </div>
+    </div>
+   
+   <!-- Donation Popup Form -->
+<div id="donationPopup" class="popup-container" style="display:none;">
+    <div class="popup-content" id="donationFormContainer">
+        <h2>Post Donation</h2>
+        <form id="donationForm" action="homepage.php" method="POST" enctype="multipart/form-data">
+            <div class="form-group">
+                <label for="wasteType">Type of Waste:</label>
+                <select id="wasteType" name="wasteType" required>
+                    <option value="">Select waste type</option>
+                    <option value="Plastic">Plastic</option>
+                    <option value="Paper">Paper</option>
+                    <option value="Metal">Metal</option>
+                    <option value="Glass">Glass</option>
+                    <option value="Electronic">Electronic</option>
+                </select>
+            </div>
+
+            <div class="form-group" id="subcategory-group" style="display:none;">
+                <label for="subcategory">Subcategory:</label>
+                <select id="subcategory" name="subcategory">
+                    <option value="">-- Select Subcategory --</option>
+                </select>
+            </div>
 
 
-    <!-- Request Donation Popup -->
-    <div id="requestPopup" class="popup-container" style="display:none;">
-        <div class="popup-content">
-            <h2>Request Materials</h2>
-            <form method="POST" action="homepage.php">
-                <input type="hidden" id="popupDonationId" name="donation_id">
-
-                <div class="form-group">
-                    <label>Waste:</label>
-                    <span id="popupWasteName"></span>
+            <div class="form-group">
+                <label for="quantity">Quantity:</label>
+                <input type="number" id="quantity" name="quantity" placeholder="Enter quantity" 
+                    min="1" required>
                 </div>
 
-                <div class="form-group">
-                    <label>Available Items:</label>
-                    <span id="popupAvailable"></span>
+            <div class="form-group">
+                <label for="description">Description:</label>
+                <textarea id="description" name="description" placeholder="Describe your donation..." rows="4" required></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="photos">Attach Photos (up to 4):</label>
+                <div class="file-upload">
+                    <input type="file" id="photos" name="photos[]" accept="image/*" multiple>
+                    <label for="photos" class="file-upload-label">Choose Files</label>
+                    <span id="file-chosen">No files chosen</span>
                 </div>
-
-                <div class="form-group">
-                    <label>Quantity to Claim:</label>
-                    <div style="display:flex;align-items:center;gap:10px;">
-                        <button type="button" onclick="updateQuantity(-1)">-</button>
-                        <input type="text" id="quantityClaim" name="quantity_claim" value="1" readonly style="width:50px;text-align:center;">
-                        <button type="button" onclick="updateQuantity(1)">+</button>
-                    </div>
+                <small class="form-hint">You can upload up to 4 photos. Only JPG, PNG, and GIF files are allowed.</small>
+                
+                <div id="file-count-message" class="file-count-message" style="display: none;"></div>
+                
+                <div id="photoPreviewContainer" class="photo-preview-container">
+                    <div id="photoPreview" class="photo-preview"></div>
                 </div>
+            </div>
+            <button type="submit" class="btn submit-btn">Post Donation</button>
+        </form>
+        <button class="close-btn">&times;</button>
+    </div>
+     <div class="popup-content success-popup" id="successPopup" style="display: none;">
+        <div class="success-icon">
+            <i class="fas fa-gift"></i>
+        </div>
+        <h2>Congratulations!</h2>
+            <p>You’ve successfully donated your waste materials! 🎉<br>
+                Please wait for others to claim your donation.
+            </p>
+        <button class="continue-btn" id="continueBtn">Continue</button>
+    </div>
+</div>
 
-                <div class="form-group">
-                    <label>Recycling Project:</label>
-                    <select name="project_id" required>
-                        <option value="">Select a project</option>
-                        <?php foreach ($user_projects as $project): ?>
-                            <option value="<?= $project['project_id'] ?>"><?= htmlspecialchars($project['project_name']) ?></option>
-                        <?php endforeach; ?>
-                        </select>
-                    </div>
+<!-- Request Donation Popup -->
+<div id="requestPopup" class="popup-container" style="display:none;">
+    <div class="popup-content">
+        <h2>Request Materials</h2>
+        <form method="POST" action="homepage.php">
+            <input type="hidden" id="popupDonationId" name="donation_id">
 
+            <div class="form-group">
+                <label>Waste:</label>
+                <span id="popupWasteName"></span>
+            </div>
 
-                <div class="form-group">
-                    <label>Urgency Level:</label>
-                    <select name="urgency_level" required>
-                        <option value="High">High (Immediate Need)</option>
-                        <option value="Medium">Medium (Within 2 weeks)</option>
-                        <option value="Low">Low (Planning ahead)</option>
+            <div class="form-group">
+                <label>Available Items:</label>
+                <span id="popupAvailable"></span>
+            </div>
+
+            <div class="form-group">
+                <label>Quantity to Claim:</label>
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <button type="button" onclick="updateQuantity(-1)">-</button>
+                    <input type="text" id="quantityClaim" name="quantity_claim" value="1" readonly style="width:50px;text-align:center;">
+                    <button type="button" onclick="updateQuantity(1)">+</button>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Recycling Project:</label>
+                <select name="project_id" required>
+                    <option value="">Select a project</option>
+                    <?php foreach ($user_projects as $project): ?>
+                        <option value="<?= $project['project_id'] ?>"><?= htmlspecialchars($project['project_name']) ?></option>
+                    <?php endforeach; ?>
                     </select>
                 </div>
 
-                <div style="margin-top:15px;">
-                    <button type="submit" name="submit_request_donation" class="request-btn">Submit Request</button>
-                    <button type="button" class="close-btn" onclick="closeRequestPopup()">Cancel</button>
-                </div>
-            </form>
-        </div>
-    </div>
 
-    <!-- Request Success Popup -->
-    <div id="requestSuccessPopup" class="popup-container" style="display:none;">
-        <div class="popup-content success-popup">
-            <h2>Request Sent!</h2>
-            <p>Your request has been submitted successfully. Please wait for the donor’s response.</p>
-            <button class="continue-btn" onclick="closeRequestSuccessPopup()">Continue</button>
-        </div>
+            <div class="form-group">
+                <label>Urgency Level:</label>
+                <select name="urgency_level" required>
+                    <option value="High">High (Immediate Need)</option>
+                    <option value="Medium">Medium (Within 2 weeks)</option>
+                    <option value="Low">Low (Planning ahead)</option>
+                </select>
+            </div>
+
+            <div style="margin-top:15px;">
+                <button type="submit" name="submit_request_donation" class="request-btn">Submit Request</button>
+                <button type="button" class="close-btn" onclick="closeRequestPopup()">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Request Success Popup -->
+<div id="requestSuccessPopup" class="popup-container" style="display:none;">
+    <div class="popup-content success-popup">
+        <h2>Request Sent!</h2>
+        <p>Your request has been submitted successfully. Please wait for the donor’s response.</p>
+        <button class="continue-btn" onclick="closeRequestSuccessPopup()">Continue</button>
     </div>
 </div>
 
 
 
-    <!-- Photo Zoom Modal -->
-    <div id="photoZoomModal" class="photo-zoom-modal" style="display:none;">
-        <span class="close-modal">&times;</span>
-        <img id="zoomedPhoto" class="zoomed-photo" src="" alt="Zoomed Photo">
-    </div>
+<!-- Photo Zoom Modal -->
+<div id="photoZoomModal" class="photo-zoom-modal" style="display:none;">
+    <span class="close-modal">&times;</span>
+    <img id="zoomedPhoto" class="zoomed-photo" src="" alt="Zoomed Photo">
+</div>
 
     <!-- Feedback Button -->
     <div class="feedback-btn" id="feedbackBtn">💬</div>
@@ -992,6 +967,7 @@ function render_comments($comments, $donation_id, $parent_id = NULL) {
         </div>
     </div>
 
+
 <script>
 
     function toggleComments(button, donationId) {
@@ -1023,73 +999,24 @@ function render_comments($comments, $donation_id, $parent_id = NULL) {
     });
     
     document.addEventListener('DOMContentLoaded', function () {
-    const donateWasteBtn = document.getElementById('donateWasteBtn');
-    const donationPopup = document.getElementById('donationPopup');
-    const donationFormContainer = document.getElementById('donationFormContainer');
-    const successPopup = document.getElementById('successPopup');
-    const urlParams = new URLSearchParams(window.location.search);
+        const donateWasteBtn = document.getElementById('donateWasteBtn');
+        const donationPopup = document.getElementById('donationPopup');
+        const donationFormContainer = document.getElementById('donationFormContainer');
+        const successPopup = document.getElementById('successPopup');
+        const urlParams = new URLSearchParams(window.location.search);
 
-    // --- Handle donation_success popup ---
-    if (urlParams.has('donation_success')) {
-        donationPopup.style.display = 'flex';
-        donationFormContainer.style.display = 'none';
-        successPopup.style.display = 'flex';
-        window.history.replaceState({}, document.title, window.location.pathname);
-    }
-
-    // --- Handle request success ---
-    if (urlParams.has('request_success')) {
-        if (document.getElementById('requestSuccessPopup')) {
-            document.getElementById('requestSuccessPopup').style.display = 'flex';
-        } else {
-            alert('Request submitted successfully.');
-        }
-        window.history.replaceState({}, document.title, window.location.pathname);
-    }
-
-    // --- Handle request errors ---
-    if (urlParams.has('request_error')) {
-        const e = urlParams.get('request_error');
-        let msg = 'Failed to submit request.';
-        if (e === 'self') msg = 'You cannot request your own donation.';
-        if (e === 'over') msg = 'Requested quantity exceeds available items.';
-        if (e === 'notfound') msg = 'Donation not found.';
-        if (e === 'concurrent') msg = 'Unable to process request (item may have been claimed).';
-        if (e === 'invalid') msg = 'Invalid request data.';
-        alert(msg);
-        window.history.replaceState({}, document.title, window.location.pathname);
-    }
-
-    // --- Open popup ---
-    donateWasteBtn.addEventListener('click', function (e) {
-        e.preventDefault();
-        donationPopup.style.display = 'flex';
-        donationFormContainer.style.display = 'block';
-        successPopup.style.display = 'none';
-    });
-
-    // --- Close popup ---
-    function closeDonationPopup() {
-        donationPopup.style.display = 'none';
-    }
-    donationPopup.addEventListener('click', function (e) {
-        if (e.target === donationPopup) closeDonationPopup();
-    });
-    document.querySelectorAll('.close-btn').forEach(btn => {
-        btn.addEventListener('click', closeDonationPopup);
-    });
-
-    // --- Subcategory dropdown logic ---
-    const categorySelect = document.getElementById("wasteCategory");
+            // --- Subcategory dropdown logic for Donate Waste ---
+    const categorySelect = document.getElementById("wasteType");
     const subcategoryGroup = document.getElementById("subcategory-group");
-    const subcategorySelect = document.getElementById("wasteSubcategory");
+    const subcategorySelect = document.getElementById("subcategory");
 
     const subcategories = {
         Plastic: ["Plastic Bottles", "Plastic Containers", "Plastic Bags", "Wrappers"],
         Paper: ["Newspapers", "Cardboard", "Magazines", "Office Paper"],
         Glass: ["Glass Bottles", "Glass Jars", "Broken Glassware"],
         Metal: ["Aluminum Cans", "Tin Cans", "Scrap Metal"],
-        Ewaste: ["Old Phones", "Chargers", "Batteries", "Broken Gadgets"]
+        Organic: ["Food Waste", "Yard Waste", "Compostable Items"],
+        Electronic: ["Old Phones", "Chargers", "Batteries", "Broken Gadgets"]
     };
 
     categorySelect.addEventListener("change", function() {
@@ -1099,7 +1026,7 @@ function render_comments($comments, $donation_id, $parent_id = NULL) {
         if (selected && subcategories[selected]) {
             subcategories[selected].forEach(function(item) {
                 const option = document.createElement("option");
-                option.value = item;  // ✅ save readable names
+                option.value = item;
                 option.textContent = item;
                 subcategorySelect.appendChild(option);
             });
@@ -1111,23 +1038,85 @@ function render_comments($comments, $donation_id, $parent_id = NULL) {
         }
     });
 
-    // --- Validate donation form ---
-    document.getElementById('donationForm').addEventListener('submit', function(e) {
-        e.preventDefault();
 
-        const wasteCategory = document.getElementById('wasteCategory').value;
-        const quantity = document.getElementById('quantity').value;
-        const description = document.getElementById('description').value;
+        if (urlParams.has('request_success')) {
+        // show your request success popup if available
+        if (document.getElementById('requestSuccessPopup')) {
+            document.getElementById('requestSuccessPopup').style.display = 'flex';
+        } else {
+            alert('Request submitted successfully.');
+        }
+        window.history.replaceState({}, document.title, window.location.pathname);
+    }
 
-        if (!wasteCategory || !quantity || !description) {
-            alert('Please fill in all required fields');
+    if (urlParams.has('request_error')) {
+        const e = urlParams.get('request_error');
+        let msg = 'Failed to submit request.';
+        if (e === 'self') msg = 'You cannot request your own donation.';
+        if (e === 'over') msg = 'Requested quantity exceeds available items.';
+        if (e === 'notfound') msg = 'Donation not found.';
+        if (e === 'concurrent') msg = 'Unable to process request (item may have been claimed by someone else).';
+        if (e === 'invalid') msg = 'Invalid request data.';
+        alert(msg);
+        window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
+        // donation_success handling (your existing logic)
+    if (urlParams.has('donation_success')) {
+        const donationPopup = document.getElementById('donationPopup');
+        const donationFormContainer = document.getElementById('donationFormContainer');
+        const successPopup = document.getElementById('successPopup');
+        if (donationPopup && donationFormContainer && successPopup) {
+            donationPopup.style.display = 'flex';
+            donationFormContainer.style.display = 'none';
+            successPopup.style.display = 'block';
+        } else {
+            alert('Donation posted successfully.');
+        }
+        window.history.replaceState({}, document.title, window.location.pathname);
+    }  
+
+        
+
+        if (!donateWasteBtn || !donationPopup) {
+            console.error('Required elements not found in the DOM');
             return;
         }
 
-        this.submit();
-    });
+        donateWasteBtn.addEventListener('click', function (e) {
+            e.preventDefault();
+            console.log('Donate Waste button clicked');
+            donationPopup.style.display = 'flex';
+            donationFormContainer.style.display = 'block';
+            successPopup.style.display = 'none';
+        });
 
+        donationPopup.addEventListener('click', function (e) {
+            if (e.target === donationPopup) {
+                donationPopup.style.display = 'none';
+            }
+        });
 
+        document.querySelectorAll('.close-btn').forEach(btn => {
+            btn.addEventListener('click', function () {
+                donationPopup.style.display = 'none';
+            });
+        });
+
+        document.getElementById('donationForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const wasteType = document.getElementById('wasteType').value;
+            const quantity = document.getElementById('quantity').value;
+            const description = document.getElementById('description').value;
+            
+            if (!wasteType || !quantity || !description) {
+                alert('Please fill in all required fields');
+                return;
+            }
+            
+            this.submit();
+        });
 
         const continueBtn = document.getElementById('continueBtn');
         if (continueBtn) {
@@ -1297,48 +1286,20 @@ function updateQuantity(change) {
 
 
     function openPhotoZoom(photoSrc) {
-    const modal = document.getElementById('photoZoomModal');
-    const zoomedPhoto = document.getElementById('zoomedPhoto');
-    const donationPopup = document.getElementById('donationPopup');
-
-    zoomedPhoto.src = photoSrc;
-    modal.style.display = 'flex';
-
-    // Blur the donation popup
-    donationPopup.classList.add('blurred');
-    }
-
-    // Close when clicking X
-    document.querySelector('.close-modal').addEventListener('click', function () {
-        closePhotoZoom();
-    });
-
-    // Close when clicking outside
-    document.getElementById('photoZoomModal').addEventListener('click', function (e) {
-        if (e.target === this) {
-            closePhotoZoom();
-        }
-    });
-
-    // Close with ESC
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') {
-            closePhotoZoom();
-        }
-    });
-
-    function closePhotoZoom() {
         const modal = document.getElementById('photoZoomModal');
-        const donationPopup = document.getElementById('donationPopup');
-        modal.style.display = 'none';
-
-        // Remove blur
-        donationPopup.classList.remove('blurred');
+        const zoomedPhoto = document.getElementById('zoomedPhoto');
+        zoomedPhoto.src = photoSrc;
+        modal.style.display = 'flex';
     }
+
+    document.querySelector('.close-modal').addEventListener('click', function () {
+        document.getElementById('photoZoomModal').style.display = 'none';
+    });
+
 
 
     //Feedback Modal
-document.addEventListener("DOMContentLoaded", function () {
+    document.addEventListener("DOMContentLoaded", function () {
     const feedbackBtn = document.getElementById("feedbackBtn");
     const feedbackModal = document.getElementById("feedbackModal");
     const feedbackCloseBtn = document.getElementById("feedbackCloseBtn");

@@ -26,17 +26,6 @@ while ($row = $result->fetch_assoc()) $donations[] = $row;
 $ideas = [];
 $result = $conn->query("SELECT * FROM recycled_ideas ORDER BY posted_at DESC");
 while ($row = $result->fetch_assoc()) $ideas[] = $row;
-
-$sql = "
-    SELECT d.*, u.first_name, u.last_name
-    FROM donations d
-    JOIN users u ON d.donor_id = u.user_id
-    WHERE d.status = 'Available'
-    ORDER BY d.donated_at DESC
-";
-$stmt = $conn->query($sql);
-$donations = $stmt->fetch_all(MYSQLI_ASSOC);
-
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -44,7 +33,7 @@ $donations = $stmt->fetch_all(MYSQLI_ASSOC);
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Browse | EcoWaste</title>
-    <link rel="stylesheet" href="assets/css/browse.css">
+    <link rel="stylesheet" href="assets/css/homepage.css">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&family=Open+Sans&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -247,10 +236,11 @@ $donations = $stmt->fetch_all(MYSQLI_ASSOC);
             <nav>
                 <ul>
                     <li><a href="homepage.php"><i class="fas fa-home"></i>Home</a></li>
-                    <li><a href="browse.php" class="active"><i class="fas fa-search"></i>Browse</a></li>
+                    <li><a href="browse.php" style="color: rgb(4, 144, 4);"><i class="fas fa-search"></i>Browse</a></li>
                     <li><a href="achievements.php"><i class="fas fa-star"></i>Achievements</a></li>
                     <li><a href="leaderboard.php"><i class="fas fa-trophy"></i>Leaderboard</a></li>
                     <li><a href="projects.php"><i class="fas fa-recycle"></i>Projects</a></li>
+                    <li><a href="shared_feed.php"><i class="fas fa-share-alt"></i>Shared Feed</a></li>
                     <li><a href="donations.php"><i class="fas fa-box"></i>Donations</a></li>
                 </ul>
             </nav>
@@ -295,62 +285,15 @@ $donations = $stmt->fetch_all(MYSQLI_ASSOC);
                         <?php else: ?>
                             <?php foreach ($donations as $donation): ?>
                             <div class="available-item">
-                                <!-- Donor header (same style as homepage) -->
-                                <div class="donation-user-header">
-                                    <div class="user-avatar">
-                                        <?php 
-                                            $donor_stmt = $conn->prepare("SELECT user_id, first_name FROM users WHERE user_id = ?");
-                                            $donor_stmt->bind_param("i", $donation['donor_id']);
-                                            $donor_stmt->execute();
-                                            $donor_result = $donor_stmt->get_result();
-                                            $donor = $donor_result->fetch_assoc();
-                                            $donor_initial = strtoupper(substr(htmlspecialchars($donor['first_name']), 0, 1));
-                                        ?>
-                                        <?= $donor_initial ?>
-                                    </div>
-                                    <div class="user-info">
-                                        <div class="user-name">
-                                            <a href="profile_view.php?user_id=<?= $donor['user_id'] ?>" class="profile-link">
-                                                <?= htmlspecialchars($donor['first_name']) ?>
-                                            </a>
-                                        </div>
-                                        <div class="donation-meta">
-                                            <span class="category">Category: <?= htmlspecialchars($donation['category']) ?></span>
-                                            <span class="time-ago"><?= htmlspecialchars(date('M d, Y', strtotime($donation['donated_at']))) ?></span>
-                                        </div>
-                                    </div>
+                                <div class="item-header">
+                                    <div class="item-title"><?= htmlspecialchars($donation['item_name']) ?></div>
+                                    <div class="item-category">Category: <?= htmlspecialchars($donation['category']) ?></div>
                                 </div>
-
-                                <!-- Quantity -->
-                                <div class="item-quantity">Quantity: <?= htmlspecialchars($donation['quantity']) ?>/<?= htmlspecialchars($donation['total_quantity']) ?></div>
-
-                                <!-- Description -->
-                                <?php if (!empty($donation['description'])): ?>
-                                <div class="donation-description">
-                                    <p><?= nl2br(htmlspecialchars($donation['description'])) ?></p>
-                                </div>
-                                <?php endif; ?>
-
-                                <!-- Images -->
-                                <?php if (!empty($donation['image_path'])): ?>
-                                    <?php
-                                    $images = json_decode($donation['image_path'], true);
-                                    if (is_array($images) && !empty($images)): ?>
-                                        <div class="donation-images">
-                                            <?php foreach ($images as $image): ?>
-                                                <img src="<?= htmlspecialchars($image) ?>" 
-                                                    alt="<?= htmlspecialchars($donation['item_name']) ?>" 
-                                                    class="donation-image">
-                                            <?php endforeach; ?>
-                                        </div>
-                                    <?php endif; ?>
-                                <?php endif; ?>
-
+                                <div class="item-time"><?= htmlspecialchars(date('M d, Y', strtotime($donation['donated_at']))) ?></div>
+                                <div class="item-quantity">Quantity: <?= htmlspecialchars($donation['quantity']) ?></div>
                                 <button class="request-btn">Request Donation</button>
                             </div>
-
                             <?php endforeach; ?>
-
                         <?php endif; ?>
                     </div>
                 </div>
@@ -461,97 +404,91 @@ $donations = $stmt->fetch_all(MYSQLI_ASSOC);
         });
         
         // Feedback system JavaScript
-        document.addEventListener("DOMContentLoaded", function () {
-    // Grab elements
-    const feedbackBtn = document.getElementById("feedbackBtn");
-    const feedbackModal = document.getElementById("feedbackModal");
-    const feedbackCloseBtn = document.getElementById("feedbackCloseBtn");
-    const emojiOptions = feedbackModal ? feedbackModal.querySelectorAll(".emoji-option") : [];
-    const feedbackSubmitBtn = document.getElementById("feedbackSubmitBtn");
-    const feedbackText = document.getElementById("feedbackText");
-    const ratingError = document.getElementById("ratingError");
-    const textError = document.getElementById("textError");
-    const thankYouMessage = document.getElementById("thankYouMessage");
-    const feedbackForm = document.getElementById("feedbackForm");
-    const spinner = document.getElementById("spinner");
-
-    if (!feedbackBtn || !feedbackModal || !feedbackSubmitBtn || !feedbackText) return;
-
-    let selectedRating = 0;
-
-    // Open modal
-    feedbackBtn.addEventListener("click", () => {
-        feedbackModal.style.display = "flex";
-        feedbackForm.style.display = "block";
-        thankYouMessage.style.display = "none";
-    });
-
-    // Close modal
-    feedbackCloseBtn?.addEventListener("click", () => feedbackModal.style.display = "none");
-    window.addEventListener("click", e => {
-        if (e.target === feedbackModal) feedbackModal.style.display = "none";
-    });
-
-    // Emoji rating selection
-    emojiOptions.forEach(option => {
-        option.addEventListener("click", () => {
-            emojiOptions.forEach(o => o.classList.remove("selected"));
-            option.classList.add("selected");
-            selectedRating = option.getAttribute("data-rating");
-            ratingError.style.display = "none";
-        });
-    });
-
-    // Submit feedback
-    feedbackSubmitBtn.addEventListener("click", e => {
-        e.preventDefault();
-
-        let valid = true;
-        if (selectedRating === 0) { ratingError.style.display = "block"; valid = false; }
-        if (feedbackText.value.trim() === "") { textError.style.display = "block"; valid = false; }
-        else { textError.style.display = "none"; }
-
-        if (!valid) return;
-
-        spinner.style.display = "inline-block";
-        feedbackSubmitBtn.disabled = true;
-
-        // AJAX POST
-        fetch("feedback_process.php", {
-            method: "POST",
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body: `rating=${selectedRating}&feedback=${encodeURIComponent(feedbackText.value)}`
-        })
-        .then(res => res.json())
-        .then(data => {
-            spinner.style.display = "none";
-            feedbackSubmitBtn.disabled = false;
-
-            if (data.status === "success") {
-                feedbackForm.style.display = "none";
-                thankYouMessage.style.display = "block";
-
-                // Reset after 3 seconds
+        document.addEventListener('DOMContentLoaded', function() {
+            const feedbackBtn = document.getElementById('feedbackBtn');
+            const feedbackModal = document.getElementById('feedbackModal');
+            const feedbackCloseBtn = document.getElementById('feedbackCloseBtn');
+            const emojiOptions = document.querySelectorAll('.emoji-option');
+            const feedbackForm = document.getElementById('feedbackForm');
+            const thankYouMessage = document.getElementById('thankYouMessage');
+            const feedbackSubmitBtn = document.getElementById('feedbackSubmitBtn');
+            const spinner = document.getElementById('spinner');
+            const ratingError = document.getElementById('ratingError');
+            const textError = document.getElementById('textError');
+            const feedbackText = document.getElementById('feedbackText');
+            let selectedRating = 0;
+            
+            emojiOptions.forEach(option => {
+                option.addEventListener('click', () => {
+                    emojiOptions.forEach(opt => opt.classList.remove('selected'));
+                    option.classList.add('selected');
+                    selectedRating = option.getAttribute('data-rating');
+                    ratingError.style.display = 'none';
+                });
+            });
+            
+            feedbackForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                let isValid = true;
+                if (selectedRating === 0) {
+                    ratingError.style.display = 'block';
+                    isValid = false;
+                } else {
+                    ratingError.style.display = 'none';
+                }
+                if (feedbackText.value.trim() === '') {
+                    textError.style.display = 'block';
+                    isValid = false;
+                } else {
+                    textError.style.display = 'none';
+                }
+                if (!isValid) return;
+                
+                feedbackSubmitBtn.disabled = true;
+                spinner.style.display = 'block';
+                
                 setTimeout(() => {
-                    feedbackModal.style.display = "none";
-                    feedbackForm.style.display = "block";
-                    thankYouMessage.style.display = "none";
-                    feedbackText.value = "";
-                    selectedRating = 0;
-                    emojiOptions.forEach(o => o.classList.remove("selected"));
-                }, 3000);
-            } else {
-                alert(data.message || "Failed to submit feedback.");
+                    spinner.style.display = 'none';
+                    feedbackForm.style.display = 'none';
+                    thankYouMessage.style.display = 'block';
+                    
+                    setTimeout(() => {
+                        feedbackModal.style.display = 'none';
+                        feedbackForm.style.display = 'block';
+                        thankYouMessage.style.display = 'none';
+                        feedbackText.value = '';
+                        emojiOptions.forEach(opt => opt.classList.remove('selected'));
+                        selectedRating = 0;
+                        feedbackSubmitBtn.disabled = false;
+                    }, 3000);
+                }, 1500);
+            });
+            
+            feedbackBtn.addEventListener('click', () => {
+                feedbackModal.style.display = 'flex';
+            });
+            
+            feedbackCloseBtn.addEventListener('click', closeFeedbackModal);
+            
+            window.addEventListener('click', (event) => {
+                if (event.target === feedbackModal) {
+                    closeFeedbackModal();
+                }
+            });
+            
+            function closeFeedbackModal() {
+                feedbackModal.style.display = 'none';
+                feedbackForm.style.display = 'block';
+                thankYouMessage.style.display = 'none';
+                feedbackText.value = '';
+                emojiOptions.forEach(opt => opt.classList.remove('selected'));
+                selectedRating = 0;
+                ratingError.style.display = 'none';
+                textError.style.display = 'none';
+                feedbackSubmitBtn.disabled = false;
+                spinner.style.display = 'none';
             }
-        })
-        .catch(err => {
-            spinner.style.display = "none";
-            feedbackSubmitBtn.disabled = false;
-            alert("Failed to submit feedback. Please try again.");
-            console.error(err);
         });
-    });
-});
     </script>
 </body>
 </html>
