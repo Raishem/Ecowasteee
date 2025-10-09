@@ -73,7 +73,7 @@ if ($result && $result->num_rows > 0) {
                 <li><a href="achievements.php"><i class="fas fa-star"></i>Achievements</a></li>
                 <li><a href="leaderboard.php" class="active"><i class="fas fa-trophy"></i>Leaderboard</a></li>
                 <li><a href="projects.php"><i class="fas fa-recycle"></i>Projects</a></li>
-                <li><a href="donations.php"><ii class="fas fa-hand-holding-heart"></i>Donations</a></li>
+                <li><a href="donations.php"><i class="fas fa-hand-holding-heart"></i>Donations</a></li>
             </ul>
         </nav>
     </aside>
