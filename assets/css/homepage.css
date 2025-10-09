@@ -1476,7 +1476,25 @@ input[type="file"] {
 }
 
 .project-item strong {
-    color: #2e8b57;
+  color: #2e8b57;
+  display: block;
+  margin-bottom: 5px;
+  font-size: 15px;
+}
+
+.project-item div {
+  font-size: 13px;
+  color: #555;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis; /* truncates long text with "..." */
+  max-width: 200px; /* adjust to fit your sidebar width */
+}
+
+.project-date {
+  font-size: 12px;
+  color: #888;
+  margin-top: 3px;
 }
 
 
