@@ -11,6 +11,7 @@ html, body {
     line-height: 1.6;
     height: 100%;
     overflow: hidden;
+    line-height: 1.6;
 }
 
 h1, h2, h3, h4 {
@@ -170,12 +171,34 @@ header {
 
 /* Adjust main content and right sidebar top spacing */
 .main-content {
-    height: calc(100vh - 80px); /* Adjust for new header height */
-    overflow-y: auto;
+    height: calc(100vh - 80px); /* Fits between header and bottom of screen */
+    overflow-y: auto; /* ✅ Only main content scrolls */
+    overflow-x: hidden;
     padding: 20px;
     background-color: #fff;
     grid-column: 2 / 3;
+    scrollbar-width: inherit;
+    scrollbar-color: #82AA52 #f0f0f0;
 }
+
+/* ✅ Custom scrollbar for the main content only */
+.main-content::-webkit-scrollbar {
+    width: 10px;
+}
+
+.main-content::-webkit-scrollbar-track {
+    background: #f0f0f0;
+}
+
+.main-content::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, #82AA52 0%, #6d8f45 100%);
+    border-radius: 10px;
+}
+
+.main-content::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(135deg, #6d8f45 0%, #5a7537 100%);
+}
+
 
 .sidebar nav ul {
     list-style: none;
@@ -351,23 +374,7 @@ header {
             color: #2e8b57;
             width: 60px;
         }
-        
-        .user-profile {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-        
-        .profile-pic {
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            background-color: #e0e0e0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
-        }
+
         
         .profile-pic img {
             width: 100%;
@@ -419,7 +426,7 @@ header {
             width: 100%;
             height: 100%;
             background-color: rgba(0,0,0,0.5);
-            z-index: 200;
+            z-index: 2000;
             justify-content: center;
             align-items: center;
         }
@@ -564,3 +571,60 @@ header {
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
+
+/* === Leaderboard User Info (Compact Clean Style) === */
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.user-link {
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+    color: #333;
+    transition: color 0.2s ease-in-out;
+}
+
+.user-link:hover .user-name {
+    color: #2e8b57;
+    text-decoration: underline;
+}
+
+.user-profile-pic {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    overflow: hidden;
+    background-color: #f2f8f0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    border: 1px solid #d6e8d0;
+}
+
+.user-profile-pic img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.user-profile-pic .default-icon {
+    color: #82AA52;
+    font-size: 17px;
+}
+
+.user-name {
+    font-weight: 600;
+    font-size: 15px;
+    white-space: nowrap;
+}
+
+/* Optional: hover pop */
+.user-link:hover .user-profile-pic {
+    transform: scale(1.05);
+    box-shadow: 0 0 6px rgba(130, 170, 82, 0.3);
+    transition: all 0.2s ease;
+}
