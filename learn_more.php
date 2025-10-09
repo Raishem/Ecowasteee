@@ -27,28 +27,11 @@ if (!$user) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Learn More | EcoWaste</title>
     <link rel="stylesheet" href="assets/css/header.css">
-    <link rel="stylesheet" href="assets/css/projects.css">
+    <link rel="stylesheet" href="assets/css/learn_more.css">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&family=Open+Sans&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 
-    <style>
-        .profile-pic {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-right: 10px;
-            overflow: hidden;
-            background-color: #3d6a06ff;
-            color: white;
-            font-weight: bold;
-            font-size: 18px;
-        }
-    </style>
-    
 <body>
     <header>
         <div class="logo-container">
