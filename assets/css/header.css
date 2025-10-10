@@ -165,3 +165,4 @@
     /* Small helpers kept for compatibility */
     .link-fontawesome { font-size: 1.1em; padding: 8px; border-radius: 50%; background: rgba(255,255,255,0.1); color: white; }
     .link-fontawesome:hover { background: rgba(255,255,255,0.2); transform: scale(1.05); }
+}
