@@ -259,7 +259,7 @@ while ($row = $result->fetch_assoc()) $projects[] = $row;
 
 // Fetch leaderboard
 $leaders = [];
-$result = $conn->query("SELECT first_name, points FROM users ORDER BY points DESC LIMIT 10");
+$result = $conn->query("SELECT user_id, first_name, points FROM users ORDER BY points DESC LIMIT 10");
 while ($row = $result->fetch_assoc()) $leaders[] = $row;
 
 /* Helper to render nested comments remains the same if you have it earlier.
@@ -785,13 +785,24 @@ function render_comments($comments, $donation_id, $parent_id = NULL) {
                 <div class="leaderboard-header">
                     <span>TOP 10 USERS</span>
                 </div>
-                <?php foreach ($leaders as $i => $leader): ?>
-                <div class="leaderboard-item">
-                    <span class="rank"><?= $i + 1 ?></span>
-                    <span class="name"><?= htmlspecialchars($leader['first_name']) ?></span>
-                    <span class="points"><?= htmlspecialchars($leader['points']) ?> pts</span>
+
+                <div class="leaderboard-scroll">
+                    <?php if (count($leaders) === 0): ?>
+                        <p>No users yet.</p>
+                    <?php else: ?>
+                        <?php foreach ($leaders as $i => $leader): ?>
+                            <a href="profile_view.php?user_id=<?= (int)$leader['user_id'] ?>" class="leaderboard-item-link">
+                                <div class="leaderboard-item">
+                                    <div class="leaderboard-rank">#<?= $i + 1 ?></div>
+                                    <div class="leaderboard-info">
+                                        <strong class="leader-name"><?= htmlspecialchars($leader['first_name']) ?></strong>
+                                        <div class="leader-points"><?= htmlspecialchars($leader['points']) ?> pts</div>
+                                    </div>
+                                </div>
+                            </a>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
                 </div>
-                <?php endforeach; ?>
             </div>
         </div>
     </div>

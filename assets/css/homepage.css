@@ -1857,3 +1857,53 @@ input[type="file"] {
 #requestPopup {
   z-index: 1002;
 }
+
+.leaderboard-scroll {
+    max-height: 300px;
+    overflow-y: auto;
+    padding-right: 4px;
+    scrollbar-width: thin;
+}
+
+.leaderboard-item-link {
+    text-decoration: none;
+    color: inherit;
+}
+
+.leaderboard-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.leaderboard-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 3px 8px rgba(0,0,0,0.05);
+}
+
+.leaderboard-rank {
+    font-weight: 700;
+    color: #2e8b57;
+    margin-right: 10px;
+    flex-shrink: 0;
+}
+
+.leaderboard-info {
+    flex: 1;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.leader-name {
+    font-weight: 600;
+    color: #333;
+}
+
+.leader-points {
+    font-size: 14px;
+    color: #777;
+}
+
