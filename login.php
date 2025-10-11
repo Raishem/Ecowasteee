@@ -4,6 +4,32 @@ session_start();
 require_once 'config.php';
 $csrf_token = generateCSRFToken();
 
+// Auto-login using remember_token if not logged in yet
+if (!isset($_SESSION['logged_in']) && isset($_COOKIE['remember_token'])) {
+    $conn = getDBConnection();
+    $token = $_COOKIE['remember_token'];
+
+    $stmt = $conn->prepare("SELECT user_id, email, first_name, last_name FROM users 
+                            WHERE remember_token = ? AND token_expiry > NOW()");
+    $stmt->bind_param("s", $token);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    if ($result->num_rows === 1) {
+        $user = $result->fetch_assoc();
+
+        // Recreate the session
+        $_SESSION['logged_in'] = true;
+        $_SESSION['user_id'] = $user['user_id'];
+        $_SESSION['email'] = $user['email'];
+        $_SESSION['first_name'] = $user['first_name'];
+        $_SESSION['last_name'] = $user['last_name'];
+
+        header('Location: homepage.php');
+        exit();
+    }
+}
+
 // Redirect if already logged in
 if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true && !empty($_SESSION['user_id'])) {
     header('Location: homepage.php');
@@ -75,10 +101,14 @@ if (isset($_SESSION['login_error'])) {
                                value="<?php echo htmlspecialchars($_POST['email'] ?? ''); ?>">
                     </div>
 
-                    <div class="form-group">
+                    <div class="form-group password-group">
                         <label for="password">Password</label>
-                        <input type="password" id="password" name="password" placeholder="Enter your password" required>
+                        <div class="password-wrapper">
+                            <input type="password" id="password" name="password" placeholder="Enter your password" required>
+                            <i class="fa-solid fa-eye toggle-password" id="togglePassword"></i>
+                        </div>
                     </div>
+
 
                     <div class="form-options">
                         <div class="remember-me">
@@ -122,6 +152,19 @@ if (isset($_SESSION['login_error'])) {
     </div>
 
 <script>
+
+    document.addEventListener("DOMContentLoaded", function() {
+    const togglePassword = document.getElementById('togglePassword');
+    const passwordInput = document.getElementById('password');
+
+    togglePassword.addEventListener('click', function() {
+        const isPassword = passwordInput.getAttribute('type') === 'password';
+        passwordInput.setAttribute('type', isPassword ? 'text' : 'password');
+        this.classList.toggle('fa-eye');
+        this.classList.toggle('fa-eye-slash');
+    });
+});
+
     document.addEventListener("DOMContentLoaded", function() {
         const banners = document.querySelectorAll('.success-banner, .error-banner');
         if (banners.length > 0) {
