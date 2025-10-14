@@ -7,7 +7,7 @@ async function completeStage(event, stageNumber, projectId) {
         btn.disabled = true;
         const originalHtml = btn.innerHTML;
         btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
-        
+
         const response = await fetch('complete_stage.php', {
             method: 'POST',
             headers: {
@@ -16,13 +16,22 @@ async function completeStage(event, stageNumber, projectId) {
             },
             body: `stage_number=${stageNumber}&project_id=${projectId}`
         });
-        
+
         const data = await response.json();
         if (data.success) {
-            btn.innerHTML = '<i class="fas fa-check"></i> Completed!';
-            showToast('Stage completed successfully');
-            // Reload after a short delay to show the success state
-            setTimeout(() => window.location.reload(), 1000);
+            if (data.action === 'completed') {
+                btn.innerHTML = '<i class="fas fa-check"></i> Completed!';
+                showToast('Stage completed successfully');
+                setTimeout(() => window.location.reload(), 900);
+            } else if (data.action === 'uncompleted') {
+                btn.innerHTML = '<i class="fas fa-undo"></i> Mark as Complete';
+                showToast('Stage marked as incomplete');
+                setTimeout(() => window.location.reload(), 700);
+            } else {
+                // generic success
+                showToast('Operation successful');
+                setTimeout(() => window.location.reload(), 700);
+            }
         } else {
             btn.disabled = false;
             btn.innerHTML = originalHtml;

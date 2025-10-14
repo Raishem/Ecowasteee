@@ -353,33 +353,36 @@
 .add-material-btn{ background:var(--accent); color:#fff; border:none; padding:10px 16px; border-radius:10px; box-shadow: 0 6px 20px rgba(46,139,87,0.12); font-weight:700 }
 .add-material-btn i{ margin-right:8px }
 
-/* Modal styling (local) */
-.modal { 
-    display: none; 
-    position: fixed; 
-    inset: 0; 
-    z-index: 1200; 
-    align-items: center; 
-    justify-content: center; 
+.modal {
+    /* Ensure all modals are fixed and centered regardless of parent containers */
+    display: none !important;
+    position: fixed !important;
+    inset: 0 !important; /* shorthand for top/right/bottom/left */
+    z-index: 12000 !important; /* very high so it sits above other UI */
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 20px; /* ensure some breathing room on small screens */
 }
-.modal.active { 
-    display: flex; 
+.modal.active {
+    display: flex !important;
 }
-.modal::before { 
-    content: ''; 
-    position: absolute; 
-    inset: 0; 
-    background: rgba(12, 18, 20, 0.6); 
+.modal::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(12, 18, 20, 0.6);
 }
-.modal .modal-content { 
-    position: relative; 
-    z-index: 2; 
-    background: #fff; 
-    width: 100%; 
-    max-width: 480px; 
-    border-radius: 16px; 
-    padding: 24px; 
+.modal .modal-content {
+    position: relative;
+    z-index: 2;
+    background: #fff;
+    width: 100%;
+    max-width: 640px; /* allow slightly larger modal */
+    border-radius: 12px;
+    padding: 24px;
     box-shadow: 0 20px 48px rgba(8, 12, 16, 0.2);
+    margin: 0 auto; /* center inside the fixed container */
+    transform: none !important; /* prevent any inherited transforms from shifting it */
 }
 .modal .modal-header { 
     display: flex; 

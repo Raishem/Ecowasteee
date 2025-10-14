@@ -398,88 +398,68 @@ try {
 <script>
     // AJAX handlers for materials: intercept forms and use fetch to avoid full reloads
 // Single event listener for the see more/see less functionality
-document.addEventListener("DOMContentLoaded", function() {
-    console.log("DOM Content Loaded");
-    const desc = document.querySelector(".project-description");
-    const toggle = document.querySelector(".see-more-btn");
+document.addEventListener('DOMContentLoaded', function() {
+    const desc = document.querySelector('.project-description');
+    const toggle = document.querySelector('.see-more-btn');
 
-    console.log("Description element:", desc);
-    console.log("Toggle button:", toggle);
+    if (!desc || !toggle) return;
 
-    if (desc && toggle) {
-        // Ensure a deterministic initial state: if neither class present, default to collapsed
-        if (!desc.classList.contains('collapsed') && !desc.classList.contains('expanded')) {
-            desc.classList.add('collapsed');
-        }
+    // Default to collapsed unless explicitly expanded
+    if (!desc.classList.contains('collapsed') && !desc.classList.contains('expanded')) desc.classList.add('collapsed');
 
-        // Sync button text/aria with current state
-        const initiallyCollapsed = desc.classList.contains('collapsed');
-        toggle.textContent = initiallyCollapsed ? 'See more' : 'See less';
-        toggle.setAttribute('aria-expanded', initiallyCollapsed ? 'false' : 'true');
+    // Detect whether content overflows more than 5 lines
+    function contentOverflowsFiveLines(el) {
+        // Create a clone to measure full height
+        const clone = el.cloneNode(true);
+        clone.style.visibility = 'hidden';
+        clone.style.position = 'absolute';
+        clone.style.maxHeight = 'none';
+        clone.style.display = 'block';
+        clone.style.width = getComputedStyle(el).width;
+        document.body.appendChild(clone);
+        const fullHeight = clone.getBoundingClientRect().height;
+        document.body.removeChild(clone);
 
-        toggle.addEventListener("click", function(e) {
-            e.preventDefault();
-            console.log('See more/less button clicked');
-
-            const isCollapsed = desc.classList.contains('collapsed');
-            if (isCollapsed) {
-                desc.classList.remove('collapsed');
-                desc.classList.add('expanded');
-                toggle.textContent = 'See less';
-                toggle.setAttribute('aria-expanded', 'true');
-            } else {
-                desc.classList.remove('expanded');
-                desc.classList.add('collapsed');
-                toggle.textContent = 'See more';
-                toggle.setAttribute('aria-expanded', 'false');
-                // Smoothly scroll the description back into view when collapsing.
-                // Wait for the collapse transition to finish (reliable) then scroll.
-                const header = document.querySelector('header');
-                const headerHeight = header ? header.getBoundingClientRect().height : 0;
-
-                const doScroll = function() {
-                    // Compute a target that centers the description vertically in the
-                    // visible viewport area (accounting for fixed header).
-                    const rect = desc.getBoundingClientRect();
-                    const elemHeight = rect.height;
-                    const viewportHeight = window.innerHeight;
-                    const available = Math.max(0, viewportHeight - headerHeight);
-
-                    // extra space to position element in the middle of the available area
-                    const extra = Math.max(0, Math.floor((available - elemHeight) / 2));
-
-                    // element top relative to the document
-                    const elemTopDoc = window.pageYOffset + rect.top;
-
-                    // target = element top minus header minus extra padding so it sits centered
-                    const target = elemTopDoc - headerHeight - extra;
-
-                    window.scrollTo({ top: Math.max(0, Math.floor(target)), behavior: 'smooth' });
-                };
-
-                // If the element has a CSS transition on max-height, wait for it; otherwise fallback after 300ms
-                let handled = false;
-                const onTransEnd = function(ev) {
-                    if (ev.propertyName && ev.propertyName.indexOf('max-height') === -1) return;
-                    if (handled) return;
-                    handled = true;
-                    desc.removeEventListener('transitionend', onTransEnd);
-                    doScroll();
-                };
-
-                desc.addEventListener('transitionend', onTransEnd);
-                // Fallback in case transitionend doesn't fire
-                setTimeout(function() {
-                    if (handled) return;
-                    handled = true;
-                    desc.removeEventListener('transitionend', onTransEnd);
-                    doScroll();
-                }, 100);
-            }
-        });
-    } else {
-        console.log("Could not find description or toggle button");
+        const lineHeight = parseFloat(getComputedStyle(el).lineHeight) || 18;
+        const maxAllowed = lineHeight * 5 + 1; // small tolerance
+        return fullHeight > maxAllowed;
     }
+
+    const overflow = contentOverflowsFiveLines(desc);
+    if (overflow) {
+        toggle.style.display = '';
+        desc.classList.add('has-overflow');
+    } else {
+        toggle.style.display = 'none';
+        desc.classList.remove('has-overflow');
+    }
+
+    // initialize button state
+    toggle.textContent = desc.classList.contains('collapsed') ? 'See more' : 'See less';
+    toggle.setAttribute('aria-expanded', desc.classList.contains('expanded') ? 'true' : 'false');
+
+    toggle.addEventListener('click', function(e){
+        e.preventDefault();
+        const isCollapsed = desc.classList.contains('collapsed');
+        if (isCollapsed) {
+            desc.classList.remove('collapsed');
+            desc.classList.add('expanded');
+            toggle.textContent = 'See less';
+            toggle.setAttribute('aria-expanded', 'true');
+        } else {
+            desc.classList.remove('expanded');
+            desc.classList.add('collapsed');
+            toggle.textContent = 'See more';
+            toggle.setAttribute('aria-expanded', 'false');
+            // when collapsing, ensure the element remains visible in viewport
+            const header = document.querySelector('header');
+            const headerHeight = header ? header.getBoundingClientRect().height : 0;
+            const rect = desc.getBoundingClientRect();
+            const elemTopDoc = window.pageYOffset + rect.top;
+            const target = Math.max(0, Math.floor(elemTopDoc - headerHeight - 20));
+            window.scrollTo({ top: target, behavior: 'smooth' });
+        }
+    });
 });
 </script>
 <script>
@@ -1689,11 +1669,46 @@ document.addEventListener("DOMContentLoaded", function() {
                                 <?php endif; ?>
 
                                 <!-- Stage-level upload removed; per-material upload button remains beside Obtained badge -->
-                                <?php if ($is_current && empty($project['status']) || ($is_current && isset($project['status']) && strtolower($project['status']) !== 'completed')): ?>
-                                    <button class="complete-stage-btn" onclick="completeStage(event, <?= $stage['number'] ?>, <?= $project_id ?>)">
+                                <?php
+                                    // Determine whether this stage can be completed: it must not be locked (i.e., earlier stages done)
+                                    $can_attempt = !$is_locked || $is_current || $is_completed;
+                                    // For Material Collection, compute whether requirements are satisfied (all materials obtained or with photos)
+                                    $req_ok = true;
+                                    if (stripos($stage['name'], 'material') !== false) {
+                                        try {
+                                            $totStmt = $conn->prepare("SELECT COUNT(*) AS total FROM project_materials WHERE project_id = ?");
+                                            $totStmt->bind_param('i', $project_id);
+                                            $totStmt->execute();
+                                            $tot = (int)$totStmt->get_result()->fetch_assoc()['total'];
+
+                                            $haveStmt = $conn->prepare("SELECT COUNT(*) AS have FROM project_materials pm WHERE pm.project_id = ? AND (LOWER(pm.status) = 'obtained' OR EXISTS(SELECT 1 FROM material_photos mp WHERE mp.material_id = pm.material_id LIMIT 1))");
+                                            $haveStmt->bind_param('i', $project_id);
+                                            $haveStmt->execute();
+                                            $have = (int)$haveStmt->get_result()->fetch_assoc()['have'];
+
+                                            if ($tot > 0 && $have < $tot) $req_ok = false;
+                                        } catch (Exception $e) { /* ignore and allow */ }
+                                    }
+
+                                    // The complete button is visible for all non-locked stages; if locked, show disabled with tooltip
+                                    $btn_classes = 'complete-stage-btn';
+                                    $btn_disabled = false;
+                                    $btn_title = '';
+                                    if ($is_locked && !$is_completed) {
+                                        $btn_disabled = true;
+                                        $btn_title = 'Locked: complete previous stages first';
+                                    } elseif (!$req_ok && !$is_completed) {
+                                        $btn_disabled = true;
+                                        $btn_title = 'Requirements not met for this stage';
+                                    }
+                                ?>
+                                <button class="<?= $btn_classes ?>" onclick="completeStage(event, <?= $stage['number'] ?>, <?= $project_id ?>)" <?= $btn_disabled ? 'disabled' : '' ?> title="<?= htmlspecialchars($btn_title) ?>" data-req-ok="<?= $req_ok ? '1' : '0' ?>" data-stage-number="<?= $stage['number'] ?>">
+                                    <?php if ($is_completed): ?>
+                                        <i class="fas fa-check"></i> Completed
+                                    <?php else: ?>
                                         <i class="fas fa-check"></i> Mark as Complete
-                                    </button>
-                                <?php endif; ?>
+                                    <?php endif; ?>
+                                </button>
                             </div>
                             <?php else: ?>
                                 <div class="stage-locked-note" title="This stage is locked until previous stages are completed.">🔒 Stage locked — complete previous stage to unlock.</div>
@@ -1780,22 +1795,18 @@ document.addEventListener("DOMContentLoaded", function() {
     </div>
     
     <!-- Edit Project Modal will be created dynamically -->
-    <div id="editProjectModalContainer"></div>
     <script>
     function createEditProjectModal() {
-        const container = document.getElementById('editProjectModalContainer');
-        if (!container) return;
-        
-        // Only create if it doesn't exist
-        if (document.getElementById('editProjectModal')) return;
-        
+        // Append the modal directly to body so it's outside any transformed parents
+        if (document.getElementById('editProjectModal')) return document.getElementById('editProjectModal');
+
         const projectName = <?= json_encode($project['project_name']) ?>;
         const projectDesc = <?= json_encode($project['description']) ?>;
-        
+
         const modal = document.createElement('div');
         modal.className = 'modal';
         modal.id = 'editProjectModal';
-        modal.style.display = 'none';  // Ensure it starts hidden
+        modal.dataset.persistent = '0';
         modal.innerHTML = `
             <div class="modal-content">
                 <div class="modal-header">
@@ -1807,12 +1818,12 @@ document.addEventListener("DOMContentLoaded", function() {
                         <label for="project_name">Project Name</label>
                         <input type="text" id="project_name" name="project_name" value="${projectName}" required>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="project_description">Description</label>
                         <textarea id="project_description" name="project_description" required>${projectDesc}</textarea>
                     </div>
-                    
+
                     <div class="modal-actions">
                         <button type="button" class="action-btn" data-action="close-edit">Cancel</button>
                         <button type="submit" name="update_project" class="action-btn check-btn">Save Changes</button>
@@ -1820,15 +1831,25 @@ document.addEventListener("DOMContentLoaded", function() {
                 </form>
             </div>
         `;
-        container.appendChild(modal);
-        
-        // Wire up close buttons
+        document.body.appendChild(modal);
+
+        // Wire up close buttons to toggle the active class
         modal.querySelectorAll('[data-action="close-edit"]').forEach(btn => {
-            btn.addEventListener('click', function() {
-                modal.style.display = 'none';
+            btn.addEventListener('click', function(ev) {
+                ev.preventDefault();
+                modal.classList.remove('active');
+                document.body.style.overflow = '';
             });
         });
-        
+
+        // Close when clicking overlay (unless persistent)
+        modal.addEventListener('click', function(e){
+            if (e.target === modal && modal.dataset.persistent !== '1') {
+                modal.classList.remove('active');
+                document.body.style.overflow = '';
+            }
+        });
+
         return modal;
     }
     </script>
@@ -1840,6 +1861,7 @@ document.addEventListener("DOMContentLoaded", function() {
             const modal = document.createElement('div');
             modal.className = 'modal';
             modal.id = 'addMaterialModal';
+            modal.dataset.persistent = '0';
             modal.innerHTML = `
                 <div class="modal-content">
                     <div class="modal-header">
@@ -1865,8 +1887,10 @@ document.addEventListener("DOMContentLoaded", function() {
             document.body.appendChild(modal);
             // attach close handlers
             modal.querySelectorAll('[data-action="close-add"]').forEach(btn=>{
-                btn.addEventListener('click', function(ev){ ev.preventDefault(); modal.classList.remove('active'); });
+                btn.addEventListener('click', function(ev){ ev.preventDefault(); modal.classList.remove('active'); document.body.style.overflow = ''; });
             });
+            // overlay click
+            modal.addEventListener('click', function(e){ if (e.target === modal && modal.dataset.persistent !== '1'){ modal.classList.remove('active'); document.body.style.overflow = ''; } });
             return modal;
         }
     </script>
@@ -2016,7 +2040,8 @@ document.addEventListener('keydown', function(ev){
             // Create modal if it doesn't exist yet
             const modal = createEditProjectModal();
             if (modal) {
-                modal.style.display = 'block';
+                modal.classList.add('active');
+                document.body.style.overflow = 'hidden';
             }
         });
     }
@@ -2028,7 +2053,8 @@ document.addEventListener('keydown', function(ev){
         if (target.classList && target.classList.contains('modal')) {
             // keep persistent modals (like confirm) open until user explicit action
             if (target.dataset && target.dataset.persistent === '1') return;
-            target.style.display = 'none';
+            target.classList.remove('active');
+            document.body.style.overflow = '';
         }
     });
     
