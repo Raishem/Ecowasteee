@@ -155,10 +155,46 @@ if ($selectedCategory !== 'All') {
 
 
 
+
 // --- Fetch recycled ideas --- //
 $ideas = [];
 $result = $conn->query("SELECT * FROM recycled_ideas ORDER BY posted_at DESC");
 while ($row = $result->fetch_assoc()) $ideas[] = $row;
+
+// Handle AJAX reply submission
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['donation_id'], $_POST['comment_text'])) {
+    header('Content-Type: application/json');
+    $donation_id = (int)$_POST['donation_id'];
+    $user_id = (int)$_SESSION['user_id'];
+    $comment_text = trim($_POST['comment_text']);
+    $parent_id = isset($_POST['parent_id']) && $_POST['parent_id'] !== '' ? (int)$_POST['parent_id'] : null;
+
+    if ($donation_id && $comment_text !== '') {
+        $stmt = $conn->prepare("INSERT INTO comments (donation_id, user_id, comment_text, parent_id) VALUES (?, ?, ?, ?)");
+        $stmt->bind_param("iisi", $donation_id, $user_id, $comment_text, $parent_id);
+        if ($stmt->execute()) {
+            $comment_id = $stmt->insert_id;
+
+            // Fetch user info for immediate UI update
+            $u = $conn->prepare("SELECT first_name, last_name FROM users WHERE user_id = ?");
+            $u->bind_param("i", $user_id);
+            $u->execute();
+            $user = $u->get_result()->fetch_assoc();
+
+            echo json_encode([
+                'success' => true,
+                'comment_id' => $comment_id,
+                'user_name' => htmlspecialchars($user['first_name'] . ' ' . $user['last_name']),
+                'user_initial' => strtoupper(substr($user['first_name'], 0, 1)),
+                'comment_text' => htmlspecialchars($comment_text)
+            ]);
+            exit;
+        }
+    }
+    echo json_encode(['success' => false, 'message' => 'Failed to save reply.']);
+    exit;
+}
+
 
 ?>
 <!DOCTYPE html>
@@ -258,17 +294,92 @@ while ($row = $result->fetch_assoc()) $ideas[] = $row;
                     <h3>Available Donations</h3>
                     <div class="available">
                         <?php
-                        // --- Fetch all comments grouped by donation_id --- //
-                        $commentsByDonation = [];
-                        $commentQuery = $conn->query("
-                            SELECT c.*, u.first_name, u.last_name
-                            FROM comments c
-                            JOIN users u ON c.user_id = u.user_id
-                            ORDER BY c.created_at DESC
-                        ");
-                        while ($row = $commentQuery->fetch_assoc()) {
-                            $commentsByDonation[$row['donation_id']][] = $row;
-                        }
+                        // --- Fetch all comments for displayed donations and build a proper tree --- //
+$commentsByDonation = [];
+
+// build list of donation ids currently displayed (to limit query)
+$donationIds = array_map(function($d){ return (int)$d['donation_id']; }, $donations);
+if (!empty($donationIds)) {
+    // prepare placeholders and types for mysqli
+    $placeholders = implode(',', array_fill(0, count($donationIds), '?'));
+    $types = str_repeat('i', count($donationIds));
+    $stmtComments = $conn->prepare("
+        SELECT c.*, u.first_name, u.last_name
+        FROM comments c
+        JOIN users u ON c.user_id = u.user_id
+        WHERE c.donation_id IN ($placeholders)
+        ORDER BY c.created_at ASC
+    ");
+    // bind params dynamically
+    $stmtComments->bind_param($types, ...$donationIds);
+    $stmtComments->execute();
+    $resComments = $stmtComments->get_result();
+    $allComments = $resComments->fetch_all(MYSQLI_ASSOC);
+} else {
+    $allComments = [];
+}
+
+// normalize ids and build map
+$commentsById = [];
+foreach ($allComments as $c) {
+    $c['comment_id'] = (int)$c['comment_id'];
+    $c['donation_id'] = (int)$c['donation_id'];
+    // normalize parent: null when empty/0
+    $c['parent_id'] = empty($c['parent_id']) ? null : (int)$c['parent_id'];
+    $c['replies'] = [];
+    $commentsById[$c['comment_id']] = $c;
+}
+
+// attach replies to their parents, otherwise collect as top-level per donation
+foreach ($commentsById as $id => $comment) {
+    $donationId = $comment['donation_id'];
+    $parentId = $comment['parent_id'];
+
+    if ($parentId && isset($commentsById[$parentId])) {
+        // attach as child to parent (use reference)
+        $commentsById[$parentId]['replies'][] = &$commentsById[$id];
+    } else {
+        // top-level comment for that donation
+        if (!isset($commentsByDonation[$donationId])) $commentsByDonation[$donationId] = [];
+        $commentsByDonation[$donationId][] = &$commentsById[$id];
+    }
+}
+
+/**
+ * Recursive renderer for a comments array (each item may have ['replies'] array)
+ * $comments is an array of comment arrays (top-level or replies)
+ */
+function renderComments(array $comments, int $sessionUserId) {
+    foreach ($comments as $comment) {
+        ?>
+        <li class="comment-item" data-id="<?= (int)$comment['comment_id'] ?>" data-donation-id="<?= (int)$comment['donation_id'] ?>">
+            <div class="comment-avatar"><?= strtoupper(substr(htmlspecialchars($comment['first_name'] ?? ''), 0, 1)) ?></div>
+            <div class="comment-content">
+                <div class="comment-author"><?= htmlspecialchars(trim(($comment['first_name'] ?? '') . ' ' . ($comment['last_name'] ?? ''))) ?></div>
+                <div class="comment-text"><?= nl2br(htmlspecialchars($comment['comment_text'])) ?></div>
+                <div class="comment-time" data-time="<?= htmlspecialchars(date('c', strtotime($comment['created_at']))) ?>"></div>
+
+
+                <div class="comment-actions">
+                    <button class="reply-btn">Reply</button>
+                    <?php if ((int)$comment['user_id'] === (int)$sessionUserId): ?>
+                        <button class="edit-btn">Edit</button>
+                        <button class="delete-btn">Delete</button>
+                    <?php endif; ?>
+                </div>
+
+                <?php if (!empty($comment['replies'])): ?>
+                    <ul class="reply-list">
+                        <?php renderComments($comment['replies'], $sessionUserId); ?>
+                    </ul>
+                <?php endif; ?>
+            </div>
+        </li>
+        <?php
+    }
+}
+
+
                         ?>
 
                         <?php if (count($donations) === 0): ?>
@@ -348,29 +459,18 @@ while ($row = $result->fetch_assoc()) $ideas[] = $row;
                                     </div>
 
                                     <!-- Hidden comments panel for this post (toggle by JS) -->
+                                    <!-- Hidden comments panel for this post (toggle by JS) -->
                                     <div class="comments-panel" id="comments-panel-<?= (int)$donation['donation_id'] ?>" style="display:none; margin-top:12px;">
                                         <ul class="comment-list" id="comment-list-<?= (int)$donation['donation_id'] ?>">
-                                        <?php
-                                        if (!empty($commentsByDonation[$donation['donation_id']])) {
-                                            foreach ($commentsByDonation[$donation['donation_id']] as $comment):
-                                        ?>
-                                            <li class="comment-item">
-                                                <div class="comment-avatar">
-                                                    <?= strtoupper(substr(htmlspecialchars($comment['first_name']), 0, 1)) ?>
-                                                </div>
-                                                <div class="comment-content">
-                                                    <div class="comment-author"><?= htmlspecialchars($comment['first_name'] . ' ' . $comment['last_name']) ?></div>
-                                                    <div class="comment-text"><?= nl2br(htmlspecialchars($comment['comment_text'])) ?></div>
-                                                    <div class="comment-time"><?= date('M d, Y h:i A', strtotime($comment['created_at'])) ?></div>
-                                                </div>
-                                            </li>
-                                        <?php
-                                            endforeach;
-                                        } else {
-                                            echo '<li class="no-comments">No comments yet. Be the first to comment!</li>';
-                                        }
-                                        ?>
-                                    </ul>
+                                            <?php
+                                            $donationComments = $commentsByDonation[$donation['donation_id']] ?? [];
+                                            if (!empty($donationComments)) {
+                                                renderComments($donationComments, $_SESSION['user_id']);
+                                            } else {
+                                                echo '<li class="no-comments">No comments yet. Be the first to comment!</li>';
+                                            }
+                                            ?>
+                                        </ul>
 
 
                                         <form class="comment-form-ajax" data-donation-id="<?= (int)$donation['donation_id'] ?>" onsubmit="return false;">
@@ -530,58 +630,44 @@ while ($row = $result->fetch_assoc()) $ideas[] = $row;
     </div>
     
 <script>
-/* ---------- Small utilities (must appear FIRST) ---------- */
+document.addEventListener("DOMContentLoaded", () => {
+
+/* ---------- Utilities ---------- */
 const qs = (sel) => document.querySelector(sel);
 const qsa = (sel) => Array.from(document.querySelectorAll(sel));
-
-const show = (el) => { if (!el) return; el.style.display = 'flex'; };
-const hide = (el) => { if (!el) return; el.style.display = 'none'; };
-
+const show = (el) => { if (el) el.style.display = 'flex'; };
+const hide = (el) => { if (el) el.style.display = 'none'; };
 function escapeHtml(unsafe) {
-    if (unsafe == null) return '';
-    return String(unsafe)
-        .replaceAll('&', "&amp;")
-        .replaceAll('<', "&lt;")
-        .replaceAll('>', "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;");
+    if (!unsafe) return '';
+    return unsafe.replace(/[&<>"']/g, m => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
+    }[m]));
 }
-/* -------------------------------------------------------- */
 
-
-// === TAB FUNCTIONALITY ===
+/* ---------- Tabs ---------- */
 function openTab(tabName) {
-    document.getElementById('donations').style.display = tabName === 'donations' ? 'block' : 'none';
-    document.getElementById('recycled-ideas').style.display = tabName === 'recycled-ideas' ? 'block' : 'none';
-    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-    const activeTab = document.querySelector(`.tab-btn[onclick="openTab('${tabName}')"]`);
-    if (activeTab) activeTab.classList.add('active');
+    qs('#donations').style.display = (tabName === 'donations') ? 'block' : 'none';
+    qs('#recycled-ideas').style.display = (tabName === 'recycled-ideas') ? 'block' : 'none';
+    qsa('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    const activeBtn = document.querySelector(`.tab-btn[onclick="openTab('${tabName}')"]`);
+    if (activeBtn) activeBtn.classList.add('active');
 }
 
-
-// === USER PROFILE DROPDOWN ===
-document.getElementById('userProfile').addEventListener('click', function() {
-    this.classList.toggle('active');
-});
-
-document.addEventListener('click', function(event) {
-    const userProfile = document.getElementById('userProfile');
-    if (!userProfile.contains(event.target)) {
-        userProfile.classList.remove('active');
-    }
-});
-
-
-// === CATEGORY ACTIVE STATE ===
-document.querySelectorAll('.category-list li').forEach(item => {
-    item.addEventListener('click', function() {
-        this.parentElement.querySelectorAll('li').forEach(li => li.classList.remove('active'));
-        this.classList.add('active');
+/* ---------- Profile Dropdown ---------- */
+const userProfile = qs('#userProfile');
+if (userProfile) {
+    userProfile.addEventListener('click', (e) => {
+        e.stopPropagation();
+        userProfile.classList.toggle('active');
     });
-});
+    document.addEventListener('click', (e) => {
+        if (!userProfile.contains(e.target)) {
+            userProfile.classList.remove('active');
+        }
+    });
+}
 
-
-// === REQUEST DONATION LOGIC ===
+/* ---------- Request Donation Popup ---------- */
 let currentAvailable = 0;
 
 function openRequestPopup(donationId, wasteName, available) {
@@ -592,7 +678,6 @@ function openRequestPopup(donationId, wasteName, available) {
     currentAvailable = parseInt(available) || 0;
     show(qs('#requestPopup'));
 }
-
 function closeRequestPopup() { hide(qs('#requestPopup')); }
 function closeRequestSuccessPopup() { hide(qs('#requestSuccessPopup')); }
 
@@ -605,8 +690,7 @@ function updateQuantity(change) {
     input.value = val;
 }
 
-
-// Attach click event to all "Request Donation" buttons
+/* Attach request button events */
 qsa('.request-btn').forEach(btn => {
     btn.addEventListener('click', function() {
         const id = this.dataset.donationId;
@@ -616,65 +700,36 @@ qsa('.request-btn').forEach(btn => {
         let wasteText = 'Unknown';
         if (categoryEl) {
             const text = categoryEl.textContent.replace('Category:', '').trim();
-            // Example text: "Plastic → Plastic Bags"
             const parts = text.split('→').map(p => p.trim());
-            if (parts.length === 2) {
-                wasteText = `${parts[1]} (${parts[0]})`; // "Plastic Bags (Plastic)"
-            } else {
-                wasteText = text;
-            }
+            if (parts.length === 2) wasteText = `${parts[1]} (${parts[0]})`;
+            else wasteText = text;
         }
         openRequestPopup(id, wasteText, available);
     });
 });
 
-
-// AJAX Submit Request
+/* AJAX submit request */
 const requestForm = qs('#requestFormAjax');
-requestForm?.addEventListener('submit', e => {
-    e.preventDefault();
-    const fd = new FormData(requestForm);
-    fd.append('submit_request_donation', '1');
-
-    fetch('homepage.php', {
-        method: 'POST',
-        body: fd,
-        headers: { 'X-Requested-With': 'XMLHttpRequest' }
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data.status === 'success') {
-            hide(qs('#requestPopup'));
-            show(qs('#requestSuccessPopup'));
-
-            // Update quantity in card
-            const id = fd.get('donation_id');
-            const qtyClaimed = parseInt(fd.get('quantity_claim')) || 0;
-            const qtyEl = qs(`[data-donation-quantity-id="${id}"]`);
-            if (qtyEl) {
-                const parts = qtyEl.textContent.split(':');
-                if (parts[1]) {
-                    const nums = parts[1].trim().split('/');
-                    if (nums.length === 2) {
-                        let current = parseInt(nums[0]);
-                        const total = nums[1];
-                        current = Math.max(0, current - qtyClaimed);
-                        qtyEl.textContent = `Quantity: ${current}/${total}`;
-                    }
-                }
+if (requestForm) {
+    requestForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const fd = new FormData(requestForm);
+        fd.append('submit_request_donation', '1');
+        fetch('homepage.php', { method: 'POST', body: fd, headers: {'X-Requested-With':'XMLHttpRequest'} })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success') {
+                hide(qs('#requestPopup'));
+                show(qs('#requestSuccessPopup'));
+            } else {
+                alert(data.message || 'Request failed.');
             }
-        } else {
-            alert(data.message || 'Request failed.');
-        }
-    })
-    .catch(err => {
-        console.error(err);
-        alert('Network error.');
+        })
+        .catch(() => alert('Network error.'));
     });
-});
+}
 
-
-// === COMMENTS SYSTEM (AJAX) ===
+/* ---------- Comments ---------- */
 qsa('.comment-btn').forEach(btn => {
     btn.addEventListener('click', () => {
         const id = btn.dataset.donationId;
@@ -684,22 +739,19 @@ qsa('.comment-btn').forEach(btn => {
 });
 
 qsa('.comment-form-ajax').forEach(form => {
-    form.addEventListener('submit', e => {
+    form.addEventListener('submit', (e) => {
         e.preventDefault();
         const id = form.dataset.donationId;
         const textarea = form.querySelector('textarea[name="comment_text"]');
-        if (!textarea.value.trim()) return;
+        const text = textarea.value.trim();
+        if (!text) return;
 
         const fd = new FormData();
         fd.append('donation_id', id);
-        fd.append('comment_text', textarea.value.trim());
+        fd.append('comment_text', text);
         fd.append('submit_comment', '1');
 
-        fetch('homepage.php', {
-            method: 'POST',
-            body: fd,
-            headers: { 'X-Requested-With': 'XMLHttpRequest' }
-        })
+        fetch('homepage.php', { method: 'POST', body: fd, headers: {'X-Requested-With':'XMLHttpRequest'} })
         .then(res => res.json())
         .then(data => {
             if (data.status === 'success') {
@@ -710,108 +762,285 @@ qsa('.comment-form-ajax').forEach(form => {
                     <div class="comment-avatar">U</div>
                     <div class="comment-content">
                         <div class="comment-author">You</div>
-                        <div class="comment-text">${escapeHtml(textarea.value.trim())}</div>
+                        <div class="comment-text">${escapeHtml(text)}</div>
                         <div class="comment-time">Just now</div>
                     </div>`;
                 list.insertBefore(li, list.firstChild);
                 textarea.value = '';
-            } else {
-                alert(data.message || 'Failed to post comment.');
-            }
+            } else alert(data.message || 'Failed to post comment.');
         })
-        .catch(err => {
-            console.error(err);
-            alert('Network error.');
-        });
+        .catch(() => alert('Network error.'));
     });
 });
 
+/* ---------- Feedback Modal ---------- */
+const feedbackBtn = qs('#feedbackBtn');
+const feedbackModal = qs('#feedbackModal');
+const feedbackCloseBtn = qs('#feedbackCloseBtn');
+const emojiOptions = qsa('.emoji-option');
+const feedbackSubmitBtn = qs('#feedbackSubmitBtn');
+const feedbackText = qs('#feedbackText');
+const ratingError = qs('#ratingError');
+const textError = qs('#textError');
+const thankYouMessage = qs('#thankYouMessage');
+const feedbackForm = qs('#feedbackForm');
+const spinner = qs('#spinner');
+let selectedRating = 0;
 
-// === FEEDBACK SYSTEM ===
-document.addEventListener("DOMContentLoaded", function () {
-    const feedbackBtn = qs("#feedbackBtn");
-    const feedbackModal = qs("#feedbackModal");
-    const feedbackCloseBtn = qs("#feedbackCloseBtn");
-    const emojiOptions = feedbackModal ? feedbackModal.querySelectorAll(".emoji-option") : [];
-    const feedbackSubmitBtn = qs("#feedbackSubmitBtn");
-    const feedbackText = qs("#feedbackText");
-    const ratingError = qs("#ratingError");
-    const textError = qs("#textError");
-    const thankYouMessage = qs("#thankYouMessage");
-    const feedbackForm = qs("#feedbackForm");
-    const spinner = qs("#spinner");
-
-    if (!feedbackBtn || !feedbackModal || !feedbackSubmitBtn || !feedbackText) return;
-
-    let selectedRating = 0;
-
-    feedbackBtn.addEventListener("click", () => {
-        feedbackModal.style.display = "flex";
-        feedbackForm.style.display = "block";
-        thankYouMessage.style.display = "none";
+if (feedbackBtn && feedbackModal) {
+    feedbackBtn.addEventListener('click', () => {
+        feedbackModal.style.display = 'flex';
+        feedbackForm.style.display = 'block';
+        thankYouMessage.style.display = 'none';
     });
 
-    feedbackCloseBtn?.addEventListener("click", () => feedbackModal.style.display = "none");
-    window.addEventListener("click", e => {
-        if (e.target === feedbackModal) feedbackModal.style.display = "none";
+    feedbackCloseBtn?.addEventListener('click', () => feedbackModal.style.display = 'none');
+    window.addEventListener('click', (e) => {
+        if (e.target === feedbackModal) feedbackModal.style.display = 'none';
     });
 
-    emojiOptions.forEach(option => {
-        option.addEventListener("click", () => {
-            emojiOptions.forEach(o => o.classList.remove("selected"));
-            option.classList.add("selected");
-            selectedRating = option.getAttribute("data-rating");
-            ratingError.style.display = "none";
+    emojiOptions.forEach(opt => {
+        opt.addEventListener('click', () => {
+            emojiOptions.forEach(o => o.classList.remove('selected'));
+            opt.classList.add('selected');
+            selectedRating = opt.getAttribute('data-rating');
+            ratingError.style.display = 'none';
         });
     });
 
-    feedbackSubmitBtn.addEventListener("click", e => {
+    feedbackSubmitBtn?.addEventListener('click', (e) => {
         e.preventDefault();
-
         let valid = true;
-        if (selectedRating === 0) { ratingError.style.display = "block"; valid = false; }
-        if (feedbackText.value.trim() === "") { textError.style.display = "block"; valid = false; }
-        else { textError.style.display = "none"; }
-
+        if (!selectedRating) { ratingError.style.display = 'block'; valid = false; }
+        if (feedbackText.value.trim() === '') { textError.style.display = 'block'; valid = false; }
+        else textError.style.display = 'none';
         if (!valid) return;
 
-        spinner.style.display = "inline-block";
+        spinner.style.display = 'inline-block';
         feedbackSubmitBtn.disabled = true;
 
-        fetch("feedback_process.php", {
-            method: "POST",
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        fetch('feedback_process.php', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
             body: `rating=${selectedRating}&feedback=${encodeURIComponent(feedbackText.value)}`
         })
         .then(res => res.json())
         .then(data => {
-            spinner.style.display = "none";
+            spinner.style.display = 'none';
             feedbackSubmitBtn.disabled = false;
-
-            if (data.status === "success") {
-                feedbackForm.style.display = "none";
-                thankYouMessage.style.display = "block";
-
+            if (data.status === 'success') {
+                feedbackForm.style.display = 'none';
+                thankYouMessage.style.display = 'block';
                 setTimeout(() => {
-                    feedbackModal.style.display = "none";
-                    feedbackForm.style.display = "block";
-                    thankYouMessage.style.display = "none";
-                    feedbackText.value = "";
+                    feedbackModal.style.display = 'none';
+                    feedbackForm.style.display = 'block';
+                    thankYouMessage.style.display = 'none';
+                    feedbackText.value = '';
                     selectedRating = 0;
-                    emojiOptions.forEach(o => o.classList.remove("selected"));
+                    emojiOptions.forEach(o => o.classList.remove('selected'));
                 }, 3000);
-            } else {
-                alert(data.message || "Failed to submit feedback.");
-            }
+            } else alert(data.message || 'Failed to submit feedback.');
         })
-        .catch(err => {
-            spinner.style.display = "none";
+        .catch(() => {
+            spinner.style.display = 'none';
             feedbackSubmitBtn.disabled = false;
-            alert("Failed to submit feedback. Please try again.");
-            console.error(err);
+            alert('Failed to submit feedback. Please try again.');
         });
     });
+}
+
+    /* ---------- Reply / Edit / Delete for Comments ---------- */
+    document.addEventListener('click', async (e) => {
+        const item = e.target.closest('.comment-item');
+        if (!item) return;
+
+        // === REPLY ===
+        if (e.target.classList.contains('reply-btn')) {
+            const existingForm = document.querySelector('.reply-box');
+            if (existingForm) existingForm.remove();
+
+            const replyForm = document.createElement('form');
+            replyForm.className = 'reply-box';
+            replyForm.innerHTML = `
+                <textarea name="reply" class="comment-input" placeholder="Write a reply..." required></textarea>
+                <button type="submit" class="comment-submit">Reply</button>
+            `;
+            item.insertAdjacentElement('afterend', replyForm);
+            replyForm.reply.focus();
+
+            replyForm.addEventListener('submit', async (ev) => {
+                ev.preventDefault();
+                const replyText = replyForm.reply.value.trim();
+                if (!replyText) return;
+
+                const donationId = item.dataset.donationId;
+                const parentId = item.dataset.id;
+
+                try {
+                    const response = await fetch('browse.php', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: `donation_id=${encodeURIComponent(donationId)}&comment_text=${encodeURIComponent(replyText)}&parent_id=${encodeURIComponent(parentId)}`
+                    });
+                    const result = await response.json();
+
+                    if (result.success) {
+                        let replyList = item.querySelector('.reply-list');
+                        if (!replyList) {
+                            replyList = document.createElement('ul');
+                            replyList.className = 'reply-list';
+                            item.appendChild(replyList);
+                        }
+
+                        const li = document.createElement('li');
+                        li.className = 'comment-item';
+                        li.dataset.id = result.comment_id;
+                        li.dataset.donationId = donationId;
+
+                        // Generate an ISO timestamp in Manila time
+                        const now = new Date().toISOString();
+
+                        li.innerHTML = `
+                            <div class="comment-avatar">${result.user_initial}</div>
+                            <div class="comment-content">
+                                <div class="comment-author">${result.user_name}</div>
+                                <div class="comment-text">${result.comment_text}</div>
+                                <div class="comment-time" data-time="${now}">Just now</div>
+                                <div class="comment-actions">
+                                    <button class="reply-btn">Reply</button>
+                                    <button class="edit-btn">Edit</button>
+                                    <button class="delete-btn">Delete</button>
+                                </div>
+                            </div>
+                        `;
+
+
+                        // Append reply
+                        replyList.appendChild(li);
+                        replyForm.remove();
+
+                        // ✅ Immediately recalculate visible times
+                        if (typeof refreshAllCommentTimes === 'function') {
+                            refreshAllCommentTimes(); // instant update
+                        }
+
+                    } else {
+                        alert(result.message || 'Failed to post reply.');
+                    }
+                } catch (err) {
+                    console.error(err);
+                    alert('Error posting reply.');
+                }
+            });
+        }
+
+        // === EDIT ===
+        else if (e.target.classList.contains('edit-btn')) {
+            const textEl = item.querySelector('.comment-text');
+            const btn = e.target;
+            const originalText = textEl.textContent.trim();
+            btn.textContent = 'Save';
+            textEl.contentEditable = true;
+            textEl.focus();
+
+            const saveOnce = async () => {
+                const newText = textEl.textContent.trim();
+                if (!newText) return alert('Empty comment.');
+
+                const fd = new FormData();
+                fd.append('id', item.dataset.id);
+                fd.append('content', newText);
+
+                const res = await fetch('edit_comment.php', { method: 'POST', body: fd });
+                const data = await res.json();
+
+                if (data.success) {
+                    textEl.textContent = newText;
+                    textEl.contentEditable = false;
+                    btn.textContent = 'Edit';
+                } else {
+                    alert(data.message || 'Edit failed.');
+                    textEl.textContent = originalText;
+                    textEl.contentEditable = false;
+                    btn.textContent = 'Edit';
+                }
+                btn.removeEventListener('click', saveOnce);
+            };
+
+            btn.addEventListener('click', saveOnce, { once: true });
+        }
+
+        // === DELETE ===
+        else if (e.target.classList.contains('delete-btn')) {
+            if (!confirm('Delete this comment (and its replies)?')) return;
+
+            const fd = new FormData();
+            fd.append('id', item.dataset.id);
+
+            try {
+                const res = await fetch('delete_comment.php', { method: 'POST', body: fd });
+                const data = await res.json();
+
+                if (data.success) {
+                    item.style.transition = 'opacity 0.3s';
+                    item.style.opacity = '0';
+                    setTimeout(() => item.remove(), 300);
+                } else {
+                    alert(data.message || 'Delete failed.');
+                }
+            } catch (err) {
+                console.error(err);
+                alert('Network error while deleting.');
+            }
+        }
+    });
 });
+
+/* ---------- Comment Time Display (Accurate + Auto-update) ---------- */
+function formatTimeDifferenceFromISO(isoString) {
+    if (!isoString) return '';
+
+    // Parse ISO 8601 into epoch ms (Date.parse handles the timezone offset in the string)
+    const commentMs = Date.parse(isoString);
+    if (isNaN(commentMs)) return '';
+
+    const nowMs = Date.now();
+    const diffSec = Math.floor((nowMs - commentMs) / 1000);
+
+    if (diffSec < 10) return 'Just now';
+    if (diffSec < 60) return `${diffSec}s ago`;
+    if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+    if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
+    if (diffSec < 7 * 86400) return `${Math.floor(diffSec / 86400)}d ago`;
+
+    // For older posts, display a readable datetime in Manila timezone
+    const date = new Date(commentMs);
+    return date.toLocaleString('en-PH', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+        timeZone: 'Asia/Manila'
+    });
+}
+
+function refreshAllCommentTimes() {
+    document.querySelectorAll('.comment-time').forEach(el => {
+        const iso = el.getAttribute('data-time');
+        if (!iso) return;
+        const text = formatTimeDifferenceFromISO(iso);
+        // only update textContent if different (avoid layout thrash)
+        if (el.textContent !== text) el.textContent = text;
+    });
+}
+
+// run immediately and update every minute
+refreshAllCommentTimes();
+setInterval(refreshAllCommentTimes, 60000);
+
 </script>
+
 </body>
 </html>
