@@ -258,10 +258,6 @@ if (!$user) {
                         </div>
                         <div class="progress-tracker">
                             <div class="progress-step active">
-                                <i class="fas fa-list"></i>
-                                <span>Planning</span>
-                            </div>
-                            <div class="progress-step">
                                 <i class="fas fa-box"></i>
                                 <span>Materials Collection</span>
                             </div>
@@ -416,8 +412,8 @@ if (!$user) {
     </div>
 
     <script>
-        let currentProjectId = null;
-        let currentProjectStatus = 'planning';
+    let currentProjectId = null;
+    let currentProjectStatus = 'collecting';
 
         // User profile dropdown
         document.getElementById('userProfile').addEventListener('click', function() {
@@ -451,7 +447,7 @@ if (!$user) {
                         document.getElementById('projectDetailDescription').textContent = data.project.description;
                         
                         // Set the current status
-                        currentProjectStatus = data.project.status || 'planning';
+                        currentProjectStatus = data.project.status || 'collecting';
                         const btn = document.getElementById('projectStatusBtn');
                         btn.setAttribute('data-status', currentProjectStatus);
                         updateProjectStatus(currentProjectStatus);
@@ -792,9 +788,6 @@ if (!$user) {
             let newStatus;
 
             switch (currentStatus) {
-                case 'planning':
-                    newStatus = 'collecting';
-                    break;
                 case 'collecting':
                     newStatus = 'in_progress';
                     break;
@@ -802,7 +795,7 @@ if (!$user) {
                     newStatus = 'completed';
                     break;
                 default:
-                    newStatus = 'planning';
+                    newStatus = 'collecting';
             }
 
             if (!currentProjectId) {
@@ -841,10 +834,9 @@ if (!$user) {
         function updateProjectStatus(status) {
             const steps = document.querySelectorAll('.progress-step');
             const statusMap = {
-                'planning': 0,
-                'collecting': 1,
-                'in_progress': 2,
-                'completed': 3
+                'collecting': 0,
+                'in_progress': 1,
+                'completed': 2
             };
 
             steps.forEach((step, index) => {
@@ -864,8 +856,6 @@ if (!$user) {
 
         function getNextStatusLabel(currentStatus) {
             switch (currentStatus) {
-                case 'planning':
-                    return 'Start Collecting';
                 case 'collecting':
                     return 'Start Project';
                 case 'in_progress':

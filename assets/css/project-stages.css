@@ -254,3 +254,37 @@
     max-height: 90vh;
     object-fit: contain;
 }
+
+/* Responsive: collapsible timeline on small screens */
+.toggle-timeline-btn {
+    display: none; /* shown in mobile via media query */
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.6rem;
+    border-radius: 6px;
+    border: 1px solid rgba(0,0,0,0.06);
+    background: #fff;
+    color: #333;
+    cursor: pointer;
+    font-size: 0.95rem;
+}
+
+@media (max-width: 768px) {
+    .toggle-timeline-btn { display: inline-flex; margin-left: 0.5rem; }
+
+    /* Collapse behavior using max-height transition */
+    .stages-timeline {
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.28s ease;
+    }
+
+    /* When expanded allow large max-height to show content */
+    .stages-timeline.expanded {
+        max-height: 6000px; /* large enough to show all stages */
+    }
+
+    /* Give stage cards a bit more compact spacing on mobile */
+    .stage-card { padding-left: 48px; }
+    .stages-timeline::before { left: 18px; }
+}

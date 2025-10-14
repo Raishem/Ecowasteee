@@ -188,28 +188,31 @@ try {
 
             <!-- Materials Section -->
             <div class="materials-section">
-                <div class="materials-header">
+                    <div class="materials-header">
                     <div class="materials-title-wrapper">
                         <i class="fas fa-box"></i>
                         <h2>Materials Needed</h2>
                     </div>
-                    <button class="add-material-btn" data-action="open-add-material">
-                        <i class="fas fa-plus"></i> Add Material
-                    </button>
                 </div>
-                
-                <div class="materials-grid">
-                    <?php foreach ($materials as $material): ?>
-                        <div class="material-card">
-                            <div class="material-info">
-                                <span class="material-name"><?= htmlspecialchars($material['name'] ?? $material['material_name'] ?? '') ?></span>
-                                <span class="material-quantity">Quantity: <?= htmlspecialchars($material['quantity'] ?? '') ?></span>
-                            </div>
-                            <div class="material-status <?= $material['status'] ?? 'needed' ?>">
-                                <?= ucfirst($material['status'] ?? 'needed') ?>
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
+
+                <div class="materials-list">
+                    <ul>
+                        <?php if (empty($materials)): ?>
+                            <li class="empty-state">No materials listed.</li>
+                        <?php else: ?>
+                            <?php foreach ($materials as $material): ?>
+                                <li class="material-item">
+                                    <span class="material-name"><?= htmlspecialchars($material['name'] ?? $material['material_name'] ?? '') ?></span>
+                                    <?php if (!empty($material['quantity'])): ?>
+                                        <span class="material-quantity">&nbsp;—&nbsp;<?= htmlspecialchars($material['quantity']) ?></span>
+                                    <?php endif; ?>
+                                    <?php if (!empty($material['status'])): ?>
+                                        <span class="material-status-label">&nbsp;(<span class="status-text"><?= ucfirst($material['status']) ?></span>)</span>
+                                    <?php endif; ?>
+                                </li>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </ul>
                 </div>
             </div>
         </div>

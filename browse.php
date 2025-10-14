@@ -248,7 +248,13 @@ while ($row = $result->fetch_assoc()) $ideas[] = $row;
         
         <main class="main-content">
             <div class="search-bar">
-                <input type="text" placeholder="Search Donations...">
+                        <?php $from_project = isset($_GET['from_project']) ? (int)$_GET['from_project'] : 0; $query = isset($_GET['query']) ? htmlspecialchars($_GET['query']) : ''; ?>
+                        <input type="text" placeholder="Search Donations..." value="<?= $query ?>">
+                        <?php if ($from_project): ?>
+                            <div class="back-to-project">
+                                <a href="project_details.php?id=<?= $from_project ?>" class="btn">&larr; Back To Project</a>
+                            </div>
+                        <?php endif; ?>
             </div>
             
             <!-- Tab Navigation -->

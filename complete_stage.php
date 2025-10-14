@@ -33,6 +33,30 @@ try {
         exit;
     }
     
+    // Check if previous stages are completed
+    $prev_check = $conn->prepare("
+        SELECT COUNT(*) as incomplete
+        FROM (
+            SELECT stage_number 
+            FROM stage_templates 
+            WHERE stage_number < ?
+        ) needed_stages
+        LEFT JOIN project_stages ps ON 
+            ps.project_id = ? AND 
+            ps.stage_number = needed_stages.stage_number AND 
+            ps.is_completed = 1
+        WHERE ps.project_id IS NULL
+    ");
+    $prev_check->bind_param("ii", $stage_number, $project_id);
+    $prev_check->execute();
+    $result = $prev_check->get_result();
+    $incomplete = $result->fetch_assoc()['incomplete'];
+    
+    if ($incomplete > 0) {
+        echo json_encode(['success' => false, 'message' => 'Cannot complete this stage until all previous stages are completed']);
+        exit;
+    }
+
     // Insert or update stage completion
     $stmt = $conn->prepare("
         INSERT INTO project_stages (project_id, stage_number, stage_name, is_completed, completed_at)

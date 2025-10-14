@@ -1,0 +1,764 @@
+/* Materials list & modal styles extracted from project_details.php */
+:root{
+    --accent:#2e8b57; /* green */
+    --accent-light: #e6f4ea;
+    --accent-dark: #1b543d;
+    --muted:#6b6b6b;
+    --card:#ffffff;
+    --card-border: #e6f4ea;
+    --danger:#e74c3c;
+    --danger-light: #fde8e7;
+    --shadow-sm: 0 2px 4px rgba(16,24,32,0.04);
+    --shadow-md: 0 4px 12px rgba(16,24,32,0.08);
+    --shadow-lg: 0 8px 24px rgba(16,24,32,0.12);
+    --transition: 0.2s cubic-bezier(0.4,0,0.2,1);
+}
+
+/* Materials grid */
+.materials-list-stage {
+    list-style: none;
+    padding: 0;
+    margin: 8px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-width: 760px;
+}
+
+.materials-list-stage > li {
+    width: 100%;
+}
+
+.material-item{
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    box-shadow: 0 1px 2px rgba(16,24,32,0.03);
+    transition: all 0.2s ease-in-out;
+    opacity: 1;
+    min-height: 44px;
+    margin-bottom: 4px;
+    gap: 8px;
+}
+.material-item:hover{ 
+    transform: translateY(-2px); 
+    box-shadow: 0 6px 12px rgba(16,24,32,0.06);
+    border-color: var(--card-border);
+}
+
+.material-item.material-obtained{ background:#f3fbf4; border-color:#dff0e0; }
+
+.material-main { 
+    flex: 1 1 auto; 
+    min-width: 0;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.mat-meta { display:flex; align-items:center; gap:8px; }
+
+/* Camera upload button when placed inside .mat-meta */
+.mat-meta .upload-material-photo {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    background: var(--accent-light);
+    border: 1px solid transparent;
+    color: var(--accent);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-left: 4px;
+}
+.mat-meta .upload-material-photo:hover {
+    background: var(--accent);
+    color: #fff;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(46,139,87,0.2);
+}
+.mat-meta .upload-material-photo i {
+    font-size: 14px;
+    transition: transform 0.2s ease;
+}
+.mat-meta .upload-material-photo:hover i {
+    transform: scale(1.1);
+}
+
+/* Action Buttons */
+.material-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+/* hide the actions container completely if empty (no buttons) */
+.material-actions:empty { display:none; }
+
+/* Check button/icon styles */
+.material-actions .check-btn,
+.material-actions .check-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 6px;
+    background-color: #43A047;
+    border: 2px solid #2E7D32;
+    color: white;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 8px rgba(67, 160, 71, 0.2);
+}
+
+.material-actions .check-btn:hover {
+    background-color: #2E7D32;
+    border-color: #1B5E20;
+    color: white;
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(67, 160, 71, 0.3);
+}
+
+.material-actions .check-icon {
+    background-color: #43A047;
+    color: white;
+    border: 2px solid #2E7D32;
+}
+
+.find-donations-btn {
+    padding: 10px 20px;
+    background-color: #2E7D32;
+    color: white;
+    border: 2px solid #1B5E20;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 8px rgba(46, 125, 50, 0.2);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+    text-decoration: none;
+    min-width: 140px;
+    justify-content: center;
+}
+
+.find-donations-btn:hover {
+    background-color: #1B5E20;
+    box-shadow: 0 4px 12px rgba(27, 94, 32, 0.3);
+    transform: translateY(-1px);
+}
+
+.remove-material-btn {
+    padding: 8px;
+    background: var(--danger-light);
+    border: 1px solid var(--danger);
+    color: var(--danger);
+    cursor: pointer;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+}
+
+.remove-material-btn:hover {
+    background: var(--danger);
+    color: white;
+    transform: scale(1.05);
+}
+
+.mat-name { 
+    display: block; 
+    font-size: 1.02rem;
+    font-weight: 600;
+    color: var(--accent-dark);
+    line-height: 1.2;
+    margin-bottom: 0;
+}
+
+.mat-qty {
+    display: inline-flex;
+    align-items: center;
+    background: var(--accent-light);
+    color: var(--accent-dark);
+    padding: 4px 12px;
+    border-radius: 6px;
+    font-size: 0.925rem;
+    font-weight: 500;
+}
+.mat-name{ 
+    display: block; 
+    font-weight: 600; 
+    color: var(--accent-dark); 
+    font-size: 1.05rem;
+    line-height: 1.4;
+    letter-spacing: -0.01em;
+    margin-bottom: 2px;
+    word-break: break-word; 
+    white-space: normal; 
+    overflow-wrap: break-word;
+}
+.mat-qty{ 
+    color: var(--accent-dark);
+    font-size: 0.88rem;
+    font-weight: 600;
+    background: var(--accent-light);
+    padding: 4px 8px;
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+}
+
+/* Ensure actions stay on single line when possible and buttons don't break vertically */
+.material-actions{ 
+    display: flex; 
+    gap: 8px; 
+    align-items: center; 
+    margin-left: 12px; 
+    flex-shrink: 0;
+    height: 36px;
+}
+
+.material-actions .btn.small {
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    background: var(--accent-light);
+    border: none;
+    color: var(--accent);
+    transition: all 0.2s ease-in-out;
+    position: relative;
+    overflow: hidden;
+}
+
+.material-actions .btn.small:hover {
+    background: var(--accent);
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.material-actions .btn.small.danger {
+    background: var(--danger-light);
+    color: var(--danger);
+}
+
+.material-actions .btn.small.danger:hover {
+    background: var(--danger);
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(231, 76, 60, 0.2);
+}
+
+.material-actions .btn.small i {
+    font-size: 1.1rem;
+    transition: transform 0.2s ease;
+}
+
+.material-actions .btn.small:hover i {
+    transform: scale(1.1);
+}
+.material-actions form{ display:inline-flex; }
+.material-actions .btn{ white-space:nowrap; padding:6px 8px; }
+.material-actions .btn i{ margin-right:6px; }
+.material-actions .btn.small{ 
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    display: inline-flex; 
+    align-items: center; 
+    justify-content: center;
+    border-radius: 10px;
+    background: #fff;
+    border: 1px solid var(--accent-light);
+    color: var(--accent);
+    transition: all 0.2s ease-in-out;
+}
+
+.material-actions .btn.small:hover {
+    background: var(--accent);
+    color: #fff;
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+    border-color: var(--accent);
+}
+/* icon-only styling */
+.material-actions .btn.small i{ margin:0; font-size:1.05rem }
+/* generic icon button */
+.icon-btn{ width:38px; height:38px; padding:6px; border-radius:8px; display:inline-flex; align-items:center; justify-content:center }
+.icon-btn i{ font-size:18px }
+.icon-btn:hover{ background:rgba(0,0,0,0.03) }
+/* obtained badge */
+.badge.obtained{ 
+    display:inline-flex; 
+    align-items:center; 
+    gap:6px; 
+    background: #e8f8ee; 
+    color: #11663b; 
+    border:1px solid #dff0e0; 
+    padding:4px 8px; 
+    border-radius:6px; 
+    font-weight:600;
+    font-size: 0.9rem;
+}
+.badge.obtained i{ 
+    color: #11663b;
+    font-size: 12px;
+}
+.material-actions .btn.small.danger{ 
+    background: var(--danger-light);
+    border-color: transparent;
+    color: var(--danger);
+}
+
+.material-actions .btn.small.danger:hover {
+    background: var(--danger);
+    color: #fff;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(231, 76, 60, 0.2);
+}
+
+.material-actions form{ margin:0; }
+
+/* Enter/leave helpers */
+.material-enter{ opacity:0; transform: translateY(-8px); }
+.material-leave{ opacity:0; transform: translateY(-8px); height:0 !important; padding-top:0 !important; padding-bottom:0 !important; margin-top:0 !important; margin-bottom:0 !important; }
+
+/* Button variants */
+.btn{ display:inline-flex; align-items:center; gap:10px; border-radius:10px; padding:10px 14px; border:1px solid transparent; background:#fff; cursor:pointer; font-weight:700; font-size:0.95rem; }
+.btn i{ opacity:0.95 }
+.btn.small{ padding:8px 10px; font-size:0.95rem; border-radius:8px }
+.btn.small.danger{ background:var(--danger); color:#fff; border-color:rgba(0,0,0,0.04); box-shadow:none; }
+.btn.small:not(.danger){ background:#fff; color:#1a1a1a; border:1px solid rgba(0,0,0,0.06); }
+.btn.small:hover{ transform:translateY(-1px); }
+
+.add-material-btn{ background:var(--accent); color:#fff; border:none; padding:10px 16px; border-radius:10px; box-shadow: 0 6px 20px rgba(46,139,87,0.12); font-weight:700 }
+.add-material-btn i{ margin-right:8px }
+
+/* Modal styling (local) */
+.modal { 
+    display: none; 
+    position: fixed; 
+    inset: 0; 
+    z-index: 1200; 
+    align-items: center; 
+    justify-content: center; 
+}
+.modal.active { 
+    display: flex; 
+}
+.modal::before { 
+    content: ''; 
+    position: absolute; 
+    inset: 0; 
+    background: rgba(12, 18, 20, 0.6); 
+}
+.modal .modal-content { 
+    position: relative; 
+    z-index: 2; 
+    background: #fff; 
+    width: 100%; 
+    max-width: 480px; 
+    border-radius: 16px; 
+    padding: 24px; 
+    box-shadow: 0 20px 48px rgba(8, 12, 16, 0.2);
+}
+.modal .modal-header { 
+    display: flex; 
+    align-items: center; 
+    justify-content: space-between; 
+    margin-bottom: 20px;
+}
+.modal .modal-header .modal-title { 
+    font-size: 1.25rem; 
+    font-weight: 600;
+    color: var(--accent-dark);
+}
+.modal .form-group { 
+    margin-bottom: 16px;
+}
+.modal .form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: var(--accent-dark);
+}
+.modal .form-group input[type="text"], 
+.modal .form-group input[type="number"], 
+.modal .form-group textarea { 
+    width: 100%; 
+    padding: 12px 16px; 
+    border-radius: 10px; 
+    border: 1px solid #e2e8f0; 
+    box-sizing: border-box;
+    font-size: 1rem;
+    transition: all 0.2s ease;
+}
+.modal .form-group input:focus,
+.modal .form-group textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-light);
+    outline: none;
+}
+.modal .modal-actions { 
+    display: flex; 
+    gap: 12px; 
+    justify-content: flex-end;
+    margin-top: 24px;
+}
+.modal .action-btn { 
+    padding: 10px 20px; 
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    transition: all 0.2s ease;
+}
+.modal .action-btn:first-child {
+    background: #f1f5f9;
+    color: #475569;
+    border: none;
+}
+.modal .action-btn:first-child:hover {
+    background: #e2e8f0;
+}
+.modal .action-btn.check-btn { 
+    background: var(--accent); 
+    color: #fff; 
+    border: none;
+}
+.modal .action-btn.check-btn:hover {
+    background: var(--accent-dark);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+}
+
+    /* Toast container (top-center) and toast styles used by project_details.js */
+    #toastContainer {
+        position: fixed;
+        top: 18px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 9999;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        pointer-events: none;
+    }
+    .toast {
+        pointer-events: auto;
+        min-width: 200px;
+        max-width: 720px;
+        padding: 10px 16px;
+        border-radius: 10px;
+        color: white;
+        font-weight: 700;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+        transform-origin: center top;
+        opacity: 0;
+        transform: translateY(-6px) scale(0.995);
+        transition: opacity 220ms ease, transform 220ms cubic-bezier(.2,.9,.2,1);
+    }
+    .toast.show { opacity: 1; transform: translateY(0) scale(1); }
+    .toast.hide { opacity: 0; transform: translateY(-6px) scale(0.995); }
+    .toast-success { background: linear-gradient(180deg,#2ea46a,#1b7c44); }
+    .toast-error { background: linear-gradient(180deg,#e04b47,#c03a33); }
+
+    /* Confirm modal appearance tuning */
+    #confirmModal .modal-content { max-width: 420px; border-radius: 12px; padding: 0; overflow: hidden; }
+    #confirmModal .modal-header { padding: 14px 16px; border-bottom: 1px solid #f1f5f9; }
+    #confirmModal .modal-body { padding: 18px 16px; color: #123; }
+    #confirmModal .modal-actions { padding: 12px 16px; display:flex; gap:10px; justify-content:flex-end; background:#fff; border-top:1px solid #f3f4f6; }
+    #confirmModal .action-btn { padding: 8px 14px; border-radius:8px; }
+    #confirmModal .danger-btn { background:#dc3545; color:#fff; border:none; }
+    #confirmModal .action-btn:first-child { background:#fff; border:1px solid #e6eef0; color:#334; }
+
+    /* Ensure mat-qty badge styles are consistent (smaller padding for compact display) */
+    .mat-qty { padding: 6px 12px; font-weight:700; }
+
+/* obtained modal tweaks */
+#obtainedModal .modal-content{ 
+    max-width: 420px;
+    animation: modalSlideIn 0.3s ease;
+}
+
+#obtainedModal .modal-body {
+    padding: 20px 0;
+}
+
+#obtainedModal .modal-body p {
+    margin-bottom: 16px;
+    color: var(--accent-dark);
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+#obtainedModal .form-group {
+    margin-bottom: 20px;
+}
+
+#obtainedModal .form-group label{ 
+    display: block; 
+    margin-bottom: 8px;
+    color: var(--accent-dark);
+    font-weight: 500;
+}
+
+#obtainedModal input[type="number"]{ 
+    width: 120px;
+    padding: 8px 12px;
+    border: 2px solid #e2e8f0;
+    border-radius: 6px;
+    font-size: 1rem;
+    transition: all 0.2s ease;
+}
+
+/* Ensure centered caret/text in number input for obtained modal */
+#obtainedModal input[type="number"] { text-align: center !important; }
+
+#obtainedModal input[type="number"]:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-light);
+    outline: none;
+}
+
+#obtainedModal .modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid #e2e8f0;
+}
+
+#obtainedModal .action-btn {
+    padding: 10px 20px;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    transition: all 0.2s ease;
+    border: none;
+}
+
+#obtainedModal .action-btn[data-action="close-obtained"] {
+    background: #f1f5f9;
+    color: #475569;
+}
+
+.material-photos { display:flex; gap:8px; margin-top:8px; align-items:center; grid-column: 1 / -1; /* place photos below the material row */ }
+.material-photo { position:relative; width:48px; height:48px; border-radius:6px; overflow:hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.06); flex:0 0 48px; background: #fff; }
+.material-photo img { width:100%; height:100%; object-fit:cover; display:block; transition: transform 160ms ease; cursor:pointer }
+.material-photo:hover img { transform: scale(1.04); }
+.material-photo .material-photo-delete { position:absolute; top:6px; right:6px; background: rgba(255,255,255,0.95); border:none; width:26px; height:26px; border-radius:6px; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; color: var(--danger); box-shadow: 0 4px 8px rgba(0,0,0,0.06); }
+.material-photo .material-photo-delete i{ font-size:11px }
+
+/* Placeholder box when a material has no photo: make it compact so unobtained rows match newly-added row */
+.material-photo.placeholder { background: linear-gradient(180deg, rgba(46,139,87,0.03), rgba(46,139,87,0.01)); border: 1px dashed rgba(46,139,87,0.08); display:flex; align-items:center; justify-content:center; color: rgba(46,139,87,0.35); font-size:12px; width:40px; height:40px; flex:0 0 40px; box-shadow: none; }
+
+/* Layout helpers: ensure the main row content and actions occupy the two grid columns
+    and photos always sit below spanning the full width */
+.material-item .material-main { grid-column: 1; }
+.material-item .material-actions { grid-column: 2; align-self: center; justify-self: end; }
+
+/* Single-photo hint: ensure only one is visible; container will handle replacement */
+.material-photos .material-photo:not(:first-child){ display:none; }
+
+/* Hide empty quantity badges (server omits 0, but this is a defensive fallback) */
+.mat-qty:empty { display:none; }
+
+/* Image viewer (lightbox) */
+.image-viewer { position:fixed; inset:0; display:none; align-items:center; justify-content:center; background: rgba(5,10,12,0.85); z-index: 5000 }
+.image-viewer img{ max-width:90%; max-height:90%; border-radius:10px; box-shadow: 0 20px 48px rgba(0,0,0,0.6); }
+
+
+#obtainedModal .action-btn[data-action="have-all-obtained"] {
+    background: #e8f5e9;
+    color: #2e7d32;
+    border: 1px solid #43a047;
+}
+
+#obtainedModal .action-btn[data-action="confirm-obtained"] {
+    background: var(--accent);
+    color: white;
+}
+
+#obtainedModal .action-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
+}
+
+@keyframes modalSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* toast undo button */
+.toast .toast-undo{ background:transparent;border:1px solid rgba(255,255,255,0.18);color:#fff;padding:6px 8px;border-radius:6px;margin-left:8px;cursor:pointer }
+
+/* Toast tweaks: fade in/out */
+.toast{ position:fixed; right:18px; bottom:18px; z-index:1300; padding:12px 16px; border-radius:10px; color:#fff; background:rgba(0,0,0,0.9); box-shadow:0 8px 20px rgba(0,0,0,0.12); opacity:0; transform:translateY(8px); transition:opacity .28s ease, transform .28s ease; }
+.toast.show{ opacity:1; transform:translateY(0); }
+.toast.hide{ opacity:0; transform:translateY(8px); }
+
+/* close button inside toasts */
+.toast-close{ background:transparent;border:none;color:#fff;font-size:18px;line-height:1;padding:6px 8px;margin-left:10px;border-radius:6px;cursor:pointer; }
+.toast-close:hover{ opacity:0.9 }
+.toast-success{ background:var(--accent); }
+.toast-error{ background:var(--danger); }
+
+/* Stage actions (buttons grouping) */
+.stage-actions .btn{ margin-right:8px; }
+.stage-actions .upload-photo-btn{ background:#fff;border:1px solid rgba(0,0,0,0.06); }
+.stage-actions .complete-stage-btn{ background:var(--accent); color:#fff; border:none }
+.stage-actions .complete-stage-btn i{ margin-right:6px }
+
+@media (max-width:640px){
+    .material-item{ padding:12px; align-items:flex-start; gap:8px; }
+    .material-main{ flex-basis: 100%; }
+    .material-actions{ width:100%; justify-content:flex-end; margin-top:8px; }
+}
+
+/* Accessibility: enlarge hit target for icon-only buttons and add focus styles */
+.material-actions .btn.small[aria-label]{
+    padding:10px; /* slightly larger tappable area */
+    min-width:44px; min-height:44px; border-radius:10px;
+}
+.material-actions .btn.small[aria-label]:focus{ outline:3px solid rgba(46,139,87,0.18); outline-offset:2px }
+
+/* Find Donations button styling */
+.material-actions .icon-btn { 
+    display: inline-flex; 
+    align-items: center;
+    justify-content: center;
+    padding: 10px 24px; 
+    min-width: 160px;
+    white-space: nowrap;
+    background: #fff;
+    color: var(--accent);
+    border: 2px solid var(--accent);
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    letter-spacing: 0.01em;
+    transition: all 0.2s ease-in-out;
+}
+
+.material-actions .icon-btn:hover {
+    background: var(--accent);
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+/* Remove icon completely */
+.material-actions .icon-btn i { 
+    display: none;
+}
+
+@media (max-width:480px){
+    .material-actions {
+        width: 100%;
+        justify-content: flex-end;
+    }
+    .material-actions .icon-btn{ 
+        padding: 10px 20px;
+        font-size: 0.92rem;
+        min-width: 140px;
+        flex: 1;
+        justify-content: center;
+        text-align: center;
+    }
+}
+
+/* ===== Overrides: unify Find Donations button and improve quantity UI ===== */
+/* Ensure both server-rendered and dynamically-inserted buttons share the same look */
+.material-actions .icon-btn,
+.material-actions a.find-donations-btn,
+.find-donations-btn,
+.material-actions .btn.find-donations-btn {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 20px !important;
+    min-width: 140px !important;
+    background-color: var(--accent) !important; /* green */
+    color: #fff !important;
+    border: 2px solid var(--accent-dark) !important;
+    border-radius: 8px !important;
+    font-weight: 700 !important;
+    font-size: 0.95rem !important;
+    text-decoration: none !important;
+    box-shadow: 0 6px 18px rgba(46,139,87,0.12) !important;
+    transition: all var(--transition) !important;
+}
+.material-actions .icon-btn:hover,
+.material-actions a.find-donations-btn:hover,
+.find-donations-btn:hover,
+.material-actions .btn.find-donations-btn:hover {
+    background-color: var(--accent-dark) !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 10px 28px rgba(27,94,32,0.18) !important;
+}
+
+/* Remove underline from anchor variants and ensure icons (if present) are visible */
+.material-actions .icon-btn,
+.material-actions a.find-donations-btn,
+.find-donations-btn { text-decoration: none; }
+.material-actions .icon-btn i,
+.find-donations-btn i { display: inline-block; margin-right:6px; color: rgba(255,255,255,0.9); }
+
+/* Improve material quantity pill appearance */
+.mat-qty{
+    background: var(--accent-light) !important;
+    color: var(--accent-dark) !important;
+    padding: 8px 14px !important;
+    border-radius: 10px !important;
+    font-size: 1rem !important;
+    font-weight: 700 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    min-width: 72px !important;
+    justify-content: center !important;
+    box-shadow: inset 0 -1px 0 rgba(0,0,0,0.02);
+}
+
+/* NOTE: em-dash is expected to be present in markup; avoid adding a pseudo-element to prevent duplication */
+
+/* Ensure responsiveness doesn't make actions wrap awkwardly */
+/* Ensure top-center toast container's toasts override legacy bottom-right toast rules */
+#toastContainer .toast { position: relative !important; right: auto !important; bottom: auto !important; }
+@media (max-width:640px){
+    .material-actions{ width:100%; justify-content:flex-end; gap:10px }
+    .material-actions .icon-btn, .material-actions a.find-donations-btn { min-width: 120px; padding:8px 14px }
+}
+
+/* End overrides */
