@@ -16,24 +16,86 @@ $image_paths_json = null;
 /* ----------------------------
    Handle comment submission
 ---------------------------- */
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['comment_text']) && isset($_POST['donation_id']) && !isset($_POST['submit_request_donation'])) {
-    // note: the extra check !isset($_POST['submit_request_donation']) avoids collision with request form inputs
-    $comment_text = htmlspecialchars($_POST['comment_text']);
+/* ----------------------------
+   Handle comment submission (supports replies)
+---------------------------- */
+if ($_SERVER['REQUEST_METHOD'] === 'POST' 
+    && isset($_POST['comment_text']) 
+    && isset($_POST['donation_id']) 
+    && !isset($_POST['submit_request_donation'])) {
+
+    $comment_text = trim($_POST['comment_text']);
+    if ($comment_text === '') {
+        if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') {
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => 'Empty comment.']);
+            exit();
+        }
+        header('Location: ' . $_SERVER['PHP_SELF']);
+        exit();
+    }
+
     $donation_id = (int)$_POST['donation_id'];
     $user_id = $_SESSION['user_id'];
-    $created_at = date('Y-m-d H:i:s');
-    
-    $stmt = $conn->prepare("INSERT INTO comments (donation_id, user_id, comment_text, created_at) VALUES (?, ?, ?, ?)");
-    $stmt->bind_param("iiss", $donation_id, $user_id, $comment_text, $created_at);
-    
+    $parent_id = (isset($_POST['parent_id']) && $_POST['parent_id'] !== '') ? (int)$_POST['parent_id'] : null;
+    $created_at = (new DateTime('now', new DateTimeZone('Asia/Manila')))->format('Y-m-d H:i:s');
+
+    $stmt = $conn->prepare("
+        INSERT INTO comments (donation_id, user_id, comment_text, parent_id, created_at)
+        VALUES (?, ?, ?, ?, ?)
+    ");
+    // parent_id can be null — bind as integer or null (use 'i' with null handled as NULL via bind_param wrapper)
+    if ($parent_id === null) {
+        // bind null as NULL (must use 's' for null string then set to null in query?) easiest: use 'i' and pass null via null cast
+        $stmt->bind_param("iisis", $donation_id, $user_id, $comment_text, $parent_id, $created_at);
+    } else {
+        $stmt->bind_param("iisis", $donation_id, $user_id, $comment_text, $parent_id, $created_at);
+    }
+
     if ($stmt->execute()) {
-        // redirect back to avoid resubmission (no donation_success param for comments)
+        $comment_id = $stmt->insert_id;
+
+        // If AJAX, return JSON with immediate UI data
+        if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') {
+            // fetch user's name for response
+            $u = $conn->prepare("SELECT first_name, last_name FROM users WHERE user_id = ?");
+            $u->bind_param("i", $user_id);
+            $u->execute();
+            $userRow = $u->get_result()->fetch_assoc();
+
+            $user_name = trim(($userRow['first_name'] ?? '') . ' ' . ($userRow['last_name'] ?? ''));
+            $user_initial = strtoupper(substr(($userRow['first_name'] ?? 'U'), 0, 1));
+
+            // created_at in Manila ISO for JS
+            $iso = (new DateTime($created_at, new DateTimeZone('Asia/Manila')))->format(DateTime::ATOM);
+
+            header('Content-Type: application/json');
+            echo json_encode([
+                'success' => true,
+                'comment_id' => (int)$comment_id,
+                'user_name' => htmlspecialchars($user_name),
+                'user_initial' => $user_initial,
+                'comment_text' => htmlspecialchars($comment_text),
+                'created_iso' => $iso,
+                'parent_id' => $parent_id
+            ]);
+            exit();
+        }
+
+        // non-AJAX fallback
         header('Location: ' . $_SERVER['PHP_SELF']);
         exit();
     } else {
+        if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') {
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => 'Failed to save comment.']);
+            exit();
+        }
         die('Error: Failed to post comment. ' . $stmt->error);
     }
 }
+
+
 
 /* ----------------------------
    Handle donation form submission
@@ -125,52 +187,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_request_donati
     $project_id = isset($_POST['project_id']) ? (int)$_POST['project_id'] : null;
     $urgency_level = isset($_POST['urgency_level']) ? htmlspecialchars($_POST['urgency_level']) : null;
 
-    // Basic validation
     if ($donation_id <= 0 || $quantity_claim <= 0) {
-        header('Location: ' . $_SERVER['PHP_SELF'] . '?request_error=invalid');
+        $response = ['status' => 'error', 'message' => 'Invalid request data.'];
+        header('Content-Type: application/json');
+        echo json_encode($response);
         exit();
     }
 
-    // Fetch donation row
     $chk = $conn->prepare("SELECT donor_id, quantity FROM donations WHERE donation_id = ?");
     $chk->bind_param("i", $donation_id);
     $chk->execute();
     $don = $chk->get_result()->fetch_assoc();
 
     if (!$don) {
-        header('Location: ' . $_SERVER['PHP_SELF'] . '?request_error=notfound');
+        header('Content-Type: application/json');
+        echo json_encode(['status' => 'error', 'message' => 'Donation not found.']);
         exit();
     }
 
-    // Block requesting own donation
     if ($don['donor_id'] == $user_id) {
-        header('Location: ' . $_SERVER['PHP_SELF'] . '?request_error=self');
+        header('Content-Type: application/json');
+        echo json_encode(['status' => 'error', 'message' => 'You cannot request your own donation.']);
         exit();
     }
 
-    // Check available quantity
     $available = (int)$don['quantity'];
     if ($quantity_claim > $available) {
-        header('Location: ' . $_SERVER['PHP_SELF'] . '?request_error=over');
+        header('Content-Type: application/json');
+        echo json_encode(['status' => 'error', 'message' => 'Requested quantity exceeds available.']);
         exit();
     }
 
-    // Atomically decrement donation quantity
     $upd = $conn->prepare("UPDATE donations SET quantity = quantity - ? WHERE donation_id = ? AND quantity >= ?");
     $upd->bind_param("iii", $quantity_claim, $donation_id, $quantity_claim);
     $upd->execute();
 
     if ($upd->affected_rows === 0) {
-        // update didn't apply (race condition or insufficient quantity)
-        header('Location: ' . $_SERVER['PHP_SELF'] . '?request_error=concurrent');
+        header('Content-Type: application/json');
+        echo json_encode(['status' => 'error', 'message' => 'Donation not available.']);
         exit();
     }
 
-    // If quantity hit zero, mark Completed
     $conn->query("UPDATE donations SET status = 'Completed' WHERE donation_id = $donation_id AND quantity = 0");
 
-    // Ensure donation_requests table exists (create if missing)
-    $create_sql = "CREATE TABLE IF NOT EXISTS donation_requests (
+    $conn->query("CREATE TABLE IF NOT EXISTS donation_requests (
         request_id INT AUTO_INCREMENT PRIMARY KEY,
         donation_id INT NOT NULL,
         user_id INT NOT NULL,
@@ -180,17 +240,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_request_donati
         requested_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         INDEX (donation_id),
         INDEX (user_id)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;";
-    $conn->query($create_sql);
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
-    // Insert request record
     $ins = $conn->prepare("INSERT INTO donation_requests (donation_id, user_id, quantity_claim, project_id, urgency_level, requested_at) VALUES (?, ?, ?, ?, ?, NOW())");
     $ins->bind_param("iiiis", $donation_id, $user_id, $quantity_claim, $project_id, $urgency_level);
     $ins->execute();
 
+    // ✅ Return JSON if AJAX
+    if (
+        isset($_SERVER['HTTP_X_REQUESTED_WITH']) &&
+        strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest'
+    ) {
+        header('Content-Type: application/json');
+        echo json_encode(['status' => 'success']);
+        exit();
+    }
+
+    // fallback redirect for normal usage
     header('Location: ' . $_SERVER['PHP_SELF'] . '?request_success=1');
     exit();
 }
+
 
 //Helper functions and data fetches 
 
@@ -266,29 +336,40 @@ while ($row = $result->fetch_assoc()) $leaders[] = $row;
    (If you removed it earlier, re-add the render_comments function.) */
 function render_comments($comments, $donation_id, $parent_id = NULL) {
     foreach ($comments as $comment) {
-        // if parent_id column exists you can use nested comments; for now this assumes flat list
-        if ($comment['parent_id'] == $parent_id) {
-            echo "<div class='comment'>";
-            echo "<div class='comment-header'>
-                    <span class='comment-author'>" . htmlspecialchars($comment['first_name']) . "</span>
-                    <span class='comment-time'>" . getTimeAgo($comment['created_at']) . "</span>
-                  </div>";
-            echo "<p class='comment-text'>" . nl2br(htmlspecialchars($comment['comment_text'])) . "</p>";
-            // reply form (if you added parent_id in DB)
-            echo "<div class='add-comment' style='margin-left:20px;'>
-                    <form method='POST' action='homepage.php'>
-                        <textarea name='comment_text' class='comment-textarea' placeholder='Reply...' required></textarea>
-                        <input type='hidden' name='donation_id' value='{$donation_id}'>
-                        <input type='hidden' name='parent_id' value='{$comment['comment_id']}'>
-                        <button type='submit' class='post-comment-btn'>Reply</button>
-                    </form>
-                  </div>";
-            // Recursive render if nested
+        // Normalize parent_id (may be null/0)
+        $cParent = isset($comment['parent_id']) && $comment['parent_id'] !== '0' ? $comment['parent_id'] : null;
+        if ($cParent == $parent_id) {
+            $userInitial = strtoupper(substr(htmlspecialchars($comment['first_name'] ?? ''), 0, 1));
+
+            // Treat stored timestamp as Manila and create ISO
+            $createdAt = new DateTime($comment['created_at'], new DateTimeZone('Asia/Manila'));
+            $isoTime = $createdAt->format(DateTime::ATOM);
+
+            echo "<li class='comment-item' data-id='" . (int)$comment['comment_id'] . "' data-donation-id='" . (int)$donation_id . "'>";
+            echo "<div class='comment-avatar'>{$userInitial}</div>";
+            echo "<div class='comment-content'>";
+            echo "<div class='comment-author'>" . htmlspecialchars(trim($comment['first_name'] ?? '')) . "</div>";
+            echo "<div class='comment-text'>" . nl2br(htmlspecialchars($comment['comment_text'])) . "</div>";
+            echo "<div class='comment-time' data-time='" . htmlspecialchars($isoTime) . "'>" . getTimeAgo($comment['created_at']) . "</div>";
+            echo "<div class='comment-actions'>";
+            echo "<button class='reply-btn'><i class='fas fa-reply'></i> Reply</button>";
+            if (isset($_SESSION['user_id']) && $_SESSION['user_id'] == $comment['user_id']) {
+                echo "<button class='edit-btn'><i class='fas fa-edit'></i> Edit</button>";
+                echo "<button class='delete-btn'><i class='fas fa-trash-alt'></i> Delete</button>";
+            }
+            echo "</div>"; // comment-actions
+            echo "</div>"; // comment-content
+
+            // Render any replies recursively
+            echo "<ul class='reply-list'>";
             render_comments($comments, $donation_id, $comment['comment_id']);
-            echo "</div>";
+            echo "</ul>";
+
+            echo "</li>";
         }
     }
 }
+
 ?>
 
 <!DOCTYPE html>
@@ -874,29 +955,35 @@ function render_comments($comments, $donation_id, $parent_id = NULL) {
     </div>
 </div>
 
-<!-- Request Donation Popup -->
+<!-- === Request Donation Popup (with Cancel at Bottom) === -->
 <div id="requestPopup" class="popup-container" style="display:none;">
     <div class="popup-content">
-        <h2>Request Materials</h2>
-        <form method="POST" action="homepage.php">
+        <h2 style="text-align:center; color:#2e7d32; font-weight:800; margin-bottom:15px;">
+            Request Materials
+        </h2>
+
+        <form id="requestFormAjax" method="POST" action="homepage.php">
             <input type="hidden" id="popupDonationId" name="donation_id">
 
             <div class="form-group">
                 <label>Waste:</label>
-                <span id="popupWasteName"></span>
+                <span id="popupWasteName" style="font-weight:500;"></span>
             </div>
 
             <div class="form-group">
                 <label>Available Items:</label>
-                <span id="popupAvailable"></span>
+                <span id="popupAvailable" style="font-weight:500;"></span>
             </div>
 
             <div class="form-group">
                 <label>Quantity to Claim:</label>
                 <div style="display:flex;align-items:center;gap:10px;">
-                    <button type="button" onclick="updateQuantity(-1)">-</button>
-                    <input type="text" id="quantityClaim" name="quantity_claim" value="1" readonly style="width:50px;text-align:center;">
-                    <button type="button" onclick="updateQuantity(1)">+</button>
+                    <button type="button" onclick="updateQuantity(-1)"
+                        style="width:32px;height:32px;border:none;background:#f0f0f0;border-radius:6px;cursor:pointer;font-size:16px;">−</button>
+                    <input type="text" id="quantityClaim" name="quantity_claim" value="1"
+                        readonly style="width:50px;text-align:center;border:1.5px solid #ccc;border-radius:6px;padding:6px;">
+                    <button type="button" onclick="updateQuantity(1)"
+                        style="width:32px;height:32px;border:none;background:#f0f0f0;border-radius:6px;cursor:pointer;font-size:16px;">+</button>
                 </div>
             </div>
 
@@ -907,9 +994,8 @@ function render_comments($comments, $donation_id, $parent_id = NULL) {
                     <?php foreach ($user_projects as $project): ?>
                         <option value="<?= $project['project_id'] ?>"><?= htmlspecialchars($project['project_name']) ?></option>
                     <?php endforeach; ?>
-                    </select>
-                </div>
-
+                </select>
+            </div>
 
             <div class="form-group">
                 <label>Urgency Level:</label>
@@ -920,13 +1006,14 @@ function render_comments($comments, $donation_id, $parent_id = NULL) {
                 </select>
             </div>
 
-            <div style="margin-top:15px;">
+            <div class="popup-btn-group">
                 <button type="submit" name="submit_request_donation" class="request-btn">Submit Request</button>
-                <button type="button" class="close-btn" onclick="closeRequestPopup()">Cancel</button>
+                <button type="button" class="cancel-btn" onclick="closeRequestPopup()">Cancel</button>
             </div>
         </form>
     </div>
 </div>
+
 
 <!-- Request Success Popup -->
 <div id="requestSuccessPopup" class="popup-container" style="display:none;">
@@ -1416,5 +1503,311 @@ function updateQuantity(change) {
     });
 });
 </script>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // Utilities
+    const qs = sel => document.querySelector(sel);
+    const qsa = sel => Array.from(document.querySelectorAll(sel));
+    function escapeHtml(unsafe) {
+        if (!unsafe) return '';
+        return unsafe.replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m]));
+    }
+
+    // Toggle comments panels
+    window.toggleComments = (button, donationId) => {
+        const commentsSection = document.getElementById('comments-' + donationId);
+        if (!commentsSection) return;
+        const isVisible = commentsSection.style.display === 'block';
+        commentsSection.style.display = isVisible ? 'none' : 'block';
+        button.innerHTML = isVisible ? '<i class="fas fa-comment"></i> Comments' : '<i class="fas fa-times"></i> Close Comments';
+    };
+
+    // ---- Time display (Accurate + Auto-update) ----
+    function formatTimeDifferenceFromISO(isoString) {
+        if (!isoString) return '';
+        const commentDate = new Date(isoString);
+        if (isNaN(commentDate)) return '';
+
+        const now = new Date();
+        const diffSec = Math.floor((now - commentDate) / 1000);
+        if (diffSec < 10) return 'Just now';
+        if (diffSec < 60) return `${diffSec}s ago`;
+        if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+        if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
+        if (diffSec < 7 * 86400) return `${Math.floor(diffSec / 86400)}d ago`;
+
+        // Older → show full readable Manila local time
+        return commentDate.toLocaleString('en-PH', {
+            timeZone: 'Asia/Manila',
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true
+        });
+    }
+
+    function refreshAllCommentTimes() {
+        document.querySelectorAll('.comment-time').forEach(el => {
+            const iso = el.dataset.time;
+            if (!iso) return;
+            el.textContent = formatTimeDifferenceFromISO(iso);
+        });
+    }
+    refreshAllCommentTimes();
+    setInterval(refreshAllCommentTimes, 60000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshAllCommentTimes(); });
+
+    // ---- Reply / Edit / Delete handlers ----
+    document.addEventListener('click', async (e) => {
+        // find comment item
+        const item = e.target.closest('.comment-item');
+        // REPLY
+        if (e.target.classList.contains('reply-btn')) {
+            e.preventDefault();
+            // remove existing reply box
+            const existing = document.querySelector('.reply-box');
+            if (existing) existing.remove();
+
+            const replyForm = document.createElement('form');
+            replyForm.className = 'reply-box';
+            replyForm.innerHTML = `
+                <textarea name="reply" class="comment-input" placeholder="Write a reply..." required style="width:100%;min-height:60px;margin:8px 0;"></textarea>
+                <div style="display:flex;gap:8px;align-items:center;">
+                    <button type="submit" class="comment-submit">Reply</button>
+                    <button type="button" class="reply-cancel">Cancel</button>
+                </div>
+            `;
+
+            // insert after the comment item (so it's visually below)
+            item.insertAdjacentElement('afterend', replyForm);
+            replyForm.reply.focus();
+
+            replyForm.querySelector('.reply-cancel').addEventListener('click', () => replyForm.remove());
+
+            replyForm.addEventListener('submit', async (ev) => {
+                ev.preventDefault();
+                const text = replyForm.reply.value.trim();
+                if (!text) return;
+
+                const donationId = item.dataset.donationId;
+                const parentId = item.dataset.id;
+
+                // send to homepage.php via AJAX
+                try {
+                    const payload = new URLSearchParams();
+                    payload.append('donation_id', donationId);
+                    payload.append('comment_text', text);
+                    payload.append('parent_id', parentId);
+
+                    const res = await fetch('homepage.php', {
+                        method: 'POST',
+                        headers: { 'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: payload.toString()
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        // Build new reply element
+                        const li = document.createElement('li');
+                        li.className = 'comment-item';
+                        li.dataset.id = data.comment_id;
+                        li.dataset.donationId = donationId;
+
+                        const nowIso = data.created_iso || new Date().toISOString();
+
+                        li.innerHTML = `
+                            <div class="comment-avatar">${data.user_initial}</div>
+                            <div class="comment-content">
+                                <div class="comment-author">${data.user_name}</div>
+                                <div class="comment-text">${data.comment_text}</div>
+                                <div class="comment-time" data-time="${nowIso}">Just now</div>
+                                <div class="comment-actions">
+                                    <button class="reply-btn">Reply</button>
+                                    <button class="edit-btn">Edit</button>
+                                    <button class="delete-btn">Delete</button>
+                                </div>
+                            </div>
+                        `;
+
+                        // find or create reply-list under the parent item
+                        let replyList = item.querySelector('.reply-list');
+                        if (!replyList) {
+                            replyList = document.createElement('ul');
+                            replyList.className = 'reply-list';
+                            item.appendChild(replyList);
+                        }
+                        replyList.appendChild(li);
+                        replyForm.remove();
+                        refreshAllCommentTimes();
+                    } else {
+                        alert(data.message || 'Failed to post reply.');
+                    }
+                } catch (err) {
+                    console.error(err);
+                    alert('Error posting reply.');
+                }
+            });
+            return;
+        }
+
+        // EDIT
+        if (e.target.classList.contains('edit-btn')) {
+            e.preventDefault();
+            const contentEl = item.querySelector('.comment-text');
+            const btn = e.target;
+            const originalText = contentEl.innerHTML;
+
+            // make editable
+            const textarea = document.createElement('textarea');
+            textarea.className = 'edit-textarea';
+            textarea.value = contentEl.textContent.trim();
+            textarea.style.width = '100%';
+            textarea.style.minHeight = '60px';
+
+            contentEl.replaceWith(textarea);
+            btn.textContent = 'Save';
+
+            const saveHandler = async () => {
+                const newText = textarea.value.trim();
+                if (!newText) { alert('Empty comment.'); return; }
+
+                const payload = new FormData();
+                payload.append('id', item.dataset.id);
+                payload.append('content', newText);
+
+                try {
+                    const res = await fetch('edit_comment.php', { method: 'POST', body: payload });
+                    const result = await res.json();
+                    if (result.success) {
+                        const newDiv = document.createElement('div');
+                        newDiv.className = 'comment-text';
+                        newDiv.innerHTML = escapeHtml(newText).replace(/\n/g, '<br>');
+                        textarea.replaceWith(newDiv);
+                        btn.textContent = 'Edit';
+                    } else {
+                        alert(result.message || 'Edit failed.');
+                        textarea.replaceWith((() => {
+                            const orig = document.createElement('div');
+                            orig.className = 'comment-text';
+                            orig.innerHTML = originalText;
+                            return orig;
+                        })());
+                        btn.textContent = 'Edit';
+                    }
+                } catch (err) {
+                    console.error(err);
+                    alert('Network error editing comment.');
+                }
+                btn.removeEventListener('click', saveHandler);
+            };
+
+            btn.addEventListener('click', saveHandler, { once: true });
+            return;
+        }
+
+        // DELETE
+        if (e.target.classList.contains('delete-btn')) {
+            e.preventDefault();
+            if (!confirm('Delete this comment (and its replies)?')) return;
+
+            const payload = new FormData();
+            payload.append('id', item.dataset.id);
+
+            try {
+                const res = await fetch('delete_comment.php', { method: 'POST', body: payload });
+                const result = await res.json();
+                if (result.success) {
+                    item.style.transition = 'opacity .25s';
+                    item.style.opacity = '0';
+                    setTimeout(() => item.remove(), 250);
+                } else {
+                    alert(result.message || 'Delete failed.');
+                }
+            } catch (err) {
+                console.error(err);
+                alert('Network error while deleting.');
+            }
+            return;
+        }
+    });
+
+    // ---- Inline posting from top-level forms (non-AJAX fallback) ----
+    // If your page has forms that POST normally, keep that behavior.
+    // Optionally you can intercept .post-comment-btn to AJAX post too.
+
+    // Optional: intercept top-level comment forms to post via AJAX for immediate UI update
+    document.querySelectorAll('form[action="homepage.php"]').forEach(form => {
+        // only handle those with a textarea named comment_text
+        const txt = form.querySelector('textarea[name="comment_text"]');
+        if (!txt) return;
+        form.addEventListener('submit', async (ev) => {
+            ev.preventDefault();
+            const donationId = form.querySelector('input[name="donation_id"]').value;
+            const text = txt.value.trim();
+            if (!text) return;
+            try {
+                const payload = new URLSearchParams();
+                payload.append('donation_id', donationId);
+                payload.append('comment_text', text);
+                // no parent_id for top-level
+
+                const res = await fetch('homepage.php', {
+                    method: 'POST',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: payload.toString()
+                });
+                const data = await res.json();
+                if (data.success) {
+                    // prepend new top-level comment to the .comments-list inside the donation's section
+                    const list = form.closest('.comments-section').querySelector('.comments-list');
+                    const li = document.createElement('li');
+                    li.className = 'comment-item';
+                    li.dataset.id = data.comment_id;
+                    li.dataset.donationId = donationId;
+                    const nowIso = data.created_iso || new Date().toISOString();
+                    li.innerHTML = `
+                        <div class="comment-avatar">${data.user_initial}</div>
+                        <div class="comment-content">
+                            <div class="comment-author">${data.user_name}</div>
+                            <div class="comment-text">${data.comment_text}</div>
+                            <div class="comment-time" data-time="${nowIso}">Just now</div>
+                            <div class="comment-actions">
+                                <button class="reply-btn">Reply</button>
+                                <button class="edit-btn">Edit</button>
+                                <button class="delete-btn">Delete</button>
+                            </div>
+                        </div>
+                    `;
+                    // If there was a "no-comments" element, remove it
+                    const noComments = list.querySelector('.no-comments');
+                    if (noComments) noComments.remove();
+
+                    // insert at top
+                    list.insertBefore(li, list.firstChild);
+                    txt.value = '';
+                    refreshAllCommentTimes();
+                } else {
+                    alert(data.message || 'Failed to post comment.');
+                }
+            } catch (err) {
+                console.error(err);
+                alert('Failed to post comment.');
+            }
+        });
+    });
+
+    
+}); // DOMContentLoaded
+
+function toggleReplyForm(commentId) {
+    const form = document.getElementById(`reply-form-${commentId}`);
+    if (!form) return;
+    form.style.display = form.style.display === 'none' || form.style.display === '' ? 'block' : 'none';
+}
+
+</script>
+
 </body>
 </html>

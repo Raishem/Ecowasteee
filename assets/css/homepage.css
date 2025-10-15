@@ -505,9 +505,11 @@ header {
 
 /* Comments Section */
 .comments-section {
+    background: #f9fafb;
+    border-radius: 10px;
+    padding: 15px;
     margin-top: 15px;
-    padding-top: 15px;
-    border-top: 1px solid #eee;
+    border: 1px solid #e3e6e8;
 }
 
 .comments-list {
@@ -517,10 +519,13 @@ header {
 }
 
 .comment {
-    padding: 10px;
-    margin-bottom: 10px;
-    background-color: #f9f9f9;
-    border-radius: 4px;
+    background: #fff;
+    border-radius: 10px;
+    padding: 12px 15px;
+    margin-bottom: 12px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+    border-left: 4px solid #4CAF50;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 .comment-author {
@@ -529,9 +534,154 @@ header {
     margin-bottom: 5px;
 }
 
+
+.comment:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.07);
+}
+
+.comment-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+
+
+.comment-time {
+    font-size: 12px;
+    color: #888;
+}
+
 .comment-text {
     color: #333;
-    margin: 0;
+    font-size: 14px;
+    line-height: 1.6;
+    margin-bottom: 8px;
+}
+
+.comment-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.comment-actions button {
+    border: none;
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-weight: 600;
+}
+
+.comment-actions .reply-btn {
+    background-color: #e8f5e9;
+    color: #2e7d32;
+}
+
+.comment-actions .reply-btn:hover {
+    background-color: #c8e6c9;
+}
+
+.comment-actions .edit-btn {
+    background-color: #e3f2fd;
+    color: #1565c0;
+}
+
+.comment-actions .edit-btn:hover {
+    background-color: #bbdefb;
+}
+
+.comment-actions .delete-btn {
+    background-color: #ffebee;
+    color: #c62828;
+}
+
+.comment-actions .delete-btn:hover {
+    background-color: #ffcdd2;
+}
+
+.comment-actions i {
+    font-size: 12px;
+}
+
+/* Reply button style */
+.edit-btn {
+    background: transparent;
+    border: none;
+    color: #4CAF50;
+    font-size: 13px;
+    cursor: pointer;
+    font-weight: 600;
+    padding: 0;
+    transition: color 0.2s;
+}
+
+.edit-btn:hover {
+    color: #2e7d32;
+}
+
+/* Reply button style */
+.reply-btn {
+    background: transparent;
+    border: none;
+    color: #4CAF50;
+    font-size: 13px;
+    cursor: pointer;
+    font-weight: 600;
+    padding: 0;
+    transition: color 0.2s;
+}
+
+.reply-btn:hover {
+    color: #2e7d32;
+}
+
+/* Reply indentation */
+.comment.reply {
+    margin-left: 30px;
+    border-left: 3px solid #c8e6c9;
+    background: #fcfdfc;
+}
+
+/* Comment textarea style */
+.comment-textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1.5px solid #cdd8cf;
+    border-radius: 8px;
+    resize: vertical;
+    font-family: 'Open Sans', sans-serif;
+    font-size: 14px;
+    margin-bottom: 10px;
+    background-color: #fff;
+}
+
+.comment-textarea:focus {
+    outline: none;
+    border-color: #4CAF50;
+    box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.15);
+}
+
+/* Post comment button */
+.post-comment-btn {
+    background: #2e7d32;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+.post-comment-btn:hover {
+    background: #43a047;
 }
 
 .no-comments {
@@ -825,69 +975,202 @@ header {
 }
 
 
-/* Popup Styles */
 .popup-container {
-    display: none; /* hidden by default */
     position: fixed;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(0,0,0,0.6); /* darker backdrop */
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.45);
+    display: none;
     justify-content: center;
     align-items: center;
-    z-index: 2000; /* above everything */
+    z-index: 9999;
 }
 
 .popup-content {
     background: #fff;
     padding: 25px 30px;
     border-radius: 12px;
-    width: 100%;
-    max-width: 480px;
-    max-height: 90vh;
-    overflow-y: auto;
-    box-shadow: 0 6px 18px rgba(0,0,0,0.25);
-    position: relative;
-    animation: fadeInScale 0.3s ease;
+    width: 420px;
+    max-width: 90%;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    animation: fadeIn 0.3s ease;
 }
-
-.popup-container.closing .popup-content {
-  animation: fadeOutScale 0.3s ease forwards;
-}
-
-/* Blur effect when modal is active */
-.popup-container.blurred {
-    filter: blur(4px);
-    pointer-events: none; /* prevent clicking behind */
-}
-
-
 
 .popup-content h2 {
-    margin: 0 0 20px;
-    color: #2e8b57;
-    font-size: 1.6rem;
+    font-family: 'Montserrat', sans-serif;
     text-align: center;
 }
 
-/* Form groups */
-.popup-content .form-group {
-    margin-bottom: 18px;
-}
-.popup-content label {
-    display: block;
-    margin-bottom: 6px;
-    font-weight: 600;
-    color: #333;
+@keyframes fadeIn {
+    from {opacity: 0; transform: scale(0.95);}
+    to {opacity: 1; transform: scale(1);}
 }
 
+/* === Popup button group === */
+.popup-btn-group {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 20px;
+}
+
+/* Submit Button (Green) */
+.popup-btn-group .request-btn {
+    background-color: #2e7d32;
+    color: #fff;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: 0.2s ease;
+}
+
+.popup-btn-group .request-btn:hover {
+    background-color: #256428;
+    transform: scale(1.03);
+}
+
+/* Cancel Button (Gray) */
+.popup-btn-group .cancel-btn {
+    background-color: #e0e0e0;
+    color: #333;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: 0.2s ease;
+}
+
+.popup-btn-group .cancel-btn:hover {
+    background-color: #ccc;
+    transform: scale(1.03);
+}
+
+.reply-list {
+    margin-left: 40px;
+    margin-top: 10px;
+    list-style: none;
+    padding-left: 0;
+}
+
+.reply-item {
+    display: flex;
+    margin-bottom: 8px;
+}
+
+.comment-avatar.small {
+    width: 28px;
+    height: 28px;
+    font-size: 13px;
+}
+
+.comment-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background-color: #81c784; /* soft green */
+    color: white;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+}
+
+.reply-form {
+    margin-left: 40px;
+    margin-top: 8px;
+}
+
+.reply-input {
+    width: 100%;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    padding: 6px;
+    resize: none;
+}
+
+.reply-submit-btn {
+    margin-top: 6px;
+    background: #2e7d32;
+    color: white;
+    border: none;
+    padding: 5px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+
+/* Buttons */
+.request-btn {
+    background-color: #2e7d32;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 10px 20px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.request-btn:hover {
+    background-color: #256828;
+}
+
+.close-btn {
+    background-color: #f1f1f1;
+    color: #333;
+    border: none;
+    border-radius: 6px;
+    padding: 10px 20px;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.close-btn:hover {
+    background-color: #ddd;
+}
+
+/* Form Styling */
 .form-group {
-    margin-bottom: 20px;
+    margin-bottom: 15px;
 }
 
 .form-group label {
     display: block;
-    margin-bottom: 8px;
-    font-weight: bold;
+    font-weight: 600;
+    margin-bottom: 5px;
     color: #333;
+}
+
+.form-group select {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1.5px solid #cfcfcf;
+    border-radius: 8px;
+    background-color: #fff;
+    font-family: 'Open Sans', sans-serif;
+    font-size: 15px;
+    color: #333;
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='8' viewBox='0 0 10 8'><path fill='%23666' d='M1 1l4 4 4-4'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 10px 8px;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.form-group select:hover {
+    border-color: #2e7d32;
+}
+
+.form-group select:focus {
+    border-color: #2e7d32;
+    box-shadow: 0 0 0 3px rgba(46, 125, 50, 0.15);
+    outline: none;
 }
 
 .form-group select,
@@ -1575,11 +1858,7 @@ input[type="file"] {
             margin: 0;
         }
         
-        /* Fix for comment section */
-        .comments-section {
-            max-height: 300px;
-            overflow-y: auto;
-        }
+
         
         .comment-text {
             max-height: 100px;
