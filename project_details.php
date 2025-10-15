@@ -90,59 +90,32 @@ try {
         // helper to detect AJAX requests
         $is_ajax_request = (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') || (isset($_SERVER['HTTP_ACCEPT']) && strpos($_SERVER['HTTP_ACCEPT'], 'application/json') !== false);
         if (isset($_POST['update_project'])) {
-            // Update project details
-            $name = trim($_POST['project_name']);
-            $description = trim($_POST['project_description']);
-            
-            if (empty($name)) {
+            // Update project details (minimal safe implementation)
+            $name = isset($_POST['project_name']) ? trim($_POST['project_name']) : '';
+            $description = isset($_POST['project_description']) ? trim($_POST['project_description']) : '';
+
+            if ($name === '') {
                 $error_message = "Project name is required.";
             } else {
-                $update_stmt = $conn->prepare("
-                    UPDATE projects 
-                    SET project_name = ?, description = ? 
-                    WHERE project_id = ? AND user_id = ?
-                ");
-                $update_stmt->bind_param("ssii", $name, $description, $project_id, $_SESSION['user_id']);
-                $update_stmt->execute();
-                $success_message = "Project updated successfully!";
-                
-                // Refresh project data
-                $project['project_name'] = $name;
-                $project['description'] = $description;
-            }
-        } elseif (isset($_POST['add_material'])) {
-            // Add new material
-            $material_name = trim($_POST['material_name']);
-            $quantity = (int)$_POST['quantity'];
-            
-            if (empty($material_name) || $quantity <= 0) {
-                $error_message = "Valid material name and quantity are required.";
-                if ($is_ajax_request) {
-                    header('Content-Type: application/json');
-                    echo json_encode(['success' => false, 'message' => $error_message]);
-                    exit();
+                try {
+                    $u = $conn->prepare("UPDATE projects SET project_name = ?, description = ? WHERE project_id = ? AND user_id = ?");
+                    if ($u) {
+                        $u->bind_param('ssii', $name, $description, $project_id, $_SESSION['user_id']);
+                        $u->execute();
+                        $success_message = 'Project updated successfully';
+                        if ($is_ajax_request) {
+                            header('Content-Type: application/json');
+                            echo json_encode(['success' => true]);
+                            exit();
+                        }
+                        header("Location: project_details.php?id=$project_id&success=updated");
+                        exit();
+                    }
+                } catch (Exception $e) {
+                    $error_message = 'Failed to update project';
                 }
-            } else {
-                $add_stmt = $conn->prepare("
-                    INSERT INTO project_materials (project_id, material_name, quantity, status) 
-                    VALUES (?, ?, ?, 'needed')
-                ");
-                $add_stmt->bind_param("isi", $project_id, $material_name, $quantity);
-                $add_stmt->execute();
-                $success_message = "Material added successfully!";
-                // If AJAX, return the newly created material data
-                if ($is_ajax_request) {
-                    $new_id = $conn->insert_id;
-                    header('Content-Type: application/json');
-                    echo json_encode(['success' => true, 'material' => ['material_id' => (int)$new_id, 'material_name' => $material_name, 'quantity' => $quantity, 'status' => 'needed']]);
-                    exit();
-                }
-
-                // Refresh the page to show new material (non-AJAX)
-                header("Location: project_details.php?id=$project_id&success=material_added");
-                exit();
             }
-        } elseif (isset($_POST['remove_material'])) {
+    } elseif (isset($_POST['remove_material'])) {
             // Remove material
             $material_id = (int)$_POST['material_id'];
             $remove_stmt = $conn->prepare("
@@ -218,13 +191,9 @@ try {
                     $crow = $cres->fetch_assoc();
                     $not_obtained = $crow ? (int)$crow['not_obtained'] : 0;
                     if ($not_obtained === 0) {
+                        // All materials obtained — inform client so it can request stage completion via complete_stage.php
+                        // Do NOT auto-mark the stage here; that would bypass server-side checks (e.g., required photos).
                         $stage_completed = true;
-                        // mark the project stage 'Material Collection' as completed if such a stage exists
-                        try {
-                            $mark = $conn->prepare("UPDATE project_stages SET is_completed = 1, completed_at = NOW() WHERE project_id = ? AND stage_number = 1");
-                            $mark->bind_param("i", $project_id);
-                            $mark->execute();
-                        } catch (Exception $e) { /* ignore */ }
                     }
                 } catch (Exception $e) { /* ignore */ }
 
@@ -696,13 +665,23 @@ document.addEventListener('DOMContentLoaded', function() {
                                         // Ensure actions area is cleared (no buttons on obtained)
                                         actions.innerHTML = '';
 
+                                        // Ensure a material-photos container exists (some server-rendered items may not have one)
+                                        let photos = materialItem.querySelector('.material-photos');
+                                        if (!photos) {
+                                            const main = materialItem.querySelector('.material-main');
+                                            photos = document.createElement('div');
+                                            photos.className = 'material-photos';
+                                            photos.setAttribute('data-material-id', mid);
+                                            if (main && main.parentNode) main.parentNode.insertBefore(photos, main.nextSibling);
+                                            else materialItem.appendChild(photos);
+                                        }
+
                                         // Ensure upload camera button is shown beside the Obtained badge (in .mat-meta) if no photo exists
-                                        const photos = materialItem.querySelector('.material-photos');
                                         const metaEl = materialItem.querySelector('.mat-meta');
                                         const hasPhotoNow = photos && photos.querySelector('.material-photo');
                                         if (metaEl && !hasPhotoNow) {
                                             // remove any placeholder that might be under photos
-                                            if (photos) photos.querySelectorAll('.material-photo-placeholder').forEach(n=>n.remove());
+                                            photos.querySelectorAll('.material-photo.placeholder').forEach(n=>n.remove());
                                             // avoid duplicate buttons
                                             if (!metaEl.querySelector('.upload-material-photo')) {
                                                 const btn = document.createElement('button');
@@ -711,6 +690,9 @@ document.addEventListener('DOMContentLoaded', function() {
                                                 metaEl.appendChild(btn);
                                             }
                                         }
+
+                                        // refresh stage completion button state (in case this change satisfies requirements)
+                                        try { refreshMaterialCollectionReqState(); } catch(e){/* ignore */}
                                     } else {
                                         // restore basic buttons (attempt minimal update)
                                         const btnToggle = materialItem.querySelector('form button[name="update_material_status"]');
@@ -721,8 +703,34 @@ document.addEventListener('DOMContentLoaded', function() {
 
                             // If server reports that the stage completed (all materials obtained), reload to reflect the next stage
                             if (data.stage_completed) {
-                                showToast('All materials obtained — advancing stage');
-                                setTimeout(()=> location.reload(), 700);
+                                showToast('All materials obtained — attempting to complete Material Collection stage');
+                                // Find the Material Collection stage button and invoke its template-numbered completion handler
+                                setTimeout(()=>{
+                                    try {
+                                        const container = document.querySelector('.workflow-stages-container');
+                                        if (container) {
+                                            const btn = container.querySelector('button.complete-stage-btn[data-stage-number]');
+                                            // Prefer the button whose title or nearby heading contains "Material"
+                                            let target = null;
+                                            const candidateButtons = container.querySelectorAll('button.complete-stage-btn[data-stage-number]');
+                                            candidateButtons.forEach(b => {
+                                                if (target) return;
+                                                const stageWrap = b.closest('.workflow-stage, .stage-card');
+                                                if (stageWrap && /material/i.test(stageWrap.textContent || '')) target = b;
+                                            });
+                                            if (!target && candidateButtons.length) target = candidateButtons[0];
+                                            if (target) {
+                                                const tn = parseInt(target.getAttribute('data-stage-number'), 10);
+                                                if (!isNaN(tn)) completeStage(null, tn, projectId);
+                                                else location.reload();
+                                            } else {
+                                                location.reload();
+                                            }
+                                        } else {
+                                            location.reload();
+                                        }
+                                    } catch (e) { location.reload(); }
+                                }, 300);
                             }
                         } else {
                             showToast((data && (data.error || data.message)) || 'Failed to update material status', 'error');
@@ -842,7 +850,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 const photos = li.querySelector('.material-photos');
                                 if (photos && !photos.querySelector('.material-photo')) {
                                     // remove any old placeholder
-                                    photos.querySelectorAll('.material-photo-placeholder').forEach(n=>n.remove());
+                                    photos.querySelectorAll('.material-photo.placeholder').forEach(n=>n.remove());
                                     const metaEl = li.querySelector('.mat-meta');
                                     if (metaEl && !metaEl.querySelector('.upload-material-photo')) {
                                         const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'btn small upload-material-photo'; btn.setAttribute('data-material-id', mid); btn.title = 'Upload photo'; btn.innerHTML = '<i class="fas fa-camera"></i>';
@@ -1140,7 +1148,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         li.className = 'material-item';
                         li.setAttribute('data-material-id', mat.material_id);
                         // Build consistent structure: main, actions, photos
-                        li.innerHTML = `<div class="material-main"><span class="mat-name">${mat.material_name}</span>${mat.quantity ? '<span class="mat-qty">' + mat.quantity + '</span>' : '<span class="mat-qty">0</span>'}</div>`;
+                        li.innerHTML = `<div class="material-main"><span class="mat-name">${mat.material_name}</span><div class="mat-meta">${mat.quantity ? '<span class="mat-qty">' + mat.quantity + '</span>' : '<span class="mat-qty">0</span>'}</div></div>`;
                         // actions: default to needed unless server returned status
                         const initialStatus = mat.status && mat.status !== '' ? mat.status : 'needed';
                         if (initialStatus === 'needed') {
@@ -1178,7 +1186,46 @@ document.addEventListener('DOMContentLoaded', function() {
         })();
     });
 
+    // Initialize Material Collection completion state on load
+    document.addEventListener('DOMContentLoaded', function(){ try{ refreshMaterialCollectionReqState(); }catch(e){} });
+
     // Delegated handler: upload photo for a specific material
+    // Helper: recompute whether Material Collection stage requirements are satisfied
+    function refreshMaterialCollectionReqState(){
+        try {
+            const materialsNode = document.querySelector('.stage-materials');
+            if (!materialsNode) return;
+            // climb to the nearest stage container (stage-card or workflow-stage)
+            const stageCard = materialsNode.closest('.stage-card') || materialsNode.closest('.workflow-stage') || materialsNode.parentElement;
+            if (!stageCard) return;
+            const btn = stageCard.querySelector('.stage-actions button[data-stage-number]');
+            if (!btn) return;
+
+            // compute total materials and how many are obtained or have photos
+            const items = Array.from(materialsNode.querySelectorAll('.material-item'));
+            const total = items.length;
+            let have = 0;
+            items.forEach(li => {
+                const statusBadge = li.querySelector('.badge.obtained');
+                const photos = li.querySelector('.material-photos');
+                const hasPhoto = photos && photos.querySelector('.material-photo');
+                if (statusBadge || hasPhoto) have++;
+            });
+            const reqOk = total === 0 ? true : (have >= total);
+
+            // toggle disabled state and tooltip
+            if (!reqOk && !btn.dataset.forceEnabled) {
+                btn.setAttribute('disabled', '');
+                btn.title = 'Requirements not met for this stage';
+                btn.dataset.reqOk = '0';
+            } else {
+                btn.removeAttribute('disabled');
+                btn.title = '';
+                btn.dataset.reqOk = '1';
+            }
+        } catch(e){ console.error('refreshMaterialCollectionReqState failed', e); }
+    }
+
     document.addEventListener('click', function(e){
         const btn = e.target.closest('.upload-material-photo');
         if (!btn) return;
@@ -1203,7 +1250,20 @@ document.addEventListener('DOMContentLoaded', function() {
                     showToast('Photo uploaded');
                     // Insert thumbnail into material's photo container
                     try {
-                        const photos = document.querySelector('.material-photos[data-material-id="' + mid + '"]');
+                        let photos = document.querySelector('.material-photos[data-material-id="' + mid + '"]');
+                        // create container if missing (some items rendered without it)
+                        if (!photos) {
+                            const item = document.querySelector('.material-item[data-material-id="' + mid + '"]');
+                            if (item) {
+                                photos = document.createElement('div');
+                                photos.className = 'material-photos';
+                                photos.setAttribute('data-material-id', mid);
+                                // insert after the main row if present
+                                const main = item.querySelector('.material-main');
+                                if (main && main.parentNode) main.parentNode.insertBefore(photos, main.nextSibling);
+                                else item.appendChild(photos);
+                            }
+                        }
                         if (photos) {
                             // Remove any existing thumbnail (one photo per material)
                             photos.querySelectorAll('.material-photo').forEach(n=>n.remove());
@@ -1223,6 +1283,8 @@ document.addEventListener('DOMContentLoaded', function() {
                             }
                         }
                     } catch (e) { console.error('Failed to insert thumbnail', e); }
+                    // after successful upload, refresh stage completion state
+                    try { refreshMaterialCollectionReqState(); } catch(e){}
                 } else {
                     showToast(json && json.message ? json.message : 'Upload failed', 'error');
                 }
@@ -1266,6 +1328,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                     }
                 } catch(e) { console.error('Failed to restore camera button', e); }
+                // refresh stage completion state after delete
+                try { refreshMaterialCollectionReqState(); } catch(e){}
             } else {
                 alert(json && json.message ? json.message : 'Delete failed');
             }
@@ -1275,75 +1339,129 @@ document.addEventListener('DOMContentLoaded', function() {
     // expose modal opener globally so inline onclick="showAddMaterialModal()" works
     window.showAddMaterialModal = showAddMaterialModal;
 
+    // Material debug UI logic (visible only when ?debug=1)
+    (function(){
+        try {
+            const dbgPanel = document.getElementById('matDebugPanel');
+            if (!dbgPanel) return;
+            const summary = document.getElementById('matDebugSummary');
+            const recompute = document.getElementById('matDebugRecompute');
+            const copyBtn = document.getElementById('matDebugCopy');
+
+            function buildReport(){
+                const items = Array.from(document.querySelectorAll('.materials-list-stage .material-item'));
+                const total = items.length;
+                const okItems = [];
+                const missing = [];
+                items.forEach(li=>{
+                    const name = (li.querySelector('.mat-name') && li.querySelector('.mat-name').textContent.trim()) || ('#' + (li.dataset.materialId || ''));
+                    const badge = !!li.querySelector('.badge.obtained');
+                    const photo = !!li.querySelector('.material-photos .material-photo');
+                    if (badge || photo) okItems.push(name); else missing.push(name);
+                });
+                const report = [];
+                report.push('Total materials: ' + total);
+                report.push('Satisfied (obtained or photo): ' + okItems.length);
+                report.push('Missing: ' + missing.length + (missing.length ? '\n - ' + missing.join('\n - ') : ''));
+                return { text: report.join('\n'), total, ok: okItems.length, missing };
+            }
+
+            function refreshDebug(){
+                try {
+                    const r = buildReport();
+                    if (summary) summary.textContent = r.text;
+                    // also ensure the stage button state is recomputed
+                    refreshMaterialCollectionReqState();
+                } catch(e){ console.error(e); }
+            }
+
+            recompute && recompute.addEventListener('click', function(){ refreshDebug(); });
+            copyBtn && copyBtn.addEventListener('click', function(){ const r = buildReport(); navigator.clipboard && navigator.clipboard.writeText(r.text).then(()=>{ copyBtn.textContent='Copied'; setTimeout(()=> copyBtn.textContent='Copy',800); }).catch(()=>{ alert('Copy failed'); }); });
+
+            // initial run
+            refreshDebug();
+        } catch(e) { console.error('mat debug init', e); }
+    })();
+
     // Reconcile donations feature removed from UI.
 
 })();
 </script>
 
-<style>
-/* Enhanced material photos styling */
-.material-photos {
-    display: flex;
-    gap: 8px;
-    margin-top: 8px;
-    flex-wrap: wrap;
-}
+<!-- Styles moved to assets/css/project-stages.css -->
 
-.material-photo {
-    position: relative;
-    width: 60px;
-    height: 60px;
-    border-radius: 6px;
-    overflow: hidden;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    transition: all 0.2s ease;
-}
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+    const tabs = document.querySelectorAll('.stage-tab');
+    const stages = document.querySelectorAll('.workflow-stage');
 
-.material-photo:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-}
+    function showStageByIndex(idx){
+        // Toggle active classes on tabs and stages
+        tabs.forEach(t => t.classList.toggle('active', parseInt(t.dataset.stageIndex,10) === idx));
+        stages.forEach(s => s.classList.toggle('active', parseInt(s.getAttribute('data-stage-index'),10) === idx));
+        // update URL hash for shareable link
+        try {
+            const hash = '#step-' + idx;
+            if (history && history.replaceState) history.replaceState(null, '', hash);
+            else location.hash = hash;
+        } catch (e) {}
+    }
 
-.material-photo img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
+    // add click handlers and keyboard support
+    tabs.forEach((t, ti) => {
+        t.setAttribute('tabindex', '0');
+        t.dataset.stageIndex = t.dataset.stageIndex || ti;
+        t.addEventListener('click', function(){
+            const idx = parseInt(this.dataset.stageIndex,10);
+            if (isNaN(idx)) return;
+            // always activate the tab (this updates the URL hash via showStageByIndex)
+            showStageByIndex(idx);
+            // scroll the selected stage into view for clarity
+            const s = document.querySelector('.workflow-stage[data-stage-index="' + idx + '"]');
+            if (s) s.scrollIntoView({behavior:'smooth', block:'start'});
+        });
+        // keyboard nav: left/right to move, enter/space to activate
+        t.addEventListener('keydown', function(ev){
+            if (ev.key === 'ArrowRight' || ev.key === 'ArrowDown') {
+                ev.preventDefault();
+                const next = tabs[(ti + 1) % tabs.length];
+                if (next) next.focus();
+            } else if (ev.key === 'ArrowLeft' || ev.key === 'ArrowUp') {
+                ev.preventDefault();
+                const prev = tabs[(ti - 1 + tabs.length) % tabs.length];
+                if (prev) prev.focus();
+            } else if (ev.key === 'Enter' || ev.key === ' ') {
+                ev.preventDefault();
+                this.click();
+            }
+        });
+    });
 
-.material-photo-delete {
-    position: absolute;
-    top: 4px;
-    right: 4px;
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    background: rgba(231, 76, 60, 0.9);
-    color: white;
-    border: none;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    font-size: 10px;
-    opacity: 0;
-    transition: all 0.2s ease;
-}
+    // on load, check URL hash like #step-2 and open that step if present
+    try {
+        const m = (location.hash || '').match(/#step-(\d+)/i);
+        if (m && m[1]) {
+            const idx = parseInt(m[1], 10);
+            if (!isNaN(idx)) showStageByIndex(idx);
+        }
+    } catch (e) {}
+    // always show only the current stage by default (no 'show all' control)
+    // initialize to current active tab or index 0
+    (function(){
+        const active = document.querySelector('.stage-tab.active');
+        const idx = active ? parseInt(active.dataset.stageIndex,10) : 0;
+        showStageByIndex(idx);
+    })();
 
-.material-photo:hover .material-photo-delete {
-    opacity: 1;
-}
-
-.material-photo-delete:hover {
-    background: var(--danger);
-    transform: scale(1.1);
-}
-
-/* Hide zero quantity */
-.mat-qty:empty,
-.mat-qty[data-qty="0"] {
-    display: none;
-}
-</style>
+    // JS fallback: ensure locked tabs show not-allowed cursor on hover
+    try {
+        document.querySelectorAll('.stage-tab.locked').forEach(el => {
+            el.addEventListener('mouseenter', function(){ el.style.cursor = 'not-allowed'; el.style.pointerEvents = 'auto'; });
+            el.addEventListener('mouseleave', function(){ el.style.cursor = ''; });
+        });
+    } catch (e) { /* ignore */ }
+});
+</script>
 
             <!-- materials are shown inside the Material Collection stage now -->
 
@@ -1365,10 +1483,12 @@ document.addEventListener('DOMContentLoaded', function() {
                         $tpl_stmt->execute();
                         $tpl_res = $tpl_stmt->get_result();
                         while ($row = $tpl_res->fetch_assoc()) {
+                            // preserve the original template stage_number as 'template_number'
                             $workflow_stages[] = [
                                 'name' => $row['stage_name'],
                                 'description' => $row['description'],
-                                'number' => (int)$row['stage_number']
+                                'number' => (int)$row['stage_number'], // will be renumbered later
+                                'template_number' => (int)$row['stage_number']
                             ];
                         }
                     }
@@ -1382,13 +1502,25 @@ document.addEventListener('DOMContentLoaded', function() {
                         $filtered = [];
                         foreach ($workflow_stages as $st) {
                             $name = trim(strtolower($st['name'] ?? ''));
+
+                    // Replace the last stage name with "Share" (was Documentation)
+                    if (!empty($workflow_stages) && is_array($workflow_stages)) {
+                        $lastIndex = count($workflow_stages) - 1;
+                        if ($lastIndex >= 0) {
+                            // normalize keys which templates might use
+                            if (isset($workflow_stages[$lastIndex]['stage_name'])) $workflow_stages[$lastIndex]['stage_name'] = 'Share';
+                            if (isset($workflow_stages[$lastIndex]['name'])) $workflow_stages[$lastIndex]['name'] = 'Share';
+                            // also ensure description (optional)
+                            if (isset($workflow_stages[$lastIndex]['description'])) $workflow_stages[$lastIndex]['description'] = 'Share your project with others.';
+                        }
+                    }
                             if ($name === '') continue;
                             if (isset($seen[$name])) continue; // skip duplicates
                             $seen[$name] = true;
                             $filtered[] = $st;
                         }
-                        // renumber sequentially starting at 1
-                        foreach ($filtered as $i => &$fs) { $fs['number'] = $i + 1; }
+                        // renumber sequentially starting at 1 for UI ordering, but keep original template_number
+                        foreach ($filtered as $i => &$fs) { $fs['number'] = $i + 1; if (!isset($fs['template_number'])) $fs['template_number'] = $fs['number']; }
                         unset($fs);
                         $workflow_stages = array_values($filtered);
                     }
@@ -1415,7 +1547,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Build a mapping of template stage_number => index in $workflow_stages
                     $numToIndex = [];
                     foreach ($workflow_stages as $i => $st) {
-                        $num = isset($st['number']) ? (int)$st['number'] : ($i + 1);
+                        // Use the original template number if present; fall back to UI number
+                        $num = isset($st['template_number']) ? (int)$st['template_number'] : (isset($st['number']) ? (int)$st['number'] : ($i + 1));
                         $numToIndex[$num] = $i;
                     }
 
@@ -1517,6 +1650,60 @@ document.addEventListener('DOMContentLoaded', function() {
                     <div class="progress-fill" style="width: <?= $progress_percent ?>%;"></div>
                 </div>
 
+                <!-- Tabs: show step titles and highlight current -->
+                <div class="stage-tabs">
+                    <?php foreach ($workflow_stages as $i => $st): 
+                        $tn = isset($st['template_number']) ? (int)$st['template_number'] : (int)($st['stage_number'] ?? $st['number'] ?? $i + 1);
+                        // determine badge class
+                        $is_completed = array_key_exists($i, $completed_stage_map);
+                        $is_current = !$is_completed && ($i === $current_stage_index);
+                        $is_locked = !$is_completed && ($i > $current_stage_index);
+                        $badgeClass = $is_completed ? 'complete' : ($is_current ? 'current' : ($is_locked ? 'locked' : ''));
+
+                        // determine small thumbnail: prefer stage_photos, fallback to material photo for material collection
+                        $thumb = '';
+                        try {
+                            // stage photos
+                            $tp = $conn->prepare("SELECT photo_path FROM stage_photos WHERE project_id = ? AND stage_number = ? ORDER BY created_at DESC LIMIT 1");
+                            $tp->bind_param('ii', $project_id, $tn);
+                            $tp->execute();
+                            $tres = $tp->get_result()->fetch_assoc();
+                            if ($tres && !empty($tres['photo_path'])) $thumb = 'assets/uploads/' . $tres['photo_path'];
+                        } catch (Exception $e) { /* ignore */ }
+                        if (empty($thumb) && stripos($st['stage_name'] ?? $st['name'] ?? '', 'material') !== false) {
+                            try {
+                                $mp = $conn->prepare("SELECT photo_path FROM material_photos WHERE project_id = ? AND material_id IN (SELECT material_id FROM project_materials WHERE project_id = ?) ORDER BY created_at DESC LIMIT 1");
+                                $mp->bind_param('ii', $project_id, $project_id);
+                                $mp->execute();
+                                $mres = $mp->get_result()->fetch_assoc();
+                                if ($mres && !empty($mres['photo_path'])) $thumb = 'assets/uploads/' . $mres['photo_path'];
+                            } catch (Exception $e) { /* ignore */ }
+                        }
+                    ?>
+                        <?php
+                            $stage_name_lower = strtolower($st['stage_name'] ?? $st['name'] ?? '');
+                            $iconClass = 'fas fa-circle';
+                            if (stripos($stage_name_lower, 'material') !== false) $iconClass = 'fas fa-box-open';
+                            else if (stripos($stage_name_lower, 'prepar') !== false) $iconClass = 'fas fa-tools';
+                            else if (stripos($stage_name_lower, 'construct') !== false) $iconClass = 'fas fa-hard-hat';
+                            else if (stripos($stage_name_lower, 'finish') !== false) $iconClass = 'fas fa-paint-roller';
+                            else if (stripos($stage_name_lower, 'share') !== false) $iconClass = 'fas fa-share-alt';
+                            // Use !important on inline style to override any stylesheet rules that may use !important
+                            $inlineStyle = $is_locked ? 'style="cursor: not-allowed !important;"' : '';
+                        ?>
+                        <button <?= $inlineStyle ?> class="stage-tab <?php echo ($i === $current_stage_index) ? 'active' : ''; ?> <?php echo $is_locked ? 'locked' : ''; ?>" data-stage-index="<?= $i ?>" data-stage-number="<?= $tn ?>" aria-label="<?= htmlspecialchars($st['stage_name'] ?? $st['name'] ?? 'Step') ?>">
+                            <span class="tab-icon"><i class="<?= $iconClass ?>" aria-hidden="true"></i></span>
+                            <span class="tab-meta">
+                                <span class="tab-title"><?= htmlspecialchars($st['stage_name'] ?? $st['name'] ?? ('Step ' . ($i+1))) ?></span>
+                                <span class="tab-badge <?= $badgeClass ?>"><?php echo $is_completed ? 'Completed' : ($is_current ? 'Current' : ($is_locked ? 'Locked' : '')) ?></span>
+                            </span>
+                        </button>
+                    <?php endforeach; ?>
+                    <div style="margin-left:auto;font-size:13px;color:#666;">
+                        <!-- removed 'Show all steps' control for simplified UI -->
+                    </div>
+                </div>
+
                 <div class="workflow-stages-container stages-timeline">
                     <?php
                     // $completed_stage_map was built above. Use it to render stages.
@@ -1528,7 +1715,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         $is_locked = !$is_completed && ($index > $current_stage_index);
                         $stage_class = $is_completed ? 'completed' : ($is_current ? 'current' : 'locked');
                     ?>
-                        <div class="workflow-stage stage-card <?= $stage_class ?>">
+                        <?php $activeClass = $is_current ? 'active' : ''; ?>
+                        <div class="workflow-stage stage-card <?= $stage_class ?> <?= $activeClass ?>" data-stage-index="<?= $index ?>">
                                 <?php $icon = $stage_icons[$stage['number']] ?? 'fa-circle'; ?>
                                 <i class="fas <?= $icon ?> stage-icon" aria-hidden="true"></i>
                                 <div class="stage-content">
@@ -1572,6 +1760,16 @@ document.addEventListener('DOMContentLoaded', function() {
                             <?php if (strtolower(trim($stage['name'] ?? '')) === 'material collection'): ?>
     <div class="stage-materials">
         <h4>Materials Needed</h4>
+        <?php if (isset($is_debug) && $is_debug): ?>
+        <div id="matDebugPanel" style="border:1px dashed #bfe6c9;padding:10px;margin:8px 0;border-radius:8px;background:#f7fbf7;color:#0f5132;">
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+                <strong style="flex:1;">Material Collection Debug</strong>
+                <button id="matDebugRecompute" class="btn small" style="background:#fff;color:#1b543d;border:1px solid rgba(0,0,0,0.06);">Recompute</button>
+                <button id="matDebugCopy" class="btn small" style="background:#fff;color:#1b543d;border:1px solid rgba(0,0,0,0.06);">Copy</button>
+            </div>
+            <div id="matDebugSummary" style="font-size:13px;white-space:pre-wrap;max-height:160px;overflow:auto;background:transparent;padding:6px 4px;">Computing...</div>
+        </div>
+        <?php endif; ?>
         <?php if (empty($materials)): ?>
             <p class="empty-state">No materials listed.</p>
         <?php else: ?>
@@ -1702,7 +1900,8 @@ document.addEventListener('DOMContentLoaded', function() {
                                         $btn_title = 'Requirements not met for this stage';
                                     }
                                 ?>
-                                <button class="<?= $btn_classes ?>" onclick="completeStage(event, <?= $stage['number'] ?>, <?= $project_id ?>)" <?= $btn_disabled ? 'disabled' : '' ?> title="<?= htmlspecialchars($btn_title) ?>" data-req-ok="<?= $req_ok ? '1' : '0' ?>" data-stage-number="<?= $stage['number'] ?>">
+                                <?php $template_num = isset($stage['template_number']) ? (int)$stage['template_number'] : (int)$stage['number']; ?>
+                                <button class="<?= $btn_classes ?>" onclick="completeStage(event, <?= $template_num ?>, <?= $project_id ?>)" <?= $btn_disabled ? 'disabled' : '' ?> title="<?= htmlspecialchars($btn_title) ?>" data-req-ok="<?= $req_ok ? '1' : '0' ?>" data-stage-number="<?= $template_num ?>">
                                     <?php if ($is_completed): ?>
                                         <i class="fas fa-check"></i> Completed
                                     <?php else: ?>
@@ -2119,7 +2318,7 @@ document.addEventListener('DOMContentLoaded', function(){
 async function completeStage(event, stageNumber, projectId) {
     try {
         // event may be missing if invoked programmatically; guard accordingly
-        const btn = event && event.currentTarget ? event.currentTarget : (event && event.target ? event.target : null);
+    let btn = event && event.currentTarget ? event.currentTarget : (event && event.target ? event.target : null);
         if (btn && btn.tagName === 'I') {
             // if the icon was clicked, move up to the parent button
             const parent = btn.closest('button');
@@ -2148,9 +2347,16 @@ async function completeStage(event, stageNumber, projectId) {
             
             setTimeout(() => window.location.reload(), 1000);
         } else {
-            alert(data.message || 'Error completing stage');
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-check"></i> Mark as Complete';
+            // If server indicates missing stage photos, show a friendly modal with upload buttons
+            if (data.reason === 'missing_stage_photos' && Array.isArray(data.missing)) {
+                showStagePhotoModal(stageNumber, data.missing, projectId);
+            } else {
+                alert(data.message || 'Error completing stage');
+            }
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-check"></i> Mark as Complete';
+            }
         }
     } catch (error) {
         console.error('Error:', error);
@@ -2161,45 +2367,123 @@ async function completeStage(event, stageNumber, projectId) {
 }
 
 // Function to handle photo upload
-function uploadStagePhoto(stageNumber) {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    
-    input.onchange = async function(e) {
-        const file = e.target.files[0];
-        if (!file) return;
-        
-        // Check file size (max 5MB)
-        if (file.size > 5 * 1024 * 1024) {
-            alert('File size must be less than 5MB');
-            return;
-        }
-        
-        const formData = new FormData();
-        formData.append('photo', file);
-        formData.append('stage_number', stageNumber);
-        formData.append('project_id', <?= $project_id ?>);
-        
-        try {
-            const response = await fetch('upload_stage_photo.php', {
-                method: 'POST',
-                body: formData
-            });
-            
-            const data = await response.json();
-            if (data.success) {
-                window.location.reload();
-            } else {
-                alert(data.message || 'Error uploading photo');
+function uploadStagePhoto(stageNumber){
+    // Open the modal allowing selecting before/after and the file
+    showStagePhotoModal(stageNumber, null, projectId);
+}
+
+// Create and show a modal that allows uploading specific stage photo types
+function showStagePhotoModal(stageNumber, missingTypes, projectId){
+    // missingTypes: null or array like ['before','after']
+    let modal = document.getElementById('stagePhotoModal');
+    if (modal) modal.remove();
+
+    modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.id = 'stagePhotoModal';
+    modal.dataset.persistent = '0';
+
+    const types = Array.isArray(missingTypes) && missingTypes.length ? missingTypes : ['before','after','other'];
+
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width:520px;padding:18px;">
+            <h3 style="margin-top:0;">Upload stage photo</h3>
+            <p>Please upload the required photo(s) for this stage.</p>
+            <div id="stagePhotoButtons" style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0"></div>
+            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;">
+                <button data-action="close-stage-photo" class="btn">Close</button>
+                <button data-action="try-complete" class="btn btn-primary">Try to complete stage</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+    document.body.style.overflow = 'hidden';
+    requestAnimationFrame(()=> modal.classList.add('active'));
+
+    const container = modal.querySelector('#stagePhotoButtons');
+
+    function createUploader(type){
+        const wrapper = document.createElement('div');
+        wrapper.style.display = 'flex';
+        wrapper.style.flexDirection = 'column';
+        wrapper.style.alignItems = 'stretch';
+        wrapper.style.minWidth = '160px';
+
+        const label = document.createElement('div');
+        label.textContent = type.toUpperCase();
+        label.style.fontWeight = '600';
+        label.style.marginBottom = '6px';
+
+        const btn = document.createElement('button');
+        btn.className = 'btn';
+        btn.textContent = 'Upload ' + type;
+
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.style.display = 'none';
+
+        btn.addEventListener('click', ()=> input.click());
+
+        input.addEventListener('change', async function(e){
+            const file = input.files[0];
+            if (!file) return;
+            if (file.size > 5 * 1024 * 1024) { showToast('File must be <5MB', 'error'); return; }
+            const fd = new FormData();
+            fd.append('photo', file);
+            fd.append('photo_type', type);
+            fd.append('stage_number', stageNumber);
+            fd.append('project_id', projectId);
+
+            try {
+                btn.disabled = true;
+                btn.textContent = 'Uploading…';
+                const res = await fetch('upload_stage_photo.php', { method: 'POST', body: fd });
+                const j = await res.json();
+                if (j && j.success) {
+                    showToast(type + ' uploaded', 'success');
+                    // remove this uploader if it was a missing requirement
+                    if (Array.isArray(missingTypes)) {
+                        wrapper.remove();
+                        // if none left, auto-close or enable Try button
+                    } else {
+                        // leave as-is but show thumbnail? (omitted)
+                    }
+                } else {
+                    showToast(j && j.message ? j.message : 'Upload failed', 'error');
+                    btn.disabled = false;
+                    btn.textContent = 'Upload ' + type;
+                }
+            } catch (err) {
+                console.error(err);
+                showToast('Network error', 'error');
+                btn.disabled = false;
+                btn.textContent = 'Upload ' + type;
             }
-        } catch (error) {
-            console.error('Error:', error);
-            alert('Network error while uploading photo');
-        }
-    };
-    
-    input.click();
+        });
+
+        wrapper.appendChild(label);
+        wrapper.appendChild(btn);
+        wrapper.appendChild(input);
+        return wrapper;
+    }
+
+    types.forEach(t => container.appendChild(createUploader(t)));
+
+    // Close handlers
+    modal.querySelector('[data-action="close-stage-photo"]').addEventListener('click', function(){ modal.classList.remove('active'); setTimeout(()=>{ try{ modal.remove(); document.body.style.overflow = ''; }catch(e){} }, 220); });
+
+    modal.querySelector('[data-action="try-complete"]').addEventListener('click', function(){
+        // attempt to complete the stage now (re-use existing completeStage)
+        modal.classList.remove('active');
+        setTimeout(()=>{ try{ modal.remove(); document.body.style.overflow = ''; } catch(e){} }, 220);
+        // call completeStage programmatically without an event
+        completeStage(null, stageNumber, projectId);
+    });
+
+    // close if clicking overlay
+    modal.addEventListener('click', function(e){ if (e.target === modal) { modal.classList.remove('active'); setTimeout(()=>{ try{ modal.remove(); document.body.style.overflow = ''; }catch(e){} }, 220); } });
 }
 </script>
 </body>

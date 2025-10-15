@@ -58,11 +58,26 @@ try {
         $already_completed = ($r && (int)$r['is_completed'] === 1);
 
         // Helper: fetch stage name from template so we can apply stage-specific requirements
-        $name_stmt = $conn->prepare("SELECT stage_name FROM stage_templates WHERE stage_number = ? LIMIT 1");
-        $name_stmt->bind_param("i", $stage_number);
-        $name_stmt->execute();
-        $name_res = $name_stmt->get_result()->fetch_assoc();
-        $stage_name = $name_res ? strtolower($name_res['stage_name']) : '';
+        $stage_name = '';
+        try {
+            $name_stmt = $conn->prepare("SELECT stage_name FROM stage_templates WHERE stage_number = ? LIMIT 1");
+            $name_stmt->bind_param("i", $stage_number);
+            $name_stmt->execute();
+            $name_res = $name_stmt->get_result()->fetch_assoc();
+            if ($name_res && !empty($name_res['stage_name'])) {
+                $stage_name = strtolower($name_res['stage_name']);
+            } else {
+                // fallback: read any existing project_stages entry for a name
+                $ps = $conn->prepare("SELECT stage_name FROM project_stages WHERE project_id = ? AND stage_number = ? LIMIT 1");
+                $ps->bind_param("ii", $project_id, $stage_number);
+                $ps->execute();
+                $prs = $ps->get_result()->fetch_assoc();
+                if ($prs && !empty($prs['stage_name'])) $stage_name = strtolower($prs['stage_name']);
+            }
+        } catch (Exception $e) {
+            // ignore and continue with empty stage_name
+            $stage_name = '';
+        }
 
         // If attempting to complete (i.e., not already completed), enforce requirements
         if (!$already_completed) {
@@ -79,22 +94,56 @@ try {
                 exit;
             }
 
+            // Determine whether this template corresponds to a Material Collection stage.
+            // First check the fetched stage_name, then as a fallback scan templates for any stage with 'material' in the name
+            $isMaterialStage = ($stage_name !== '' && strpos($stage_name, 'material') !== false);
+            if (!$isMaterialStage) {
+                try {
+                    $scan = $conn->prepare("SELECT stage_number, stage_name FROM stage_templates WHERE LOWER(stage_name) LIKE '%material%'");
+                    $scan->execute();
+                    $sres = $scan->get_result();
+                    $materialTemplateNumbers = [];
+                    while ($sr = $sres->fetch_assoc()) {
+                        $materialTemplateNumbers[] = (int)$sr['stage_number'];
+                    }
+                    if (in_array($stage_number, $materialTemplateNumbers, true)) $isMaterialStage = true;
+                } catch (Exception $e) {
+                    // ignore scan errors
+                }
+            }
+
             // Example requirement: for material collection step, require every material to be obtained OR have at least one photo
-            if (strpos($stage_name, 'material') !== false) {
-                // count total materials for project
-                $totStmt = $conn->prepare("SELECT COUNT(*) AS total FROM project_materials WHERE project_id = ?");
-                $totStmt->bind_param("i", $project_id);
-                $totStmt->execute();
-                $tot = (int)$totStmt->get_result()->fetch_assoc()['total'];
+            if ($isMaterialStage) {
+                // For stage-level photo requirement (Option B): require at least one 'before' and one 'after' stage photo
+                try {
+                    $ptypeStmt = $conn->prepare("SELECT COALESCE(photo_type,'other') AS photo_type, COUNT(*) AS c FROM stage_photos WHERE project_id = ? AND stage_number = ? GROUP BY photo_type");
+                    $ptypeStmt->bind_param("ii", $project_id, $stage_number);
+                    $ptypeStmt->execute();
+                    $res = $ptypeStmt->get_result();
+                    $haveTypes = [];
+                    while ($row = $res->fetch_assoc()) {
+                        $pt = strtolower(trim($row['photo_type']));
+                        if ($pt === '') $pt = 'other';
+                        $haveTypes[$pt] = (int)$row['c'];
+                    }
 
-                // count materials that satisfy requirement: status='obtained' OR at least one photo exists
-                $haveStmt = $conn->prepare("SELECT COUNT(*) AS have FROM project_materials pm WHERE pm.project_id = ? AND (LOWER(pm.status) = 'obtained' OR EXISTS(SELECT 1 FROM material_photos mp WHERE mp.material_id = pm.material_id LIMIT 1))");
-                $haveStmt->bind_param("i", $project_id);
-                $haveStmt->execute();
-                $have = (int)$haveStmt->get_result()->fetch_assoc()['have'];
+                    $missing = [];
+                    if (!isset($haveTypes['before']) || $haveTypes['before'] <= 0) $missing[] = 'before';
+                    if (!isset($haveTypes['after']) || $haveTypes['after'] <= 0) $missing[] = 'after';
 
-                if ($tot > 0 && $have < $tot) {
-                    echo json_encode(['success' => false, 'message' => 'Cannot complete Material Collection: all materials must be obtained or have a photo before completing this stage.']);
+                    if (!empty($missing)) {
+                        echo json_encode([
+                            'success' => false,
+                            'message' => 'Cannot complete Material Collection: missing required stage photo(s)',
+                            'reason' => 'missing_stage_photos',
+                            'missing' => $missing,
+                            'have' => $haveTypes
+                        ]);
+                        exit;
+                    }
+                } catch (Exception $e) {
+                    // if something goes wrong with photo checks, fail-safe: disallow completion and report error
+                    echo json_encode(['success' => false, 'message' => 'Error verifying stage photos: ' . $e->getMessage()]);
                     exit;
                 }
             }
@@ -127,19 +176,10 @@ try {
         $unset->execute();
 
         echo json_encode(['success' => true, 'action' => 'uncompleted']);
+            exit; // ensure we do not fall through to the completion path below
 
     // Insert or update stage completion
-    $stmt = $conn->prepare("
-        INSERT INTO project_stages (project_id, stage_number, stage_name, is_completed, completed_at)
-        SELECT ?, stage_number, stage_name, 1, NOW()
-        FROM stage_templates
-        WHERE stage_number = ?
-        ON DUPLICATE KEY UPDATE is_completed = 1, completed_at = NOW()
-    ");
-    $stmt->bind_param("ii", $project_id, $stage_number);
-    $stmt->execute();
-    
-    echo json_encode(['success' => true]);
+        // No further action: successful branches above already returned.
     
 } catch (Exception $e) {
     echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);

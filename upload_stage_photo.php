@@ -16,6 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 $project_id = isset($_POST['project_id']) ? (int)$_POST['project_id'] : 0;
 $stage_number = isset($_POST['stage_number']) ? (int)$_POST['stage_number'] : 0;
+$photo_type = isset($_POST['photo_type']) ? trim($_POST['photo_type']) : 'other';
 
 if (!$project_id || !$stage_number) {
     echo json_encode(['success' => false, 'message' => 'Missing required parameters']);
@@ -54,15 +55,16 @@ try {
         $target_file = $upload_dir . $unique_file_name;
 
         if (move_uploaded_file($file_tmp, $target_file)) {
-            // Insert into stage_photos table
-            $photo_stmt = $conn->prepare("
-                INSERT INTO stage_photos (project_id, stage_number, photo_path, uploaded_at)
-                VALUES (?, ?, ?, NOW())
-            ");
-            $photo_stmt->bind_param("iis", $project_id, $stage_number, $unique_file_name);
+            // Normalize photo_type and restrict to known types
+            $allowed_ptypes = ['before','after','other'];
+            $ptype = in_array(strtolower($photo_type), $allowed_ptypes) ? strtolower($photo_type) : 'other';
+
+            // Insert into stage_photos table (store photo_type)
+            $photo_stmt = $conn->prepare("INSERT INTO stage_photos (project_id, stage_number, photo_path, photo_type, uploaded_at) VALUES (?, ?, ?, ?, NOW())");
+            $photo_stmt->bind_param("iiss", $project_id, $stage_number, $unique_file_name, $ptype);
             $photo_stmt->execute();
             
-            echo json_encode(['success' => true]);
+            echo json_encode(['success' => true, 'photo_type' => $ptype]);
         } else {
             echo json_encode(['success' => false, 'message' => 'Failed to upload image']);
         }
