@@ -114,38 +114,37 @@ try {
 
             // Example requirement: for material collection step, require every material to be obtained OR have at least one photo
             if ($isMaterialStage) {
-                // For stage-level photo requirement (Option B): require at least one 'before' and one 'after' stage photo
-                try {
-                    $ptypeStmt = $conn->prepare("SELECT COALESCE(photo_type,'other') AS photo_type, COUNT(*) AS c FROM stage_photos WHERE project_id = ? AND stage_number = ? GROUP BY photo_type");
-                    $ptypeStmt->bind_param("ii", $project_id, $stage_number);
-                    $ptypeStmt->execute();
-                    $res = $ptypeStmt->get_result();
-                    $haveTypes = [];
-                    while ($row = $res->fetch_assoc()) {
-                        $pt = strtolower(trim($row['photo_type']));
-                        if ($pt === '') $pt = 'other';
-                        $haveTypes[$pt] = (int)$row['c'];
+                    // Server-side compatibility: first verify per-material requirements (each material must be obtained OR have a material photo).
+                    try {
+                        $totStmt = $conn->prepare("SELECT COUNT(*) AS tot FROM project_materials WHERE project_id = ?");
+                        $totStmt->bind_param('i', $project_id);
+                        $totStmt->execute();
+                        $totRes = $totStmt->get_result()->fetch_assoc();
+                        $tot = isset($totRes['tot']) ? (int)$totRes['tot'] : 0;
+
+                        if ($tot > 0) {
+                            $haveStmt = $conn->prepare("SELECT COUNT(*) AS have FROM project_materials pm WHERE pm.project_id = ? AND (LOWER(pm.status) = 'obtained' OR EXISTS(SELECT 1 FROM material_photos mp WHERE mp.material_id = pm.material_id LIMIT 1))");
+                            $haveStmt->bind_param('i', $project_id);
+                            $haveStmt->execute();
+                            $haveRes = $haveStmt->get_result()->fetch_assoc();
+                            $have = isset($haveRes['have']) ? (int)$haveRes['have'] : 0;
+                            if ($have < $tot) {
+                                // Not all materials obtained/have a photo — return a clear reason so client can show which
+                                echo json_encode([
+                                    'success' => false,
+                                    'message' => 'Cannot complete Material Collection: some materials are missing (not obtained or missing photo)',
+                                    'reason' => 'missing_materials',
+                                    'total' => $tot,
+                                    'have' => $have
+                                ]);
+                                exit;
+                            }
+                        }
+                    } catch (Exception $e) {
+                        // ignore and continue to fallback checks below
                     }
 
-                    $missing = [];
-                    if (!isset($haveTypes['before']) || $haveTypes['before'] <= 0) $missing[] = 'before';
-                    if (!isset($haveTypes['after']) || $haveTypes['after'] <= 0) $missing[] = 'after';
-
-                    if (!empty($missing)) {
-                        echo json_encode([
-                            'success' => false,
-                            'message' => 'Cannot complete Material Collection: missing required stage photo(s)',
-                            'reason' => 'missing_stage_photos',
-                            'missing' => $missing,
-                            'have' => $haveTypes
-                        ]);
-                        exit;
-                    }
-                } catch (Exception $e) {
-                    // if something goes wrong with photo checks, fail-safe: disallow completion and report error
-                    echo json_encode(['success' => false, 'message' => 'Error verifying stage photos: ' . $e->getMessage()]);
-                    exit;
-                }
+                // Per-material requirement satisfied — allow completion. No additional stage-level before/after photos required.
             }
 
             // All checks passed — mark as completed

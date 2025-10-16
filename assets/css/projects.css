@@ -266,7 +266,7 @@ input.edit-input, textarea.edit-input, .form-row input, .form-row textarea, #new
     border: none !important;
     padding: 8px 12px !important;
     border-radius: 6px !important;
-    cursor: pointer !important;
+    cursor: pointer;
 }
 
 .cancel-btn { border: 1px solid #ddd !important; background: #f8f9fa !important; color: #333 !important; }

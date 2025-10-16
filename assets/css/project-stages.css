@@ -400,6 +400,20 @@ body .stage-tabs .stage-tab.locked * {
     box-shadow: 0 0 0 4px rgba(13,110,253,0.12);
 }
 
+/* Final override: ensure locked stage tabs always show not-allowed cursor and keep interactive controls inside stages disabled */
+.stage-tabs .stage-tab.locked, .stage-tabs .stage-tab.locked * {
+    cursor: not-allowed !important;
+}
+.workflow-stage.locked .stage-actions button, .workflow-stage.locked .material-actions .material-btn {
+    pointer-events: none !important;
+    opacity: 0.6 !important;
+}
+
+/* Custom black 'forbidden' cursor for locked tabs to avoid platform-specific red 'no-drop' cursor */
+.stage-tabs .stage-tab.locked, .stage-tabs .stage-tab.locked * {
+    cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32'><circle cx='16' cy='16' r='12' stroke='black' stroke-width='2' fill='white'/><line x1='6' y1='26' x2='26' y2='6' stroke='black' stroke-width='3' stroke-linecap='round'/></svg>") 16 16, not-allowed !important;
+}
+
 .stage-tab.active {
     background: #f8fafd;
     border-color: #ccd6e4;

@@ -58,16 +58,101 @@
     display: flex;
     flex-direction: row;
     align-items: center;
-    justify-content: space-between;
-    gap: 8px;
+    /* keep items grouped to the left so status/meta appears on the left column
+       actions that need to float right should use margin-left:auto */
+    justify-content: flex-start;
+    gap: 10px;
 }
 
-.mat-meta { display:flex; align-items:center; gap:8px; }
+/* Ensure action buttons inside the left column push to the far right of that column */
+.material-main > .material-actions { margin-left: auto; }
+
+.mat-meta { display:flex; align-items:center; gap:10px; /* will be positioned near thumbnail on wide screens */ }
+
+/* Position the status/badge to sit directly left of the thumbnail/upload area */
+.material-item { position: relative; }
+.material-item .mat-meta {
+    /* use inline flow so the badge sits inline with the row content and centers naturally */
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin-left: auto; /* push meta to the far right of the left column */
+    position: static;
+}
+
+/* Center the material name vertically within the left column */
+.material-main .mat-name {
+    display: flex;
+    align-items: center;
+    margin: 0;
+    padding: 0;
+    line-height: 1.2;
+    height: auto;
+}
+
+
+/* Keep left column natural height; rely on flex/grid align-items for centering */
+.material-main { height: auto; }
+
+/* Move photos to the right column of the material row and style thumbnails */
+.material-item{ position: relative; }
+.material-photos {
+    grid-column: 2 / 3; /* place in the right column */
+    justify-self: end;
+    display: flex;
+    gap: 18px;
+    align-items: center;
+}
+
+.material-photo {
+    /* larger thumbnails for better visibility */
+    width: 110px;
+    height: 110px;
+    border-radius: 14px;
+    overflow: hidden;
+    background: #f6f6f6;
+    border: 1px solid rgba(0,0,0,0.06);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+/* Responsive fallback: on narrow screens keep layout flow and reduce sizes */
+@media (max-width: 800px) {
+    .material-item .mat-meta { position: static; margin-left: 8px; top: auto; right: auto; }
+    .material-photo { width: 72px; height: 72px; border-radius: 10px; }
+    .mat-meta { gap: 8px; }
+}
+.material-photo img { width:100%; height:100%; object-fit:cover; display:block; }
+
+/* Optional: if you prefer to show the original image scaled (letterboxed) instead of a cropped thumbnail,
+   toggle this class on the .material-photo element (e.g. add .use-original). It will preserve the whole image
+   and fit it inside the box. This avoids hard-cropping but may show empty background areas. */
+.material-photo.use-original img { object-fit:contain; background:#f6f6f6 }
+
+/* Delete overlay for material photo */
+.material-photo .material-photo-delete {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.45);
+    color: #fff;
+    cursor: pointer;
+    font-size: 12px;
+}
+
 
 /* Camera upload button when placed inside .mat-meta */
 .mat-meta .upload-material-photo {
-    width: 32px;
-    height: 32px;
+    width: 56px;
+    height: 56px;
     padding: 0;
     display: inline-flex;
     align-items: center;
@@ -78,7 +163,7 @@
     color: var(--accent);
     cursor: pointer;
     transition: all 0.2s ease;
-    margin-left: 4px;
+    margin-left: 6px;
 }
 .mat-meta .upload-material-photo:hover {
     background: var(--accent);
@@ -182,12 +267,13 @@
 }
 
 .mat-name { 
-    display: block; 
+    display: flex; 
+    align-items: center;
     font-size: 1.02rem;
     font-weight: 600;
     color: var(--accent-dark);
     line-height: 1.2;
-    margin-bottom: 0;
+    margin: 0;
 }
 
 .mat-qty {
@@ -201,13 +287,14 @@
     font-weight: 500;
 }
 .mat-name{ 
-    display: block; 
+    display: flex; 
+    align-items: center; 
     font-weight: 600; 
     color: var(--accent-dark); 
     font-size: 1.05rem;
-    line-height: 1.4;
+    line-height: 1.2;
     letter-spacing: -0.01em;
-    margin-bottom: 2px;
+    margin: 0;
     word-break: break-word; 
     white-space: normal; 
     overflow-wrap: break-word;
@@ -222,6 +309,9 @@
     display: inline-flex;
     align-items: center;
 }
+
+/* Place the obtained badge more to the left, away from the thumbnails on the right */
+.badge.obtained { margin-right: 0; margin-left: 6px; }
 
 /* Ensure actions stay on single line when possible and buttons don't break vertically */
 .material-actions{ 
@@ -352,6 +442,65 @@
 
 .add-material-btn{ background:var(--accent); color:#fff; border:none; padding:10px 16px; border-radius:10px; box-shadow: 0 6px 20px rgba(46,139,87,0.12); font-weight:700 }
 .add-material-btn i{ margin-right:8px }
+
+/* Make the stage completion button visually match the Add Material button for consistency */
+.stage-actions .complete-stage-btn{
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 10px;
+    font-weight: 700;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    box-shadow: 0 6px 20px rgba(46,139,87,0.12);
+}
+.stage-actions .complete-stage-btn:hover{ background: var(--accent-dark); transform: translateY(-1px); box-shadow: 0 8px 24px rgba(27,94,32,0.14);} 
+.stage-actions .complete-stage-btn[disabled]{ opacity: 0.55; cursor: not-allowed; transform: none; box-shadow: none; }
+
+/* Visual disabled state when using aria-disabled or is-disabled class (keeps button clickable for JS runtime checks) */
+.stage-actions .complete-stage-btn[aria-disabled="true"],
+.stage-actions .complete-stage-btn.is-disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+/* Debug-only helper that explains why a stage is disabled */
+.why-disabled-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    margin-left: 8px;
+    background: var(--accent-dark);
+    border: 1px solid rgba(0,0,0,0.06);
+    color: #fff;
+    font-weight: 700;
+    cursor: pointer;
+    font-size: 13px;
+}
+.why-disabled-btn:hover { filter: brightness(1.05); }
+.why-disabled-panel {
+    position: absolute;
+    z-index: 120000;
+    background: #fff;
+    color: #123;
+    border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.12);
+    padding: 12px 14px;
+    min-width: 240px;
+    font-size: 13px;
+}
+.why-disabled-panel h4 { margin:0 0 6px 0; font-size:14px }
+.why-disabled-panel ul{ margin:0; padding-left: 18px; }
+.why-disabled-panel li.missing-photo { color: #c0392b; }
+.why-disabled-panel li.missing-obtained { color: #e67e22; }
 
 .modal {
     /* Ensure all modals are fixed and centered regardless of parent containers */
@@ -569,15 +718,31 @@
     color: #475569;
 }
 
-.material-photos { display:flex; gap:8px; margin-top:8px; align-items:center; grid-column: 1 / -1; /* place photos below the material row */ }
-.material-photo { position:relative; width:48px; height:48px; border-radius:6px; overflow:hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.06); flex:0 0 48px; background: #fff; }
+.material-photos {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    grid-column: 2 / 3; /* place photos in the right column */
+    justify-self: end;
+    margin-top: 0;
+}
+.material-photo {
+    position: relative;
+    width: 110px;
+    height: 110px;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.06);
+    flex: 0 0 110px;
+    background: #fff;
+}
 .material-photo img { width:100%; height:100%; object-fit:cover; display:block; transition: transform 160ms ease; cursor:pointer }
 .material-photo:hover img { transform: scale(1.04); }
-.material-photo .material-photo-delete { position:absolute; top:6px; right:6px; background: rgba(255,255,255,0.95); border:none; width:26px; height:26px; border-radius:6px; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; color: var(--danger); box-shadow: 0 4px 8px rgba(0,0,0,0.06); }
-.material-photo .material-photo-delete i{ font-size:11px }
+.material-photo .material-photo-delete { position:absolute; top:6px; right:6px; background: rgba(255,255,255,0.95); border:none; width:32px; height:32px; border-radius:8px; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; color: var(--danger); box-shadow: 0 4px 8px rgba(0,0,0,0.06); }
+.material-photo .material-photo-delete i{ font-size:13px }
 
 /* Placeholder box when a material has no photo: make it compact so unobtained rows match newly-added row */
-.material-photo.placeholder { background: linear-gradient(180deg, rgba(46,139,87,0.03), rgba(46,139,87,0.01)); border: 1px dashed rgba(46,139,87,0.08); display:flex; align-items:center; justify-content:center; color: rgba(46,139,87,0.35); font-size:12px; width:40px; height:40px; flex:0 0 40px; box-shadow: none; }
+.material-photo.placeholder { background: linear-gradient(180deg, rgba(46,139,87,0.03), rgba(46,139,87,0.01)); border: 1px dashed rgba(46,139,87,0.08); display:flex; align-items:center; justify-content:center; color: rgba(46,139,87,0.35); font-size:12px; width:110px; height:110px; flex:0 0 110px; box-shadow: none; }
 
 /* Layout helpers: ensure the main row content and actions occupy the two grid columns
     and photos always sit below spanning the full width */
