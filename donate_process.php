@@ -125,23 +125,46 @@ if ($action === 'view_donation' && $_SERVER['REQUEST_METHOD'] === 'GET') {
             </div>
         </div>
         
-        <!-- Comments Section -->
-        <div class="comments-section">
-            <h4>Comments</h4>
-            
-            <?php if ($comments->num_rows > 0): ?>
-                <?php while ($c = $comments->fetch_assoc()): ?>
-                    <div class="comment">
-                        <strong><?= htmlspecialchars($c['first_name'] . ' ' . $c['last_name']); ?></strong>
-                        <p><?= htmlspecialchars($c['comment_text']); ?></p>
-                        <div class="comment-time"><?= date("M d, Y H:i", strtotime($c['created_at'])); ?></div>
-                    </div>
-                <?php endwhile; ?>
-            <?php else: ?>
-                <div class="no-comments">
-                    <p>No comments yet. Be the first to comment!</p>
-                </div>
-            <?php endif; ?>
+<!-- Requests Section -->
+<div class="requests-section">
+    <h4>Requests</h4>
+
+    <?php if ($requests->num_rows > 0): ?>
+        <?php while ($r = $requests->fetch_assoc()): ?>
+            <div class="request" data-request-id="<?= $r['request_id']; ?>">
+                <strong><?= htmlspecialchars($r['first_name'] . ' ' . $r['last_name']); ?></strong>
+                <p><?= htmlspecialchars($r['project_name']); ?></p>
+                <p class="status-text">Status: <span><?= htmlspecialchars($r['status']); ?></span></p>
+
+                <?php if (strtolower($r['status']) === 'pending'): ?>
+                    <button class="approve-btn">Approve</button>
+                    <button class="decline-btn">Decline</button>
+                <?php else: ?>
+                    <button class="approve-btn" disabled><?= ucfirst($r['status']); ?></button>
+                <?php endif; ?>
+            </div>
+        <?php endwhile; ?>
+    <?php else: ?>
+        <p>No requests yet.</p>
+    <?php endif; ?>
+</div>
+
+<!-- Comments Section -->
+<div class="comments-section">
+    <h4>Comments</h4>
+
+    <?php if ($comments->num_rows > 0): ?>
+        <?php while ($c = $comments->fetch_assoc()): ?>
+            <div class="comment">
+                <strong><?= htmlspecialchars($c['first_name'] . ' ' . $c['last_name']); ?></strong>
+                <p><?= htmlspecialchars($c['comment_text']); ?></p>
+                <div class="comment-time"><?= date("M d, Y H:i", strtotime($c['created_at'])); ?></div>
+            </div>
+        <?php endwhile; ?>
+    <?php else: ?>
+        <p>No comments yet. Be the first to comment!</p>
+    <?php endif; ?>
+
 
             <?php if (isset($_SESSION['user_id'])): ?>
                 <form class="add-comment-form" data-id="<?= $donation_id; ?>">
@@ -217,4 +240,224 @@ if ($action === 'delete_donation' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     exit;
 }
+
+// Approve a donation request
+if ($action === 'approve_request' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    header('Content-Type: application/json');
+    if (!isset($_SESSION['user_id'])) {
+        echo json_encode(["status" => "error", "message" => "Not logged in"]);
+        exit;
+    }
+
+    $request_id = intval($_POST['request_id'] ?? 0);
+    if ($request_id <= 0) {
+        echo json_encode(["status" => "error", "message" => "Invalid request id"]);
+        exit;
+    }
+
+    // Fetch request and donation info
+    $stmt = $conn->prepare("
+        SELECT dr.request_id, dr.donation_id, dr.status as request_status, d.donor_id, d.quantity AS current_quantity, d.total_quantity
+        FROM donation_requests dr
+        JOIN donations d ON dr.donation_id = d.donation_id
+        WHERE dr.request_id = ?
+        FOR UPDATE
+    ");
+    $stmt->bind_param("i", $request_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $request = $result->fetch_assoc();
+
+    if (!$request) {
+        error_log("[donate_process] approve_request: request not found: " . $request_id);
+        echo json_encode(["status" => "error", "message" => "Request not found"]);
+        exit;
+    }
+
+    // only donor who owns the donation can approve
+    if ($request['donor_id'] != $_SESSION['user_id']) {
+        error_log("[donate_process] approve_request: unauthorized user. request_id: $request_id user:" . ($_SESSION['user_id'] ?? 'none'));
+        echo json_encode(["status" => "error", "message" => "Unauthorized"]);
+        exit;
+    }
+
+    // ensure it is pending
+    if (strtolower($request['request_status']) !== 'pending') {
+        echo json_encode(["status" => "error", "message" => "Request is not pending"]);
+        exit;
+    }
+
+    // Check stock remaining
+    $current = intval($request['current_quantity']);
+    $total = intval($request['total_quantity']);
+    if ($current >= $total) {
+        echo json_encode(["status" => "error", "message" => "No more items remaining"]);
+        exit;
+    }
+
+    // Update request status
+    $stmt = $conn->prepare("UPDATE donation_requests SET status = 'approved' WHERE request_id = ?");
+    $stmt->bind_param("i", $request_id);
+    if (!$stmt->execute()) {
+        error_log("[donate_process] approve_request: failed update request_id=" . $request_id . " - " . $conn->error);
+        echo json_encode(["status" => "error", "message" => "Failed to approve request"]);
+        exit;
+    }
+
+    // Increment donation quantity
+    $stmt = $conn->prepare("UPDATE donations SET quantity = quantity + 1 WHERE donation_id = ?");
+    $stmt->bind_param("i", $request['donation_id']);
+    if (!$stmt->execute()) {
+        error_log("[donate_process] approve_request: failed increment donation_id=" . $request['donation_id'] . " - " . $conn->error);
+        echo json_encode(["status" => "error", "message" => "Failed to update donation quantity"]);
+        exit;
+    }
+
+    // fetch new quantity
+    $stmt = $conn->prepare("SELECT quantity, total_quantity FROM donations WHERE donation_id = ?");
+    $stmt->bind_param("i", $request['donation_id']);
+    $stmt->execute();
+    $newRow = $stmt->get_result()->fetch_assoc();
+    $new_quantity = intval($newRow['quantity']);
+    $total_quantity = intval($newRow['total_quantity']);
+
+    echo json_encode([
+        "status" => "success",
+        "message" => "Request approved",
+        "new_quantity" => $new_quantity,
+        "total_quantity" => $total_quantity
+    ]);
+    exit;
+}
+
+
+// Decline a donation request
+if ($action === 'decline_request' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    header('Content-Type: application/json');
+    if (!isset($_SESSION['user_id'])) {
+        echo json_encode(["status" => "error", "message" => "Not logged in"]);
+        exit;
+    }
+
+    $request_id = intval($_POST['request_id'] ?? 0);
+    if ($request_id <= 0) {
+        echo json_encode(["status" => "error", "message" => "Invalid request id"]);
+        exit;
+    }
+
+    $stmt = $conn->prepare("
+        SELECT dr.request_id, dr.donation_id, dr.status as request_status, d.donor_id
+        FROM donation_requests dr
+        JOIN donations d ON dr.donation_id = d.donation_id
+        WHERE dr.request_id = ?
+    ");
+    $stmt->bind_param("i", $request_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $request = $result->fetch_assoc();
+
+    if (!$request) {
+        error_log("[donate_process] decline_request: request not found: " . $request_id);
+        echo json_encode(["status" => "error", "message" => "Request not found"]);
+        exit;
+    }
+
+    if ($request['donor_id'] != $_SESSION['user_id']) {
+        error_log("[donate_process] decline_request: unauthorized user. request_id: $request_id user:" . ($_SESSION['user_id'] ?? 'none'));
+        echo json_encode(["status" => "error", "message" => "Unauthorized"]);
+        exit;
+    }
+
+    if (strtolower($request['request_status']) !== 'pending') {
+        echo json_encode(["status" => "error", "message" => "Request is not pending"]);
+        exit;
+    }
+
+    // Update status
+    $stmt = $conn->prepare("UPDATE donation_requests SET status = 'declined' WHERE request_id = ?");
+    $stmt->bind_param("i", $request_id);
+    if ($stmt->execute()) {
+        echo json_encode(["status" => "success", "message" => "Request declined"]);
+    } else {
+        error_log("[donate_process] decline_request: failed update request_id=" . $request_id . " - " . $conn->error);
+        echo json_encode(["status" => "error", "message" => "Failed to decline request"]);
+    }
+    exit;
+}
+
+// Cancel Request
+if (isset($_POST['action']) && $_POST['action'] === 'cancel_request') {
+    $request_id = $_POST['request_id'] ?? null;
+
+    if (!$request_id) {
+        echo json_encode(['status' => 'error', 'message' => 'Missing request ID']);
+        exit;
+    }
+
+    $stmt = $conn->prepare("DELETE FROM donation_requests WHERE request_id = ?");
+    $stmt->bind_param("i", $request_id);
+
+    if ($stmt->execute()) {
+        echo json_encode(['status' => 'success']);
+    } else {
+        echo json_encode(['status' => 'error', 'message' => 'Failed to cancel request']);
+    }
+    exit;
+}
+
+// Get request details for editing
+if ($_GET['action'] === 'get_request_details' && isset($_GET['request_id'])) {
+    $id = intval($_GET['request_id']);
+    $stmt = $conn->prepare("SELECT request_id, quantity_claim, urgency_level FROM donation_requests WHERE request_id = ?");
+    $stmt->bind_param("i", $id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    if ($result->num_rows > 0) {
+        $data = $result->fetch_assoc();
+        echo json_encode(["status" => "success", "data" => $data]);
+    } else {
+        echo json_encode(["status" => "error", "message" => "Request not found."]);
+    }
+    exit;
+}
+
+// Update Request (AJAX)
+if (isset($_POST['action']) && $_POST['action'] === 'update_request') {
+    header('Content-Type: application/json');
+
+    if (!isset($_SESSION['user_id'])) {
+        echo json_encode(["status" => "error", "message" => "Not logged in"]);
+        exit;
+    }
+
+    $request_id = intval($_POST['request_id']);
+    $quantity_claim = intval($_POST['quantity_claim']);
+    $urgency_level = $_POST['urgency_level'];
+    $user_id = $_SESSION['user_id'];
+
+    // Validate ownership
+    $check = $conn->prepare("SELECT request_id FROM donation_requests WHERE request_id = ? AND user_id = ?");
+    $check->bind_param("ii", $request_id, $user_id);
+    $check->execute();
+    $res = $check->get_result();
+
+    if ($res->num_rows === 0) {
+        echo json_encode(["status" => "error", "message" => "Unauthorized or request not found."]);
+        exit;
+    }
+
+    // Perform update
+    $stmt = $conn->prepare("UPDATE donation_requests SET quantity_claim = ?, urgency_level = ? WHERE request_id = ?");
+    $stmt->bind_param("isi", $quantity_claim, $urgency_level, $request_id);
+
+    if ($stmt->execute()) {
+        echo json_encode(["status" => "success", "message" => "Request updated successfully."]);
+    } else {
+        echo json_encode(["status" => "error", "message" => "Database update failed."]);
+    }
+
+    exit;
+}
+
+
 ?>

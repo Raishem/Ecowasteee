@@ -11,13 +11,35 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true || empty($
 $conn = getDBConnection();
 $user_id = $_SESSION['user_id'];
 
+
 // Fetch My Donations
 $myDonations = [];
-$stmt = $conn->prepare("SELECT * FROM donations WHERE donor_id = ?");
+$stmt = $conn->prepare("
+    SELECT 
+        donation_id,
+        status,
+        quantity,
+        total_quantity,
+        donated_at,
+        delivered_at,
+        description,
+        category,
+        subcategory
+    FROM donations 
+    WHERE donor_id = ?
+    ORDER BY donated_at DESC
+");
 $stmt->bind_param("i", $user_id);
 $stmt->execute();
 $result = $stmt->get_result();
-while ($row = $result->fetch_assoc()) $myDonations[] = $row;
+while ($row = $result->fetch_assoc()) {
+    // fallback for empty subcategory
+    if (empty($row['subcategory'])) $row['subcategory'] = '—';
+    if (empty($row['category'])) $row['category'] = '—';
+    $myDonations[] = $row;
+}
+$stmt->close();
+
 
 // Fetch all requests for my donations (with claimer + project)
 $donationRequestsMap = [];
@@ -48,12 +70,12 @@ $stmt = $conn->prepare("
     SELECT 
         dr.request_id,
         dr.status AS request_status,
-        dr.requested_quantity,
+        dr.quantity_claim,
         dr.urgency_level,
         dr.requested_at,
-        d.item_name,
+        d.subcategory,
         d.category,
-        d.quantity AS total_quantity,
+        d.total_quantity,
         u.first_name,
         u.last_name,
         u.address,
@@ -65,6 +87,7 @@ $stmt = $conn->prepare("
     WHERE d.donor_id = ?
     ORDER BY dr.requested_at DESC
 ");
+
 
 $stmt->bind_param("i", $user_id);
 $stmt->execute();
@@ -78,10 +101,10 @@ $stmt = $conn->prepare("
     SELECT 
         dr.request_id,
         dr.status,
-        dr.requested_quantity,
+        dr.quantity_claim,
         dr.urgency_level,
         dr.requested_at,
-        d.item_name, 
+        d.subcategory,
         d.category, 
         d.total_quantity,
         u.first_name AS donor_first_name,
@@ -94,6 +117,7 @@ $stmt = $conn->prepare("
     WHERE dr.user_id = ?
     ORDER BY dr.requested_at DESC
 ");
+
 
 // ✅ Bind the user_id parameter before executing
 $stmt->bind_param("i", $user_id);
@@ -108,7 +132,7 @@ $stmt->close();
 
 // Fetch My Received Donations
 $receivedDonations = [];
-$stmt = $conn->prepare("SELECT * FROM donations WHERE receiver_id = ?");
+$stmt = $conn->prepare("SELECT *, subcategory FROM donations WHERE receiver_id = ?");
 $stmt->bind_param("i", $user_id);
 $stmt->execute();
 $result = $stmt->get_result();
@@ -193,7 +217,7 @@ while ($row = $result->fetch_assoc()) {
                                 <?php foreach ($myDonations as $d): ?>
                                     <div class="donation-card">
                                         <div class="donation-header">
-                                            <span class="donation-title"><?= htmlspecialchars($d['item_name']) ?></span>
+                                            <span class="donation-title"><?= htmlspecialchars($d['subcategory']) ?></span>
                                             <span class="donation-status 
                                                 <?= strtolower($d['status']) == 'pending' ? 'status-pending' :
                                                 (strtolower($d['status']) == 'completed' ? 'status-completed' :
@@ -258,7 +282,7 @@ while ($row = $result->fetch_assoc()) {
                             <?php foreach ($myRequests as $rq): ?>
                                 <div class="donation-card">
                                     <div class="donation-header">
-                                        <span class="donation-title"><?= htmlspecialchars($rq['item_name']) ?></span>
+                                        <span class="donation-title"><?= htmlspecialchars($rq['subcategory']) ?></span>
                                         <span class="donation-status 
                                             <?= strtolower($rq['status']) == 'pending' ? 'status-pending' :
                                             (strtolower($rq['status']) == 'completed' ? 'status-completed' :
@@ -271,7 +295,7 @@ while ($row = $result->fetch_assoc()) {
                                         <p><strong>Project Name:</strong> <?= htmlspecialchars($rq['project_name'] ?? '—') ?></p>
                                         <p><strong>Type of Waste:</strong> <?= htmlspecialchars($rq['category'] ?? '—') ?></p>
                                        <p><strong>Quantity:</strong> 
-                                            <?= htmlspecialchars($rq['requested_quantity'] ?? 0) ?> /
+                                            <?= htmlspecialchars($rq['quantity_claim'] ?? 0) ?> /
                                             <?= htmlspecialchars($rq['total_quantity'] ?? 0) ?> Units
                                         </p>
                                         <p><strong>Request Date:</strong> <?= date("M d, Y H:i", strtotime($rq['requested_at'])) ?></p>
@@ -279,9 +303,11 @@ while ($row = $result->fetch_assoc()) {
                                         <p><strong>Status:</strong> <?= htmlspecialchars($rq['status']) ?></p>
                                     </div>
                                     <div class="card-actions">
-                                        <button class="edit-request-btn" data-id="<?= $rq['request_id'] ?>">Edit Request</button>
-                                        <button class="cancel-request-btn" data-id="<?= $rq['request_id'] ?>">Cancel Request</button>
+                                        <button class="edit-request-btn" data-id="<?= htmlspecialchars($rq['request_id']) ?>">Edit Request</button>
+                                        <button class="cancel-request-btn" data-id="<?= htmlspecialchars($rq['request_id']) ?>">Cancel Request</button>
                                     </div>
+
+
                                 </div>
                             <?php endforeach; ?>
                         <?php else: ?>
@@ -294,6 +320,34 @@ while ($row = $result->fetch_assoc()) {
                     </div>
 
 
+                    <!-- Edit Request Modal -->
+                    <div id="editRequestModal" class="modal" style="display:none;">
+                    <div class="modal-content small-modal" style="max-width:520px; margin: 30px auto; border-radius: 8px; padding: 20px; position: relative;">
+                        <h3 style="margin-top:0;">Edit Request</h3>
+                        <form id="editRequestForm">
+                        <input type="hidden" name="request_id" id="editRequestId" value="">
+                        <div class="form-row">
+                            <label for="editQuantityClaim">Quantity Claimed:</label>
+                            <input type="number" name="quantity_claim" id="editQuantityClaim" min="1" required style="width:100%; padding:8px; margin-bottom:12px;">
+                        </div>
+                        <div class="form-row">
+                            <label for="editUrgencyLevel">Urgency Level:</label>
+                            <select name="urgency_level" id="editUrgencyLevel" required style="width:100%; padding:8px; margin-bottom:16px;">
+                            <option value="Low">Low</option>
+                            <option value="Medium">Medium</option>
+                            <option value="High">High</option>
+                            </select>
+                        </div>
+
+                        <div style="display:flex; gap:12px; justify-content:flex-start;">
+                            <button id="saveRequestBtn" class="btn btn-primary" type="submit" style="padding:8px 18px; background:#2e8b57; color:#fff; border:none; border-radius:6px;">Save</button>
+                            <button id="cancelEditBtn" type="button" class="btn btn-secondary" style="padding:8px 18px; background:#aaa; color:#fff; border:none; border-radius:6px;">Cancel</button>
+                        </div>
+                        </form>
+                    </div>
+                    </div>
+
+
 
                     <!-- Requests for My Donations Tab -->
                     <div id="requests-for-me" class="tab-content">
@@ -301,7 +355,7 @@ while ($row = $result->fetch_assoc()) {
                             <?php foreach ($requestsForMe as $r): ?>
                                 <div class="donation-card">
                                     <div class="donation-header">
-                                        <span class="donation-title"><?= htmlspecialchars($r['item_name']) ?></span>
+                                        <span class="donation-title"><?= htmlspecialchars($r['category']) ?></span>
                                         <span class="donation-status 
                                             <?= strtolower($r['request_status']) == 'pending' ? 'status-pending' :
                                             (strtolower($r['request_status']) == 'approved' ? 'status-completed' :
@@ -318,7 +372,7 @@ while ($row = $result->fetch_assoc()) {
                                         <p><strong>Project Name:</strong> <?= htmlspecialchars($r['project_name'] ?? '—') ?></p>
                                         <p><strong>Type of Waste:</strong> <?= htmlspecialchars($r['category'] ?? '—') ?></p>
                                         <p><strong>Quantity:</strong> 
-                                            <?= htmlspecialchars($r['requested_quantity'] ?? $r['quantity'] ?? '—') ?>/<?= htmlspecialchars($r['total_quantity'] ?? $r['quantity'] ?? '—') ?>
+                                            <?= htmlspecialchars($r['quantity_claim'] ?? $r['quantity'] ?? '—') ?>/<?= htmlspecialchars($r['total_quantity'] ?? $r['quantity'] ?? '—') ?>
                                         </p>
                                         <p><strong>Location:</strong> <?= htmlspecialchars($r['address'] ?? '—') ?></p>
                                         <p><strong>Requested At:</strong> <?= date("M d, Y H:i", strtotime($r['requested_at'])) ?></p>
@@ -353,7 +407,7 @@ while ($row = $result->fetch_assoc()) {
                             <?php foreach ($receivedDonations as $rec): ?>
                                 <div class="donation-card">
                                     <div class="donation-header">
-                                        <span class="donation-title"><?= htmlspecialchars($rec['item_name']) ?></span>
+                                        <span class="donation-title"><?= htmlspecialchars($rec['subcategory']) ?></span>
                                         <span class="donation-status status-completed">Received</span>
                                     </div>
                                     <div class="donation-details">
@@ -423,7 +477,7 @@ while ($row = $result->fetch_assoc()) {
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 
 <script>
-    // Profile dropdown toggle
+    // ==================== PROFILE DROPDOWN TOGGLE ====================
     document.getElementById('userProfile').addEventListener('click', function() {
         this.classList.toggle('active');
     });
@@ -434,7 +488,7 @@ while ($row = $result->fetch_assoc()) {
         }
     });
 
-    // Tab descriptions
+    // ==================== TAB DESCRIPTIONS AND TAB SWITCHING ====================
     const descriptions = {
         "my-donations": "Here are all the donations you created. You can manage them here.",
         "requests-for-me": "These are requests from other users for your donations.",
@@ -442,7 +496,6 @@ while ($row = $result->fetch_assoc()) {
         "received-donations": "These are the donations you have successfully received."
     };
 
-    // Show tab
     function showTab(tabId, btn) {
         $(".tab-content").removeClass("tab-active");
         $(".tab-btn").removeClass("tab-btn-active");
@@ -451,7 +504,7 @@ while ($row = $result->fetch_assoc()) {
         $("#tab-description").text(descriptions[tabId]);
     }
 
-    // Delete donation
+    // ==================== DELETE DONATION ====================
     $(document).on("click", ".delete-btn", function() {
         if (confirm("Are you sure you want to delete this donation?")) {
             let id = $(this).data("id");
@@ -461,7 +514,7 @@ while ($row = $result->fetch_assoc()) {
         }
     });
 
-    // View details
+    // ==================== VIEW DONATION DETAILS (POPUP) ====================
     $(document).on("click", ".view-details", function(e) {
         e.preventDefault();
         let id = $(this).data("id");
@@ -471,26 +524,115 @@ while ($row = $result->fetch_assoc()) {
         });
     });
 
-    // Cancel request
-    $(document).on("click", ".cancel-request-btn", function() {
-        if (confirm("Cancel this request?")) {
-            let id = $(this).data("id");
-            $.post("donate_process.php", { action: "cancel_request", request_id: id }, function() {
-                location.reload();
-            });
-        }
-    });
-
-
-
-
-    // Edit request
-    $(document).on("click", ".edit-request-btn", function() {
+    // ==================== FIXED EDIT REQUEST LOGIC ====================
+    // Opens the edit modal with request data loaded from database
+    $(document).on("click", ".edit-request-btn", function(e) {
+        e.preventDefault();
         let id = $(this).data("id");
-        window.location.href = "edit_request.php?id=" + id;
+
+        if (!id) return Swal.fire({ icon: "error", title: "Error", text: "Invalid request ID" });
+
+        $.get("get_request_data.php", { id: id }, function(response) {
+            try {
+                let res = typeof response === "object" ? response : JSON.parse(response);
+
+                if (res.status === "success" && res.data) {
+                    // Fill modal fields with current request data
+                    $("#editRequestId").val(res.data.request_id || "");
+                    $("#editQuantityClaim").val(res.data.quantity_claim || "");
+                    $("#editUrgencyLevel").val(res.data.urgency_level || "");
+                    $("#editRequestModal").fadeIn(200);
+                } else {
+                    Swal.fire({ icon: "error", title: "Error", text: res.message || "Unable to load request details." });
+                }
+            } catch (e) {
+                console.error("Invalid JSON:", response, e);
+                Swal.fire({ icon: "error", title: "Error", text: "Error loading request data." });
+            }
+        }).fail(function(jqXHR, textStatus, errorThrown){
+            console.error("AJAX Error:", textStatus, errorThrown, jqXHR.responseText);
+            Swal.fire({ icon: "error", title: "Server Error", text: "Could not load request. Please try again." });
+        });
     });
 
-    // Close details modal
+    // Closes the edit modal when "Cancel" is clicked
+    $("#cancelEditBtn").on("click", function() {
+        $("#editRequestModal").fadeOut(200);
+    });
+
+    // Submits the edited request to server
+    $(document).on("submit", "#editRequestForm", function(e) {
+        e.preventDefault();
+
+        const formData = $(this).serialize();
+
+        $.post("edit_request_process.php", formData, function(response) {
+            let res;
+            try {
+                res = typeof response === "object" ? response : JSON.parse(response);
+            } catch (e) {
+                console.error("Invalid JSON response from server:", response, e);
+                Swal.fire({
+                    icon: "error",
+                    title: "Server Error",
+                    text: "Could not update request. Please check the server and try again."
+                });
+                return;
+            }
+
+            if(res.status === "success") {
+                $("#editRequestModal").fadeOut(200);
+                Swal.fire({
+                    icon: "success",
+                    title: "Updated!",
+                    text: res.message || "Request updated successfully.",
+                    timer: 1500,
+                    showConfirmButton: false
+                });
+                setTimeout(() => {
+                    // Refresh only "My Requests" tab after update
+                    $("#my-requests").load(location.href + " #my-requests > *");
+                }, 1000);
+            } else {
+                Swal.fire({
+                    icon: "error",
+                    title: "Update Failed",
+                    text: res.message || "Failed to update request."
+                });
+            }
+        }).fail(function(jqXHR, textStatus, errorThrown){
+            console.error("AJAX request failed:", textStatus, errorThrown, jqXHR.responseText);
+            Swal.fire({
+                icon: "error",
+                title: "Server Error",
+                text: "Could not update request. Please try again."
+            });
+        });
+    });
+    // ==================== END EDIT REQUEST LOGIC ====================
+
+    // ==================== CANCEL REQUEST ====================
+    $(document).on("click", ".cancel-request-btn", function() {
+        const id = $(this).data("id");
+        if (!id) return alert("Invalid request ID");
+        if (!confirm("Are you sure you want to cancel this request?")) return;
+
+        $.post("donate_process.php", { action: "cancel_request", request_id: id }, function(res) {
+            try {
+                const data = JSON.parse(res);
+                if (data.status === "success") {
+                    alert("Request canceled successfully.");
+                    location.reload();
+                } else {
+                    alert(data.message || "Failed to cancel request.");
+                }
+            } catch (e) {
+                alert("Invalid server response.");
+            }
+        });
+    });
+
+    // ==================== CLOSE DONATION DETAILS MODAL ====================
     $(document).on("click", ".close-btn", function() {
         $("#details-modal").hide();
     });
@@ -500,35 +642,35 @@ while ($row = $result->fetch_assoc()) {
         }
     });
 
-    // Handle add comment
-$(document).on("submit", ".add-comment-form", function(e) {
-    e.preventDefault();
-    let form = $(this);
-    let donationId = form.data("id");
-    let commentText = form.find("textarea[name='comment_text']").val();
+    // ==================== ADD COMMENT (DONATION COMMENT SECTION) ====================
+    $(document).on("submit", ".add-comment-form", function(e) {
+        e.preventDefault();
+        let form = $(this);
+        let donationId = form.data("id");
+        let commentText = form.find("textarea[name='comment_text']").val();
 
-    $.post("donate_process.php", {
-        action: "add_comment",
-        donation_id: donationId,
-        comment_text: commentText
-    }, function(response) {
-        try {
-            let res = JSON.parse(response);
-            if (res.status === "success") {
-                // Reload details to show new comment
-                $.get("donate_process.php", { action: "view_donation", donation_id: donationId }, function(data) {
-                    $("#details-body").html(data);
-                });
-            } else {
-                alert(res.message);
+        $.post("donate_process.php", {
+            action: "add_comment",
+            donation_id: donationId,
+            comment_text: commentText
+        }, function(response) {
+            try {
+                let res = JSON.parse(response);
+                if (res.status === "success") {
+                    // Reload comments after adding one
+                    $.get("donate_process.php", { action: "view_donation", donation_id: donationId }, function(data) {
+                        $("#details-body").html(data);
+                    });
+                } else {
+                    alert(res.message);
+                }
+            } catch (e) {
+                console.error("Invalid response:", response);
             }
-        } catch (e) {
-            console.error("Invalid response:", response);
-        }
+        });
     });
-});
 
-    // Feedback modal
+    // ==================== FEEDBACK MODAL SYSTEM ====================
     $(document).ready(function() {
         const feedbackBtn = $("#feedbackBtn");
         const feedbackModal = $("#feedbackModal");
@@ -544,7 +686,7 @@ $(document).on("submit", ".add-comment-form", function(e) {
 
         let selectedRating = 0;
 
-        // Emoji select
+        // Emoji click event (rating selection)
         emojiOptions.on("click", function() {
             emojiOptions.removeClass("selected");
             $(this).addClass("selected");
@@ -553,67 +695,61 @@ $(document).on("submit", ".add-comment-form", function(e) {
         });
 
         // Feedback form submit
-feedbackForm.on("submit", function(e) {
-    e.preventDefault();
-    let isValid = true;
+        feedbackForm.on("submit", function(e) {
+            e.preventDefault();
+            let isValid = true;
 
-    if (selectedRating === 0) {
-        ratingError.show();
-        isValid = false;
-    } else {
-        ratingError.hide();
-    }
+            if (selectedRating === 0) {
+                ratingError.show();
+                isValid = false;
+            } else ratingError.hide();
 
-    if ($.trim(feedbackText.val()) === "") {
-        textError.show();
-        isValid = false;
-    } else {
-        textError.hide();
-    }
+            if ($.trim(feedbackText.val()) === "") {
+                textError.show();
+                isValid = false;
+            } else textError.hide();
 
-    if (!isValid) return;
+            if (!isValid) return;
 
-    feedbackSubmitBtn.prop("disabled", true);
-    spinner.show();
+            feedbackSubmitBtn.prop("disabled", true);
+            spinner.show();
 
-    // ✅ Send feedback to PHP
-    $.post("feedback_process.php", { 
-        rating: selectedRating, 
-        feedback: feedbackText.val().trim() 
-    }, function(response){
-        try {
-            let res = JSON.parse(response);
-            if(res.status === "success"){
-                spinner.hide();
-                feedbackForm.hide();
-                thankYouMessage.show();
+            // Send feedback to server
+            $.post("feedback_process.php", { 
+                rating: selectedRating, 
+                feedback: feedbackText.val().trim() 
+            }, function(response){
+                try {
+                    let res = JSON.parse(response);
+                    if(res.status === "success"){
+                        spinner.hide();
+                        feedbackForm.hide();
+                        thankYouMessage.show();
 
-                setTimeout(() => {
-                    feedbackModal.hide();
-                    feedbackForm.show();
-                    thankYouMessage.hide();
-                    feedbackText.val("");
-                    emojiOptions.removeClass("selected");
-                    selectedRating = 0;
+                        setTimeout(() => {
+                            feedbackModal.hide();
+                            feedbackForm.show();
+                            thankYouMessage.hide();
+                            feedbackText.val("");
+                            emojiOptions.removeClass("selected");
+                            selectedRating = 0;
+                            feedbackSubmitBtn.prop("disabled", false);
+                        }, 3000);
+                    } else {
+                        alert(res.message || "Something went wrong.");
+                        spinner.hide();
+                        feedbackSubmitBtn.prop("disabled", false);
+                    }
+                } catch(e) {
+                    console.error("Invalid JSON response:", response);
+                    spinner.hide();
                     feedbackSubmitBtn.prop("disabled", false);
-                }, 3000);
-            } else {
-                alert(res.message || "Something went wrong.");
-                spinner.hide();
-                feedbackSubmitBtn.prop("disabled", false);
-            }
-        } catch(e) {
-            console.error("Invalid JSON response:", response);
-            spinner.hide();
-            feedbackSubmitBtn.prop("disabled", false);
-        }
-    });
-});
-        
-        // Open modal
-        feedbackBtn.on("click", () => feedbackModal.css("display", "flex"));
+                }
+            });
+        });
 
-        // Close modal
+        // Feedback modal open/close
+        feedbackBtn.on("click", () => feedbackModal.css("display", "flex"));
         feedbackCloseBtn.on("click", closeFeedbackModal);
         $(window).on("click", function(event) {
             if (event.target === feedbackModal[0]) {
@@ -635,163 +771,103 @@ feedbackForm.on("submit", function(e) {
         }
     });
 
-/* Robust approve/decline handler — paste near bottom, after jQuery */
-(function(){
-    // utility to send request and parse JSON safely
-    function postAction(action, requestId) {
-        return $.ajax({
-            url: 'donate_process.php?action=' + action,
-            method: 'POST',
-            data: { request_id: requestId },
-            dataType: 'text', // get raw text first so we can handle non-json responses
-            timeout: 10000
-        }).then(function(rawResponse) {
-            // attempt to parse JSON
-            try {
-                return JSON.parse(rawResponse);
-            } catch (e) {
-                console.error("Non-JSON response for", action, requestId, "raw:", rawResponse);
-                return { status: 'error', message: 'Invalid server response. Check PHP error log.' };
-            }
-        }, function(jqXHR, textStatus, errorThrown) {
-            console.error("AJAX error", action, requestId, textStatus, errorThrown, jqXHR.responseText);
-            return { status: 'error', message: 'Network or server error: ' + textStatus };
-        });
-    }
-
-    $(document).on('click', '.approve-request-btn, .approve-btn, .decline-request-btn, .decline-btn', async function(e) {
-        e.preventDefault();
-        const btn = $(this);
-        const isApprove = btn.hasClass('approve-request-btn') || btn.hasClass('approve-btn');
-        const action = isApprove ? 'approve_request' : 'decline_request';
-
-        // find the closest request container and its id
-        const container = btn.closest('[data-id], [data-request-id], .request, .donation-card');
-        // check multiple attribute possibilities
-        const requestId = container.data('id') || container.data('request-id') || btn.data('id') || btn.data('request-id');
-
-        if (!requestId) {
-            console.error("Request ID not found on element or container:", btn, container);
-            alert("Internal error: request id missing. See console.");
-            return;
-        }
-
-        if (!confirm((isApprove ? "Approve" : "Decline") + " this donation request?")) return;
-
-        // disable while processing
-        btn.prop('disabled', true).text(isApprove ? 'Approving...' : 'Declining...');
-
-        const res = await postAction(action, requestId);
-
-        if (res && res.status === 'success') {
-            // update UI in-place
-            // find status text span in this request block
-            let statusSpan = container.find('.status-text span').first();
-            if (!statusSpan.length) {
-                // fallback: find any .donation-status inside block
-                statusSpan = container.find('.donation-status').first();
-            }
-            if (statusSpan.length) {
-                statusSpan.text(isApprove ? 'approved' : 'declined');
-            }
-
-            // visually disable or change buttons
-            container.find('button').prop('disabled', true);
-            btn.text(isApprove ? 'Approved ✓' : 'Declined ✕');
-
-            // update quantity display if server sent it
-            if (res.new_quantity !== undefined && res.total_quantity !== undefined) {
-                const qtyElem = container.closest('.donation-card').find('.donation-detail:contains("Quantity"), .info-item:contains("Quantity")').first();
-                if (qtyElem.length) {
-                    // replace numeric portion by simple string (safe)
-                    qtyElem.html('<strong>Quantity:</strong> ' + res.new_quantity + '/' + res.total_quantity + ' Units');
+    // ==================== APPROVE / DECLINE REQUEST LOGIC ====================
+    (function(){
+        function postAction(action, requestId) {
+            return $.ajax({
+                url: 'donate_process.php?action=' + action,
+                method: 'POST',
+                data: { request_id: requestId },
+                dataType: 'text',
+                timeout: 10000
+            }).then(function(rawResponse) {
+                try {
+                    return JSON.parse(rawResponse);
+                } catch (e) {
+                    console.error("Non-JSON response for", action, requestId, "raw:", rawResponse);
+                    return { status: 'error', message: 'Invalid server response.' };
                 }
-            }
-
-            console.log("Action success:", res);
-        } else {
-            alert(res && res.message ? res.message : "Server returned an error. Check console.");
-            console.error("Action failed:", res);
-            btn.prop('disabled', false);
-            // restore text
-            btn.text(isApprove ? 'Approve' : 'Decline');
+            }, function(jqXHR, textStatus, errorThrown) {
+                console.error("AJAX error", action, requestId, textStatus, errorThrown, jqXHR.responseText);
+                return { status: 'error', message: 'Network/server error: ' + textStatus };
+            });
         }
-    });
-})();
 
-// Handle Delete Request
-document.querySelectorAll('.delete-request-btn').forEach(button => {
-    button.addEventListener('click', function() {
-        const requestId = this.getAttribute('data-id');
-        const card = this.closest('.donation-card');
+        // Handles approve and decline buttons
+        $(document).on('click', '.approve-request-btn, .approve-btn, .decline-request-btn, .decline-btn', async function(e) {
+            e.preventDefault();
+            const btn = $(this);
+            const isApprove = btn.hasClass('approve-request-btn') || btn.hasClass('approve-btn');
+            const action = isApprove ? 'approve_request' : 'decline_request';
 
-        if (!confirm("Are you sure you want to delete this request? This cannot be undone.")) return;
+            const container = btn.closest('[data-id], [data-request-id], .request, .donation-card');
+            const requestId = container.data('id') || container.data('request-id') || btn.data('id') || btn.data('request-id');
 
-        fetch('delete_request.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({ request_id: requestId })
-        })
-        .then(res => res.json())
-        .then(data => {
-            if (data.success) {
-                // Smooth fade out and remove
-                card.style.transition = 'opacity 0.4s ease, transform 0.3s ease';
-                card.style.opacity = '0';
-                card.style.transform = 'scale(0.95)';
-                setTimeout(() => card.remove(), 400);
-            } else {
-                alert('Failed to delete request.');
+            if (!requestId) {
+                console.error("Request ID not found:", btn, container);
+                alert("Internal error: request id missing. See console.");
+                return;
             }
-        })
-        .catch(err => alert('Error: ' + err.message));
-    });
-});
 
-</script>
+            if (!confirm((isApprove ? "Approve" : "Decline") + " this donation request?")) return;
 
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    document.querySelectorAll('.approve-request-btn, .decline-request-btn').forEach(button => {
+            btn.prop('disabled', true).text(isApprove ? 'Approving...' : 'Declining...');
+            const res = await postAction(action, requestId);
+
+            if (res && res.status === 'success') {
+                let statusSpan = container.find('.status-text span').first();
+                if (!statusSpan.length) statusSpan = container.find('.donation-status').first();
+                if (statusSpan.length) statusSpan.text(isApprove ? 'approved' : 'declined');
+
+                container.find('button').prop('disabled', true);
+                btn.text(isApprove ? 'Approved ✓' : 'Declined ✕');
+
+                if (res.new_quantity !== undefined && res.total_quantity !== undefined) {
+                    const qtyElem = container.closest('.donation-card').find('.donation-detail:contains("Quantity"), .info-item:contains("Quantity")').first();
+                    if (qtyElem.length) {
+                        qtyElem.html('<strong>Quantity:</strong> ' + res.new_quantity + '/' + res.total_quantity + ' Units');
+                    }
+                }
+            } else {
+                alert(res && res.message ? res.message : "Server returned an error. Check console.");
+                console.error("Action failed:", res);
+                btn.prop('disabled', false).text(isApprove ? 'Approve' : 'Decline');
+            }
+        });
+    })();
+
+    // ==================== DELETE REQUEST (USER SIDE) ====================
+    document.querySelectorAll('.delete-request-btn').forEach(button => {
         button.addEventListener('click', function() {
             const requestId = this.getAttribute('data-id');
-            const newStatus = this.classList.contains('approve-request-btn') ? 'approved' : 'declined';
             const card = this.closest('.donation-card');
-            const statusSpan = card.querySelector('.donation-status');
-            const actionsDiv = card.querySelector('.card-actions');
 
-            // Disable buttons while loading
-            this.disabled = true;
-            actionsDiv.querySelectorAll('button').forEach(btn => btn.disabled = true);
+            if (!confirm("Are you sure you want to delete this request? This cannot be undone.")) return;
 
-            fetch('update_request_status.php', {
+            fetch('delete_request.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: new URLSearchParams({ request_id: requestId, status: newStatus })
+                body: new URLSearchParams({ request_id: requestId })
             })
             .then(res => res.json())
             .then(data => {
                 if (data.success) {
-                    // Update status text and color instantly
-                    statusSpan.textContent = newStatus.charAt(0).toUpperCase() + newStatus.slice(1);
-                    statusSpan.className = 'donation-status ' + 
-                        (newStatus === 'approved' ? 'status-completed' : 'status-declined');
-
-                    // Replace buttons with message
-                    actionsDiv.innerHTML = `<span class="action-note">${statusSpan.textContent} request</span>`;
+                    card.style.transition = 'opacity 0.4s ease, transform 0.3s ease';
+                    card.style.opacity = '0';
+                    card.style.transform = 'scale(0.95)';
+                    setTimeout(() => card.remove(), 400);
                 } else {
-                    alert('Failed to update status: ' + (data.message || 'Please try again.'));
-                    actionsDiv.querySelectorAll('button').forEach(btn => btn.disabled = false);
+                    alert('Failed to delete request.');
                 }
             })
-            .catch(err => {
-                alert('Error: ' + err.message);
-                actionsDiv.querySelectorAll('button').forEach(btn => btn.disabled = false);
-            });
+            .catch(err => alert('Error: ' + err.message));
         });
     });
-});
 </script>
+
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
 
 </body>
 </html>
