@@ -3,282 +3,19 @@
     padding: 0;
     box-sizing: border-box;
     font-family: 'Open Sans', sans-serif;
+    scrollbar-width: inherit;             
+    scrollbar-color: #82AA52 #f6ffeb;
 }
 
-/* Prevent extremely long words/strings from breaking layouts */
+
 html, body {
-    overflow-x: hidden;
-}
-
-* {
-    overflow-wrap: break-word;
-    word-break: break-word;
-}
-
-/* Stronger rules to prevent any element from causing horizontal overflow */
-body, .container, .main-content, .projects-container, .project-card, .project-details-content {
-    max-width: 100vw;
-    box-sizing: border-box;
-}
-
-/* Force wrap and normal white-space for titles/descriptions */
-.project-header h3,
-.project-description,
-#projectDetailDescription,
-.project-details-header h2,
-.project-card * {
-    white-space: normal !important;
-    overflow-wrap: anywhere !important;
-    word-break: break-word !important;
-}
-
-/* Project Steps Styles */
-.step-item {
-    background: white;
-    border-radius: 8px;
-    padding: 20px;
-    margin-bottom: 20px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.step-header {
-    margin-bottom: 15px;
-}
-
-.step-header h4 {
-    color: #2c3e50;
-    font-size: 1.1em;
-    margin: 0;
-}
-
-.step-content p {
-    color: #666;
-    line-height: 1.5;
-    margin-bottom: 15px;
-}
-
-.step-photos {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    margin-top: 15px;
-}
-
-.step-photos img {
-    max-width: 200px;
-    height: auto;
-    border-radius: 4px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-/* Project card styles */
-.project-card {
-    position: relative;
-    background: white;
-    border-radius: 8px;
-    padding: 20px;
-    padding-bottom: 70px;
-    margin-bottom: 20px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    min-height: 200px;
-}
-
-.project-card .project-materials {
-    background: #f8f9fa;
-    padding: 15px;
-    border-radius: 6px;
-    margin-top: 15px;
-}
-
-/* View Details button (consolidated) */
-.project-card .view-details,
-.project-card .action-btn.view-details {
-    position: absolute;
-    bottom: 16px;
-    right: 16px;
-    background: #4CAF50;
-    color: white;
-    border: none;
-    padding: 8px 12px;
-    border-radius: 6px;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    transition: background-color 0.2s, transform 0.15s;
-    white-space: nowrap;
-    writing-mode: horizontal-tb !important;
-    text-orientation: mixed;
-    transform: none !important;
-    width: auto !important;
-    height: auto !important;
-    min-width: 110px;
-    z-index: 3;
-}
-
-.project-card .view-details:hover,
-.project-card .action-btn.view-details:hover {
-    background: #45a049;
-    transform: translateY(-1px);
-}
-
-.project-card .project-materials ul {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-}
-
-.project-card .project-materials ul {
-    list-style: none;
-    padding: 0;
-    margin-bottom: 10px;
-}
-
-.project-card .more-materials {
-    color: #666;
-    font-style: italic;
-}
-
-/* ...existing code... */
-
-/* Responsive: on small screens, place the View Details button below the card content */
-@media (max-width: 768px) {
-    .projects-container {
-        grid-template-columns: 1fr;
-        gap: 20px;
-    }
-
-    .project-card {
-        padding-bottom: 80px; /* leave space for stacked button */
-    }
-
-    .project-card .view-details,
-    .project-card .action-btn.view-details {
-        position: static !important;
-        display: block !important;
-        width: 100% !important;
-        margin-top: 12px !important;
-        padding: 10px 12px !important;
-        text-align: center !important;
-        transform: none !important;
-        writing-mode: horizontal-tb !important;
-    }
-
-    .project-actions {
-        position: static;
-        margin-top: 10px;
-        display: block;
-    }
-}
-
-/* Material styles */
-.material-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10px;
-    border-bottom: 1px solid #eee;
-}
-
-.material-content {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.material-check {
-    color: #4CAF50;
-    margin-left: 8px;
-}
-
-.material-unit {
-    color: #666;
-    font-size: 0.9em;
-}
-
-.material-actions {
-    display: flex;
-    gap: 8px;
-}
-
-.check-btn {
-    background: #4CAF50;
-    color: white;
-    border: none;
-    padding: 6px 12px;
-    border-radius: 4px;
-    cursor: pointer;
-}
-
-.delete-btn {
-    background: #dc3545;
-    color: white;
-    border: none;
-    padding: 6px 12px;
-    border-radius: 4px;
-    cursor: pointer;
-}
-
-/* Project actions positioning */
-.project-actions {
-    /* ensure actions flow naturally below materials instead of overlapping */
-    position: static;
-    display: flex;
-    justify-content: flex-end;
-    gap: 10px;
-    margin-top: 8px;
-}
-
-.action-btn.view-details {
-    background-color: #4CAF50;
-    color: white;
-    padding: 10px 18px;
-    border-radius: 8px;
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    transition: background-color 0.2s ease, transform 0.12s;
-    white-space: nowrap;
-    min-width: 150px;
-}
-
-.action-btn.view-details:hover {
-    background-color: #45a049;
-    transform: translateY(-1px);
-}
-
-/* Normalize inputs and buttons with higher specificity to ensure styles apply */
-input.edit-input, textarea.edit-input, .form-row input, .form-row textarea, #newMaterialName, #newMaterialQuantity, #newMaterialUnit {
-    -webkit-appearance: none !important;
-    appearance: none !important;
-    border: 1px solid #ddd !important;
-    background: #fff !important;
-    padding: 8px 10px !important;
-    border-radius: 6px !important;
-    font-size: 14px !important;
-    box-shadow: none !important;
-}
-
-.save-btn, .cancel-btn, .action-btn, .add-material-btn, .back-button {
-    -webkit-appearance: none !important;
-    appearance: none !important;
-    border: none !important;
-    padding: 8px 12px !important;
-    border-radius: 6px !important;
-    cursor: pointer !important;
-}
-
-.cancel-btn { border: 1px solid #ddd !important; background: #f8f9fa !important; color: #333 !important; }
-.save-btn { background: #82AA52 !important; color: #fff !important; }
-
-/* Hide any accidental horizontal scrollbar on body */
-html, body { overflow-x: hidden; }
-
-body {
     background-color: #f5f5f5;
     color: #333;
     line-height: 1.6;
+    height: 100%;
+    margin: 0;
+    overflow-y: auto;   /* allow one unified scrollbar */
+    overflow-x: hidden; /* prevent horizontal scroll */
 }
 
 h1, h2, h3, h4 {
@@ -287,10 +24,11 @@ h1, h2, h3, h4 {
 
 .container {
     display: grid;
-    grid-template-columns: 250px 1fr;
+    grid-template-columns: 250px 1fr 300px;
     max-width: 1200px;
     margin: 0 auto;
     gap: 20px;
+    align-items: flex-start; /* sidebars align to top */
 }
 
 /* Fix Header Structure with Larger Logo */
@@ -385,18 +123,6 @@ header {
     transform: rotate(180deg);
 }
 
-.profile-dropdown {
-    position: absolute;
-    top: 100%;
-    right: 0;
-    background-color: white;
-    border-radius: 5px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    width: 200px;
-    z-index: 100;
-    display: none;
-    overflow: hidden;
-}
 
 .user-profile.active .profile-dropdown {
     display: block;
@@ -441,11 +167,22 @@ header {
     padding: 30px 20px;
     box-shadow: 5px 0 25px rgba(0,0,0,0.08);
     position: sticky;
-    top: 80px; /* Changed from 80px to match new header height */
+    width: 250px;
+    top: 90px; /* Changed from 80px to match new header height */
     align-self: start;
-    height: calc(100vh - 80px); /* Adjust for new header height */
-    overflow-y: auto;
+    height: calc(100vh - 90px); /* Adjust for new header height */
+    overflow: hidden;
+    left: 0;
     border: 1px solid rgba(130, 170, 82, 0.2);
+}
+
+/* Adjust main content and right sidebar top spacing */
+.main-content {
+    min-height: calc(100vh - 90px); /* Adjust for new header height */
+    overflow: visible;
+    padding: 20px;
+    background-color: #fff;
+    grid-column: 2 / 3;
 }
 
 .sidebar nav ul {
@@ -484,6 +221,12 @@ header {
     font-size: 18px;
 }
 
+/* Active States */
+.sidebar nav a.active,
+.sidebar nav a[href="projects.php"] {
+    color: #faffe8;
+}
+
 /* Enhanced Sidebar Scrollbar */
 .sidebar::-webkit-scrollbar {
     width: 8px;
@@ -507,13 +250,6 @@ header {
 .sidebar {
     scrollbar-width: thin;
     scrollbar-color: var(--primary-green) rgba(130, 170, 82, 0.1);
-}
-
-.main-content {
-    padding: 30px;
-    background-color: #fff;
-    border-radius: 8px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
 }
 
 /* Responsive adjustments */
@@ -1262,6 +998,21 @@ header {
     .project-actions { justify-content: center; }
 }
 
+.view-details {
+            background-color: #2e8b57;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .view-details:hover {
+            background-color: #3cb371;
+            transform: translateY(-1px);
+        }
+
 /* Share Modal Styles */
 .modal {
     position: fixed;
@@ -1587,21 +1338,6 @@ textarea:focus {
 .project-details-description::-webkit-scrollbar-thumb:hover,
 #projectDetailDescription::-webkit-scrollbar-thumb:hover {
     background: #999999;
-}
-
-.profile-pic {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-right: 10px;
-    overflow: hidden;
-    background-color: #3d6a06;
-    color: white;
-    font-weight: bold;
-    font-size: 18px;
 }
 
 .projects-container {
