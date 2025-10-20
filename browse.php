@@ -102,10 +102,9 @@
         }
     }
 
-    // Always show the 5 main categories (even if no donations yet)
-    if (empty($categories)) {
-        $categories = $mainCategories;
-    }
+    // Always include all main categories, even if they have no donations yet
+    $categories = array_unique(array_merge($mainCategories, $categories));
+
 
     // Add “Other” if there are any non-main categories
     if (!empty($otherCategories)) {
@@ -376,12 +375,19 @@
 
 
                     <div class="comment-actions">
-                        <button class="reply-btn">Reply</button>
+                        <button class="reply-btn" title="Reply to this comment">
+                            <i class="fas fa-reply"></i> Reply
+                        </button>
                         <?php if ((int)$comment['user_id'] === (int)$sessionUserId): ?>
-                            <button class="edit-btn">Edit</button>
-                            <button class="delete-btn">Delete</button>
+                            <button class="edit-btn" title="Edit your comment">
+                                <i class="fas fa-pen"></i> Edit
+                            </button>
+                            <button class="delete-btn" title="Delete this comment">
+                                <i class="fas fa-trash"></i> Delete
+                            </button>
                         <?php endif; ?>
                     </div>
+
 
                     <?php if (!empty($comment['replies'])): ?>
                         <ul class="reply-list">
@@ -525,16 +531,19 @@
                 </div>
 
                 <div class="form-group">
-                    <label>Quantity to Claim:</label>
-                    <div style="display:flex;align-items:center;gap:10px;">
-                        <button type="button" onclick="updateQuantity(-1)"
-                            style="width:32px;height:32px;border:none;background:#f0f0f0;border-radius:6px;cursor:pointer;font-size:16px;">−</button>
-                        <input type="text" id="quantityClaim" name="quantity_claim" value="1"
-                            readonly style="width:50px;text-align:center;border:1.5px solid #ccc;border-radius:6px;padding:6px;">
-                        <button type="button" onclick="updateQuantity(1)"
-                            style="width:32px;height:32px;border:none;background:#f0f0f0;border-radius:6px;cursor:pointer;font-size:16px;">+</button>
-                    </div>
+                <label>Quantity to Claim:</label>
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <button type="button" id="btnMinus"
+                    style="width:32px;height:32px;border:none;background:#f0f0f0;border-radius:6px;cursor:pointer;font-size:18px;font-weight:bold;">−</button>
+
+                    <input type="number" id="quantityClaim" name="quantity_claim" value="1" min="1"
+                    style="width:60px;text-align:center;border:1.5px solid #ccc;border-radius:6px;padding:6px;appearance:none;-moz-appearance:textfield;">
+
+                    <button type="button" id="btnPlus"
+                    style="width:32px;height:32px;border:none;background:#f0f0f0;border-radius:6px;cursor:pointer;font-size:18px;font-weight:bold;">+</button>
                 </div>
+                </div>
+
 
                 <div class="form-group">
                     <label>Recycling Project:</label>
@@ -557,7 +566,7 @@
 
                 <div class="popup-btn-group">
                     <button type="submit" name="submit_request_donation" class="request-btn">Submit Request</button>
-                    <button type="button" class="cancel-btn" onclick="closeRequestPopup()">Cancel</button>
+                    <button type="button" id="cancelRequest" class="cancel-btn">Cancel</button>
                 </div>
             </form>
         </div>
@@ -569,7 +578,7 @@
         <div class="popup-content success-popup">
             <h2>Request Sent!</h2>
             <p>Your request has been submitted successfully. Please wait for the donor’s response.</p>
-            <button class="continue-btn" onclick="closeRequestSuccessPopup()">Continue</button>
+            <button class="continue-btn" id="continueBtn">Continue</button>
         </div>
     </div>
 
@@ -659,14 +668,29 @@
         }[m]));
     }
 
-    /* ---------- Tabs ---------- */
+   /* ---------- Tabs ---------- */
     function openTab(tabName) {
-        qs('#donations').style.display = (tabName === 'donations') ? 'block' : 'none';
-        qs('#recycled-ideas').style.display = (tabName === 'recycled-ideas') ? 'block' : 'none';
-        qsa('.tab-btn').forEach(btn => btn.classList.remove('active'));
-        const activeBtn = document.querySelector(`.tab-btn[onclick="openTab('${tabName}')"]`);
-        if (activeBtn) activeBtn.classList.add('active');
+        // Hide all tab contents
+        document.querySelectorAll('.tab-content').forEach(tab => {
+            tab.style.display = 'none';
+        });
+
+        // Show the selected tab content
+        const targetTab = document.getElementById(tabName);
+        if (targetTab) {
+            targetTab.style.display = 'block';
+        }
+
+        // Update active button styles
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        const clickedBtn = Array.from(document.querySelectorAll('.tab-btn'))
+            .find(btn => btn.getAttribute('onclick') === `openTab('${tabName}')`);
+        if (clickedBtn) {
+            clickedBtn.classList.add('active');
+        }
     }
+
+
 
     /* ---------- Profile Dropdown ---------- */
     const userProfile = qs('#userProfile');
@@ -697,13 +721,18 @@
     function closeRequestSuccessPopup() { hide(qs('#requestSuccessPopup')); }
 
     function updateQuantity(change) {
-        const input = qs('#quantityClaim');
-        let val = parseInt(input.value) || 1;
-        val += change;
-        if (val < 1) val = 1;
-        if (val > currentAvailable) val = currentAvailable;
-        input.value = val;
+    const input = qs('#quantityClaim');
+    if (!input) return;
+
+    let val = parseInt(input.value) || 1;
+    val += change;
+
+    if (val < 1) val = 1;
+    if (val > currentAvailable && currentAvailable > 0) val = currentAvailable;
+
+    input.value = val;
     }
+
 
     /* Attach request button events */
     qsa('.request-btn').forEach(btn => {
@@ -743,6 +772,39 @@
             .catch(() => alert('Network error.'));
         });
     }
+
+    // === Quantity Input Controls ===
+    const quantityInput = qs('#quantityClaim');
+    const btnMinus = qs('#btnMinus');
+    const btnPlus = qs('#btnPlus');
+
+    if (quantityInput) {
+    // Prevent typing e, +, -, ., or other non-numeric characters
+    quantityInput.addEventListener('keydown', function(e) {
+        if (['e', 'E', '+', '-', '.'].includes(e.key)) e.preventDefault();
+    });
+
+    // Update via + and - buttons
+    btnMinus?.addEventListener('click', () => updateQuantity(-1));
+    btnPlus?.addEventListener('click', () => updateQuantity(1));
+    }
+
+    // Attach listeners to the new Cancel and Continue buttons (IDs added earlier)
+    const cancelBtn = qs('#cancelRequest');
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            closeRequestPopup();
+        });
+    }
+    const continueBtn = qs('#continueBtn');
+    if (continueBtn) {
+        continueBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            closeRequestSuccessPopup();
+        });
+    }
+
 
     /* ---------- Comments ---------- */
     qsa('.comment-btn').forEach(btn => {
