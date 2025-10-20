@@ -2186,3 +2186,68 @@ input[type="file"] {
     color: #777;
 }
 
+
+/* === POPUP OVERLAY === */
+#donationPopup {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.6);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+/* === POPUP BOX === */
+#donationPopup .popup-content {
+  background: #fff;
+  width: 90%;
+  max-width: 600px;
+  max-height: 80vh; /* constrain popup size */
+  border-radius: 10px;
+  padding: 20px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+  overflow: hidden; /* prevents overflow outside popup */
+}
+
+/* === SCROLLABLE AREA === */
+#donationPopup .popup-scroll-area {
+  overflow-y: auto;
+  padding-right: 10px;
+  margin-top: 10px;
+  flex: 1;
+}
+
+/* === CLOSE BUTTON === */
+#donationPopup .close-btn {
+  position: absolute;
+  top: 10px;
+  right: 15px;
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: #555;
+  cursor: pointer;
+}
+#donationPopup .close-btn:hover {
+  color: #000;
+}
+
+/* === Prevent background scrolling when popup is open === */
+body.popup-open {
+  overflow: hidden;
+}
+
+#donationPopup .popup-content {
+  animation: fadeIn 0.25s ease;
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}

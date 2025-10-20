@@ -172,6 +172,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['wasteType']) && !isse
     exit();
 }
 
+
+
 /* ----------------------------
    Handle request donation with extra details
    Validations:
@@ -888,61 +890,67 @@ function render_comments($comments, $donation_id, $parent_id = NULL) {
         </div>
     </div>
    
-   <!-- Donation Popup Form -->
-<div id="donationPopup" class="popup-container" style="display:none;">
-    <div class="popup-content" id="donationFormContainer">
-        <h2>Post Donation</h2>
-        <form id="donationForm" action="homepage.php" method="POST" enctype="multipart/form-data">
-            <div class="form-group">
-                <label for="wasteType">Type of Waste:</label>
-                <select id="wasteType" name="wasteType" required>
-                    <option value="">Select waste type</option>
-                    <option value="Plastic">Plastic</option>
-                    <option value="Paper">Paper</option>
-                    <option value="Metal">Metal</option>
-                    <option value="Glass">Glass</option>
-                    <option value="Electronic">Electronic</option>
-                </select>
-            </div>
+            <!-- Donation Popup Form -->
+            <div id="donationPopup" class="popup-container" style="display:none;">
+                <div class="popup-content">
+                    <button class="close-btn">&times;</button>
+                    <h2>Post Donation</h2>
 
-            <div class="form-group" id="subcategory-group" style="display:none;">
-                <label for="subcategory">Subcategory:</label>
-                <select id="subcategory" name="subcategory">
-                    <option value="">-- Select Subcategory --</option>
-                </select>
-            </div>
+                    <!-- ✅ NEW WRAPPER for scrollable content -->
+                    <div id="donationFormContainer" class="popup-scroll-area">
+                        <form id="donationForm" action="homepage.php" method="POST" enctype="multipart/form-data">
+                            <div class="form-group">
+                                <label for="wasteType">Type of Waste:</label>
+                                <select id="wasteType" name="wasteType" required>
+                                    <option value="">Select waste type</option>
+                                    <option value="Plastic">Plastic</option>
+                                    <option value="Paper">Paper</option>
+                                    <option value="Metal">Metal</option>
+                                    <option value="Glass">Glass</option>
+                                    <option value="Electronic">Electronic</option>
+                                </select>
+                            </div>
 
+                            <div class="form-group" id="subcategory-group" style="display:none;">
+                                <label for="subcategory">Subcategory:</label>
+                                <select id="subcategory" name="subcategory">
+                                    <option value="">-- Select Subcategory --</option>
+                                </select>
+                            </div>
 
-            <div class="form-group">
-                <label for="quantity">Quantity:</label>
-                <input type="number" id="quantity" name="quantity" placeholder="Enter quantity" 
-                    min="1" required>
+                            <div class="form-group">
+                                <label for="quantity">Quantity:</label>
+                                <input type="number" id="quantity" name="quantity" placeholder="Enter quantity" min="1" required>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="description">Description:</label>
+                                <textarea id="description" name="description" placeholder="Describe your donation..." rows="4" required></textarea>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="photos">Attach Photos (up to 4):</label>
+                                <div class="file-upload">
+                                    <input type="file" id="photos" name="photos[]" accept="image/*" multiple>
+                                    <label for="photos" class="file-upload-label">Choose Files</label>
+                                    <span id="file-chosen">No files chosen</span>
+                                </div>
+                                <small class="form-hint">You can upload up to 4 photos. Only JPG, PNG, and GIF files are allowed.</small>
+
+                                <div id="file-count-message" class="file-count-message" style="display: none;"></div>
+
+                                <div id="photoPreviewContainer" class="photo-preview-container">
+                                    <div id="photoPreview" class="photo-preview"></div>
+                                </div>
+                            </div>
+
+                            <button type="submit" class="btn submit-btn">Post Donation</button>
+                        </form>
+                    </div>
                 </div>
-
-            <div class="form-group">
-                <label for="description">Description:</label>
-                <textarea id="description" name="description" placeholder="Describe your donation..." rows="4" required></textarea>
             </div>
             
-            <div class="form-group">
-                <label for="photos">Attach Photos (up to 4):</label>
-                <div class="file-upload">
-                    <input type="file" id="photos" name="photos[]" accept="image/*" multiple>
-                    <label for="photos" class="file-upload-label">Choose Files</label>
-                    <span id="file-chosen">No files chosen</span>
-                </div>
-                <small class="form-hint">You can upload up to 4 photos. Only JPG, PNG, and GIF files are allowed.</small>
-                
-                <div id="file-count-message" class="file-count-message" style="display: none;"></div>
-                
-                <div id="photoPreviewContainer" class="photo-preview-container">
-                    <div id="photoPreview" class="photo-preview"></div>
-                </div>
-            </div>
-            <button type="submit" class="btn submit-btn">Post Donation</button>
-        </form>
-        <button class="close-btn">&times;</button>
-    </div>
+
      <div class="popup-content success-popup" id="successPopup" style="display: none;">
         <div class="success-icon">
             <i class="fas fa-gift"></i>
@@ -1806,6 +1814,28 @@ function toggleReplyForm(commentId) {
     if (!form) return;
     form.style.display = form.style.display === 'none' || form.style.display === '' ? 'block' : 'none';
 }
+
+// === Restrict Quantity Input to Digits Only ===
+document.addEventListener("DOMContentLoaded", function() {
+  const quantityInput = document.getElementById("quantity");
+  if (quantityInput) {
+    // Block invalid keys (e, E, +, -, .)
+    quantityInput.addEventListener("keydown", function(e) {
+      if (
+        e.key === "e" || e.key === "E" ||
+        e.key === "+" || e.key === "-" ||
+        e.key === "."
+      ) {
+        e.preventDefault();
+      }
+    });
+
+    // Clean up pasted values (remove non-numeric)
+    quantityInput.addEventListener("input", function(e) {
+      this.value = this.value.replace(/[^0-9]/g, '');
+    });
+  }
+});
 
 </script>
 
