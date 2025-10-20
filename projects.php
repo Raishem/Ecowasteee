@@ -29,8 +29,61 @@ if (!$user) {
     <title>Projects | EcoWaste</title>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&family=Open+Sans&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="assets/css/header.css">
     <link rel="stylesheet" href="assets/css/projects.css">
+    <style>
+        .profile-dropdown {
+            display: none;
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background-color: white;
+            border-radius: 8px;
+                    
+            background-color: #eee;
+            margin: 8px 0;
+        }
 
+        .user-profile {
+            position: relative;
+            cursor: pointer;
+        }
+
+        .user-profile.active .dropdown-arrow {
+            transform: rotate(180deg);
+        }
+
+        .filter-tab {
+            cursor: pointer;
+            padding: 8px 16px;
+            border-radius: 6px;
+            transition: all 0.3s ease;
+        }
+
+        .filter-tab.active {
+            background-color: #2e8b57;
+            color: white;
+        }
+
+        .filter-tab:hover:not(.active) {
+            background-color: #f0f7e8;
+        }
+
+        .view-details {
+            background-color: #2e8b57;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .view-details:hover {
+            background-color: #3cb371;
+            transform: translateY(-1px);
+        }
+    </style>
 </head>
 <body>
     <header>
@@ -64,7 +117,7 @@ if (!$user) {
                     <li><a href="achievements.php"><i class="fas fa-star"></i>Achievements</a></li>
                     <li><a href="leaderboard.php"><i class="fas fa-trophy"></i>Leaderboard</a></li>
                     <li><a href="projects.php" class="active"><i class="fas fa-recycle"></i>Projects</a></li>
-                    <li><a href="donations.php"><i class="fas fa-hand-holding-heart"></i>Donations</a></li>
+                    <li><a href="donations.php"><i class="fas fa-box"></i>Donations</a></li>
                 </ul>
             </nav>
         </aside>
@@ -137,10 +190,8 @@ if (!$user) {
                                     </ul>
                                 </div>
                                 <div class="project-actions">
-                                    <button class="action-btn view-details" onclick="viewProjectDetails(<?= $project['project_id'] ?>)">
-                                        <i class="fas fa-eye"></i> View Details
-                                    </button>
-                                </div>
+                                        <a href="project_details.php?id=<?php echo $project['project_id']; ?>" class="action-btn view-details" data-project-id="<?php echo $project['project_id']; ?>"><i class="fas fa-eye"></i> View Details</a>
+                                    </div>
                             </div>
                             <?php
                         }
@@ -207,10 +258,6 @@ if (!$user) {
                         </div>
                         <div class="progress-tracker">
                             <div class="progress-step active">
-                                <i class="fas fa-list"></i>
-                                <span>Planning</span>
-                            </div>
-                            <div class="progress-step">
                                 <i class="fas fa-box"></i>
                                 <span>Materials Collection</span>
                             </div>
@@ -258,21 +305,21 @@ if (!$user) {
                         <!-- Add Step Form -->
                         <div id="addStepForm" class="add-step-form" style="display: none;">
                             <div class="form-group">
-                                <label>Step Title</label>
+                                <label for="stepTitle">Step Title</label>
                                 <input type="text" id="stepTitle" class="edit-input" placeholder="e.g., Prepare materials">
                             </div>
                             <div class="form-group">
-                                <label>Instructions</label>
+                                <label for="stepInstructions">Instructions</label>
                                 <textarea id="stepInstructions" class="edit-input" placeholder="Describe the step in detail..."></textarea>
                             </div>
                             <div class="form-group">
-                                <label>Add Photos (optional)</label>
+                                <label for="stepPhotos">Add Photos (optional)</label>
                                 <input type="file" id="stepPhotos" multiple accept="image/*" class="file-input">
                                 <div class="photo-preview"></div>
                             </div>
                             <div class="edit-actions">
-                                <button class="save-btn" onclick="saveProjectStep()">Add Step</button>
-                                <button class="cancel-btn" onclick="hideAddStepForm()">Cancel</button>
+                                <button type="button" class="save-btn" onclick="saveProjectStep()">Add Step</button>
+                                <button type="button" class="cancel-btn" onclick="hideAddStepForm()">Cancel</button>
                             </div>
                         </div>
                     </div>
@@ -364,371 +411,679 @@ if (!$user) {
         </div>
     </div>
 
-<script>
-document.addEventListener("DOMContentLoaded", function () {
+    <script>
     let currentProjectId = null;
-    let currentProjectStatus = 'planning';
+    let currentProjectStatus = 'collecting';
 
-    // ---------------- PROFILE DROPDOWN ----------------
-    const userProfile = document.getElementById('userProfile');
-    const profileDropdown = document.querySelector('.profile-dropdown');
-
-    if (userProfile && profileDropdown) {
-        userProfile.addEventListener('click', function(e) {
-            e.stopPropagation();
-            profileDropdown.style.display =
-                profileDropdown.style.display === 'block' ? 'none' : 'block';
+        // User profile dropdown
+        document.getElementById('userProfile').addEventListener('click', function() {
+            this.classList.toggle('active');
         });
 
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(event) {
+            const userProfile = document.getElementById('userProfile');
+            if (!userProfile.contains(event.target)) {
+                userProfile.classList.remove('active');
+            }
+        });
+
+        // Function to handle viewing project details
+        function viewProjectDetails(projectId) {
+            currentProjectId = projectId;
+            
+            // Make an AJAX request to get project details
+            fetch(`update_project.php?action=get_project_details&project_id=${projectId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Update the project details section
+                        document.getElementById('projectDetailTitle').textContent = data.project.project_name;
+                        document.getElementById('projectDetailDate').textContent = 'Created: ' + new Date(data.project.created_at).toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric'
+                        });
+                        document.getElementById('projectDetailDescription').textContent = data.project.description;
+                        
+                        // Set the current status
+                        currentProjectStatus = data.project.status || 'collecting';
+                        const btn = document.getElementById('projectStatusBtn');
+                        btn.setAttribute('data-status', currentProjectStatus);
+                        updateProjectStatus(currentProjectStatus);
+                        
+                        // Update materials list
+                        updateMaterialsList(data.materials);
+
+                        // Update steps list
+                        updateStepsList(data.steps || []);
+
+                        // Switch views
+                        document.getElementById('projectsListView').style.display = 'none';
+                        document.getElementById('projectDetailsView').style.display = 'block';
+                    } else {
+                        alert('Error loading project details: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error loading project details');
+                });
+        }
+
+        function updateMaterialsList(materials) {
+            const materialsContainer = document.getElementById('projectDetailMaterials');
+            materialsContainer.innerHTML = '';
+
+            if (materials && materials.length > 0) {
+                materials.forEach(material => {
+                    const materialDiv = document.createElement('div');
+                    materialDiv.className = 'material-item';
+                    materialDiv.innerHTML = `
+                        <div class="material-content">
+                            <span class="material-name">${material.name}</span>
+                            <span class="material-unit">${material.unit || ''}</span>
+                            ${material.is_found ? '<i class="fas fa-check-circle material-check"></i>' : ''}
+                        </div>
+                        <div class="material-actions">
+                            ${!material.is_found ? `
+                                <button class="check-btn" data-action="mark-found" data-material-id="${material.id}" title="Mark as obtained">
+                                    <i class="fas fa-check"></i>
+                                </button>
+                            ` : ''}
+                            <button class="delete-btn" data-action="delete-material" data-material-id="${material.id}" title="Delete">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>`;
+                    materialsContainer.appendChild(materialDiv);
+                });
+                } else {
+                    materialsContainer.innerHTML = '<p class="no-materials">No materials added yet.</p>';
+                }
+            }
+
+        }
+
+        // Functions for managing materials
+        function showAddMaterialForm() {
+            document.getElementById('addMaterialForm').style.display = 'block';
+        }
+
+        function hideAddMaterialForm() {
+            const form = document.getElementById('addMaterialForm');
+            form.style.display = 'none';
+            // Clear form inputs
+            form.querySelector('#newMaterialName').value = '';
+            form.querySelector('#newMaterialQuantity').value = '';
+            form.querySelector('#newMaterialUnit').value = '';
+        }
+
+        function addNewMaterial() {
+            const name = document.getElementById('newMaterialName').value.trim();
+            const unit = document.getElementById('newMaterialUnit').value.trim();
+
+            if (!name || !unit) {
+                alert('Please fill in all material fields');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('action', 'add_material');
+            formData.append('project_id', currentProjectId);
+            formData.append('name', name);
+            formData.append('unit', unit);
+
+            fetch('update_project.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    hideAddMaterialForm();
+                    // Refresh project details to show new material
+                    viewProjectDetails(currentProjectId);
+                } else {
+                    alert('Error adding material: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error adding material');
+            });
+        }
+
+        function deleteMaterial(materialId) {
+            if (confirm('Are you sure you want to delete this material?')) {
+                const formData = new FormData();
+                formData.append('action', 'delete_material');
+                formData.append('project_id', currentProjectId);
+                formData.append('material_id', materialId);
+
+                fetch('update_project.php', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Refresh project details to update materials list
+                        viewProjectDetails(currentProjectId);
+                    } else {
+                        alert('Error deleting material: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error deleting material');
+                });
+            }
+        }
+
+        // Function to toggle title edit form
+        function toggleEditTitle() {
+            const titleElement = document.getElementById('projectDetailTitle').parentElement;
+            const editForm = document.querySelector('.edit-title-form');
+            const editInput = document.getElementById('editTitleInput');
+            
+            editInput.value = document.getElementById('projectDetailTitle').textContent;
+            titleElement.style.display = 'none';
+            editForm.style.display = 'block';
+            editInput.focus();
+        }
+
+        // Function to cancel title editing
+        function cancelEditTitle() {
+            const titleElement = document.getElementById('projectDetailTitle').parentElement;
+            const editForm = document.querySelector('.edit-title-form');
+            
+            titleElement.style.display = 'flex';
+            editForm.style.display = 'none';
+        }
+
+        // Function to save project title
+        function saveProjectTitle() {
+            const newTitle = document.getElementById('editTitleInput').value.trim();
+            if (!newTitle) {
+                alert('Title cannot be empty');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('action', 'update_title');
+            formData.append('project_id', currentProjectId);
+            formData.append('title', newTitle);
+
+            fetch('update_project.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('projectDetailTitle').textContent = newTitle;
+                    cancelEditTitle();
+                    // Update the project card in the list view
+                    const projectCard = document.querySelector(`[data-project-id="${currentProjectId}"]`);
+                    if (projectCard) {
+                        projectCard.querySelector('h3').textContent = newTitle;
+                    }
+                } else {
+                    alert('Error updating title: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error updating title');
+            });
+        }
+
+        // Function to toggle description edit form
+        function toggleEditDescription() {
+            const descElement = document.getElementById('projectDetailDescription');
+            const editForm = document.querySelector('.edit-description-form');
+            const editInput = document.getElementById('editDescriptionInput');
+            
+            editInput.value = descElement.textContent;
+            descElement.style.display = 'none';
+            editForm.style.display = 'block';
+            editInput.focus();
+        }
+
+        // Function to cancel description editing
+        function cancelEditDescription() {
+            const descElement = document.getElementById('projectDetailDescription');
+            const editForm = document.querySelector('.edit-description-form');
+            
+            descElement.style.display = 'block';
+            editForm.style.display = 'none';
+        }
+
+        // Function to save project description
+        function saveProjectDescription() {
+            const newDescription = document.getElementById('editDescriptionInput').value.trim();
+            if (!newDescription) {
+                alert('Description cannot be empty');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('action', 'update_description');
+            formData.append('project_id', currentProjectId);
+            formData.append('description', newDescription);
+
+            fetch('update_project.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('projectDetailDescription').textContent = newDescription;
+                    cancelEditDescription();
+                    // Update description in list view if visible
+                    const projectCard = document.querySelector(`[data-project-id="${currentProjectId}"]`);
+                    if (projectCard) {
+                        projectCard.querySelector('.project-description').textContent = newDescription;
+                    }
+                } else {
+                    alert('Error updating description: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error updating description');
+            });
+        }
+
+        // Function to find material in browse section
+        function findMaterial(materialName) {
+            // Encode the material name for the URL
+            const encodedMaterial = encodeURIComponent(materialName);
+            // Redirect to browse page with search parameter
+            window.location.href = `browse.php?search=${encodedMaterial}`;
+        }
+
+        // Function to mark material as found
+        function markMaterialFound(materialId) {
+            const formData = new FormData();
+            formData.append('action', 'mark_material_found');
+            formData.append('project_id', currentProjectId);
+            formData.append('material_id', materialId);
+
+            fetch('update_project.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (!data.success) {
+                    alert('Error updating material status: ' + data.message);
+                    btn.classList.remove('found');
+                    btn.removeAttribute('disabled');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                btn.classList.remove('found');
+                btn.removeAttribute('disabled');
+            });
+        }
+
+        // Project Steps Functions
+        function showAddStepForm() {
+            document.getElementById('addStepForm').style.display = 'block';
+        }
+
+        function hideAddStepForm() {
+            document.getElementById('addStepForm').style.display = 'none';
+            document.getElementById('stepTitle').value = '';
+            document.getElementById('stepInstructions').value = '';
+            document.getElementById('stepPhotos').value = '';
+            document.querySelector('.photo-preview').innerHTML = '';
+        }
+
+        function saveProjectStep() {
+            const title = document.getElementById('stepTitle').value.trim();
+            const instructions = document.getElementById('stepInstructions').value.trim();
+            const photos = document.getElementById('stepPhotos').files;
+
+            if (!title || !instructions) {
+                alert('Please fill in all required fields');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('action', 'add_step');
+            formData.append('project_id', currentProjectId);
+            formData.append('title', title);
+            formData.append('instructions', instructions);
+
+            for (let i = 0; i < photos.length; i++) {
+                formData.append('photos[]', photos[i]);
+            }
+
+            fetch('update_project.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    hideAddStepForm();
+                    viewProjectDetails(currentProjectId);
+                } else {
+                    alert('Error adding step: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error adding step');
+            });
+        }
+
+        function toggleProjectStatus() {
+            const btn = document.getElementById('projectStatusBtn');
+            const currentStatus = btn.getAttribute('data-status');
+            let newStatus;
+
+            switch (currentStatus) {
+                case 'collecting':
+                    newStatus = 'in_progress';
+                    break;
+                case 'in_progress':
+                    newStatus = 'completed';
+                    break;
+                default:
+                    newStatus = 'collecting';
+            }
+
+            if (!currentProjectId) {
+                alert('Error: No project selected');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('action', 'update_project_status');
+            formData.append('project_id', currentProjectId);
+            formData.append('status', newStatus);
+
+            fetch('update_project.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                    if (data.success) {
+                    updateProjectStatus(newStatus);
+                    if (newStatus === 'completed') {
+                        // Do not auto-open the Share modal. Sharing is a manual action available
+                        // from the Project Details page when the project is completed.
+                        showToast('Project marked as completed — you can share it from the details page', 'success');
+                    }
+                } else {
+                    alert('Error updating project status');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error updating project status');
+            });
+        }
+
+        function updateProjectStatus(status) {
+            const steps = document.querySelectorAll('.progress-step');
+            const statusMap = {
+                'collecting': 0,
+                'in_progress': 1,
+                'completed': 2
+            };
+
+            steps.forEach((step, index) => {
+                if (index <= statusMap[status]) {
+                    step.classList.add('active');
+                } else {
+                    step.classList.remove('active');
+                }
+            });
+
+            const btn = document.getElementById('projectStatusBtn');
+            btn.setAttribute('data-status', status);
+            btn.innerHTML = status === 'completed' 
+                ? '<i class="fas fa-check-circle"></i> Completed'
+                : '<i class="fas fa-flag"></i> ' + getNextStatusLabel(status);
+        }
+
+        function getNextStatusLabel(currentStatus) {
+            switch (currentStatus) {
+                case 'collecting':
+                    return 'Start Project';
+                case 'in_progress':
+                    return 'Mark as Complete';
+                default:
+                    return 'Mark as Complete';
+            }
+        }
+
+        
+
+        function copyShareLink() {
+            const url = document.querySelector('.copy-link').getAttribute('data-url');
+            navigator.clipboard.writeText(url).then(() => {
+                alert('Link copied to clipboard!');
+            });
+        }
+
+        // Function to update steps list
+        function updateStepsList(steps) {
+            const stepsContainer = document.getElementById('projectSteps');
+            stepsContainer.innerHTML = '';
+
+            if (steps && steps.length > 0) {
+                steps.forEach(step => {
+                    const stepDiv = document.createElement('div');
+                    stepDiv.className = 'step-item';
+                    stepDiv.innerHTML = `
+                        <div class="step-header">
+                            <h4>Step ${step.step_number}: ${step.title}</h4>
+                        </div>
+                        <div class="step-content">
+                            <p>${step.instructions}</p>
+                            ${step.photos ? `
+                                <div class="step-photos">
+                                    ${step.photos.split(',').map(photo => `
+                                        <img src="assets/uploads/${photo}" alt="Step photo">
+                                    `).join('')}
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
+                    stepsContainer.appendChild(stepDiv);
+                });
+            } else {
+                stepsContainer.innerHTML = '<p class="no-steps">No steps added yet.</p>';
+            }
+        }
+
+        // Function to go back to project list
+        function showProjectsList() {
+            document.getElementById('projectsListView').style.display = 'block';
+            document.getElementById('projectDetailsView').style.display = 'none';
+        }
+
+        // Project filters functionality
+        const filterTabs = document.querySelectorAll('.filter-tab');
+        filterTabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                // Update active tab
+                filterTabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+
+                const filter = tab.getAttribute('data-filter');
+                const projectCards = document.querySelectorAll('.project-card');
+
+                projectCards.forEach(card => {
+                    if (filter === 'all' || card.getAttribute('data-status') === filter) {
+                        card.style.display = 'block';
+                        setTimeout(() => {
+                            card.style.opacity = '1';
+                            card.style.transform = 'translateY(0)';
+                        }, 10);
+                    } else {
+                        card.style.opacity = '0';
+                        card.style.transform = 'translateY(20px)';
+                        setTimeout(() => {
+                            card.style.display = 'none';
+                        }, 300);
+                    }
+                });
+            });
+        });
+
+        // Add some CSS styles for material items
+        // All styles have been moved to projects.css
+    </script>
+    <script>
+        // User Profile Dropdown
+        const userProfile = document.getElementById('userProfile');
+        const profileDropdown = document.querySelector('.profile-dropdown');
+        
+        userProfile.addEventListener('click', function(e) {
+            e.stopPropagation();
+            userProfile.classList.toggle('active');
+            profileDropdown.style.display = profileDropdown.style.display === 'block' ? 'none' : 'block';
+        });
+        
         document.addEventListener('click', function(event) {
             if (!userProfile.contains(event.target)) {
+                userProfile.classList.remove('active');
                 profileDropdown.style.display = 'none';
             }
         });
-    }
 
-    // ---------------- VIEW PROJECT DETAILS ----------------
-    window.viewProjectDetails = function (projectId) {
-        window.location.href = `project_details.php?id=${projectId}`;
-    };
-
-    // ---------------- MATERIALS ----------------
-    window.updateMaterialsList = function (materials) {
-        const materialsContainer = document.getElementById('projectDetailMaterials');
-        materialsContainer.innerHTML = '';
-
-        if (materials && materials.length > 0) {
-            materials.forEach(material => {
-                const materialDiv = document.createElement('div');
-                materialDiv.className = 'material-item';
-                materialDiv.innerHTML = `
-                    <div class="material-content">
-                        <span class="material-name">${material.name}</span>
-                        <span class="material-unit">${material.unit || ''}</span>
-                        ${material.is_found ? '<i class="fas fa-check-circle material-check"></i>' : ''}
-                    </div>
-                    <div class="material-actions">
-                        ${!material.is_found ? `
-                            <button class="check-btn" onclick="markMaterialFound(${material.id})" title="Mark as obtained">
-                                <i class="fas fa-check"></i>
-                            </button>
-                        ` : ''}
-                        <button class="delete-btn" onclick="deleteMaterial(${material.id})" title="Delete">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </div>`;
-                materialsContainer.appendChild(materialDiv);
+        // Filter Tabs Functionality
+        const filterTabs = document.querySelectorAll('.filter-tab');
+        filterTabs.forEach(tab => {
+            tab.addEventListener('click', function() {
+                // Remove active class from all tabs
+                filterTabs.forEach(t => t.classList.remove('active'));
+                // Add active class to clicked tab
+                this.classList.add('active');
+                
+                const filter = this.getAttribute('data-filter');
+                const projectCards = document.querySelectorAll('.project-card');
+                
+                projectCards.forEach(card => {
+                    if (filter === 'all' || card.getAttribute('data-status') === filter) {
+                        card.style.display = 'block';
+                    } else {
+                        card.style.display = 'none';
+                    }
+                });
             });
-        } else {
-            materialsContainer.innerHTML = '<p class="no-materials">No materials added yet.</p>';
-        }
-    };
-
-    window.showAddMaterialForm = function () {
-        document.getElementById('addMaterialForm').style.display = 'block';
-    };
-
-    window.hideAddMaterialForm = function () {
-        const form = document.getElementById('addMaterialForm');
-        form.style.display = 'none';
-        form.querySelector('#newMaterialName').value = '';
-        form.querySelector('#newMaterialUnit').value = '';
-    };
-
-    window.addNewMaterial = function () {
-        const name = document.getElementById('newMaterialName').value.trim();
-        const unit = document.getElementById('newMaterialUnit').value.trim();
-
-        if (!name || !unit) {
-            alert('Please fill in all material fields');
-            return;
-        }
-
-        const formData = new FormData();
-        formData.append('action', 'add_material');
-        formData.append('project_id', currentProjectId);
-        formData.append('name', name);
-        formData.append('unit', unit);
-
-        fetch('update_project.php', { method: 'POST', body: formData })
-        .then(res => res.json())
-        .then(data => {
-            if (data.success) {
-                hideAddMaterialForm();
-                viewProjectDetails(currentProjectId);
-            } else {
-                alert('Error adding material: ' + data.message);
-            }
-        })
-        .catch(err => {
-            console.error(err);
-            alert('Error adding material');
         });
-    };
 
-    window.deleteMaterial = function (materialId) {
-        if (!confirm('Are you sure you want to delete this material?')) return;
-
-        const formData = new FormData();
-        formData.append('action', 'delete_material');
-        formData.append('project_id', currentProjectId);
-        formData.append('material_id', materialId);
-
-        fetch('update_project.php', { method: 'POST', body: formData })
-        .then(res => res.json())
-        .then(data => {
-            if (data.success) {
-                viewProjectDetails(currentProjectId);
-            } else {
-                alert('Error deleting material: ' + data.message);
+        // Delegated handlers for view-details and material actions
+        document.addEventListener('click', function (e) {
+            const vd = e.target.closest('.view-details');
+            if (vd) {
+                const pid = vd.dataset.projectId;
+                if (pid) window.location.href = `project_details.php?id=${pid}`;
+                return;
             }
-        })
-        .catch(err => {
-            console.error(err);
-            alert('Error deleting material');
-        });
-    };
 
-    window.markMaterialFound = function (materialId) {
-        const formData = new FormData();
-        formData.append('action', 'mark_material_found');
-        formData.append('project_id', currentProjectId);
-        formData.append('material_id', materialId);
-
-        fetch('update_project.php', { method: 'POST', body: formData })
-        .then(res => res.json())
-        .then(data => {
-            if (!data.success) {
-                alert('Error updating material status: ' + data.message);
+            const markBtn = e.target.closest('[data-action="mark-found"]');
+            if (markBtn) {
+                const mid = markBtn.dataset.materialId;
+                if (!mid || !currentProjectId) return;
+                markMaterialFound(mid);
+                return;
             }
-        })
-        .catch(err => {
-            console.error(err);
-            alert('Error updating material status');
-        });
-    };
 
-    // ---------------- PROJECT STATUS ----------------
-    window.toggleProjectStatus = function () {
-        const btn = document.getElementById('projectStatusBtn');
-        const currentStatus = btn.getAttribute('data-status');
-        let newStatus;
-
-        switch (currentStatus) {
-            case 'planning': newStatus = 'collecting'; break;
-            case 'collecting': newStatus = 'in_progress'; break;
-            case 'in_progress': newStatus = 'completed'; break;
-            default: newStatus = 'planning';
-        }
-
-        if (!currentProjectId) {
-            alert('Error: No project selected');
-            return;
-        }
-
-        const formData = new FormData();
-        formData.append('action', 'update_project_status');
-        formData.append('project_id', currentProjectId);
-        formData.append('status', newStatus);
-
-        fetch('update_project.php', { method: 'POST', body: formData })
-        .then(res => res.json())
-        .then(data => {
-            if (data.success) {
-                updateProjectStatus(newStatus);
-                if (newStatus === 'completed') {
-                    showShareModal();
+            const delBtn = e.target.closest('[data-action="delete-material"]');
+            if (delBtn) {
+                const mid = delBtn.dataset.materialId;
+                if (!mid || !currentProjectId) return;
+                if (confirm('Are you sure you want to delete this material?')) {
+                    deleteMaterial(mid);
                 }
-            } else {
-                alert('Error updating project status');
+                return;
             }
-        })
-        .catch(err => {
-            console.error(err);
-            alert('Error updating project status');
-        });
-    };
-
-    function updateProjectStatus(status) {
-        const steps = document.querySelectorAll('.progress-step');
-        const statusMap = { 'planning': 0, 'collecting': 1, 'in_progress': 2, 'completed': 3 };
-
-        steps.forEach((step, i) => {
-            if (i <= statusMap[status]) step.classList.add('active');
-            else step.classList.remove('active');
         });
 
-        const btn = document.getElementById('projectStatusBtn');
-        btn.setAttribute('data-status', status);
-        btn.innerHTML = status === 'completed' 
-            ? '<i class="fas fa-check-circle"></i> Completed'
-            : '<i class="fas fa-flag"></i> ' + getNextStatusLabel(status);
-    }
+        // showToast helper used across this page
+        function showToast(message, type = 'info', timeout = 3500) {
+            let container = document.getElementById('toastContainer');
+            if (!container) {
+                container = document.createElement('div');
+                container.id = 'toastContainer';
+                container.style.position = 'fixed';
+                container.style.right = '20px';
+                container.style.top = '20px';
+                container.style.zIndex = 9999;
+                document.body.appendChild(container);
+            }
 
-    function getNextStatusLabel(status) {
-        switch (status) {
-            case 'planning': return 'Start Collecting';
-            case 'collecting': return 'Start Project';
-            case 'in_progress': return 'Mark as Complete';
-            default: return 'Mark as Complete';
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+            toast.style.marginBottom = '8px';
+            toast.style.padding = '10px 14px';
+            toast.style.borderRadius = '8px';
+            toast.style.boxShadow = '0 2px 10px rgba(0,0,0,0.08)';
+            toast.style.color = '#fff';
+            toast.style.display = 'flex';
+            toast.style.alignItems = 'center';
+            toast.style.gap = '10px';
+
+            const icon = document.createElement('span');
+            icon.className = 'toast-icon';
+            icon.innerHTML = type === 'success' ? '✅' : type === 'error' ? '⚠️' : 'ℹ️';
+
+            const text = document.createElement('span');
+            text.textContent = message;
+
+            const close = document.createElement('button');
+            close.textContent = '✕';
+            close.style.marginLeft = '8px';
+            close.style.background = 'transparent';
+            close.style.border = 'none';
+            close.style.color = 'inherit';
+            close.style.cursor = 'pointer';
+
+            toast.appendChild(icon);
+            toast.appendChild(text);
+            toast.appendChild(close);
+
+            if (type === 'success') toast.style.background = '#2e8b57';
+            else if (type === 'error') toast.style.background = '#d9534f';
+            else toast.style.background = '#333';
+
+            container.appendChild(toast);
+
+            const removeToast = () => toast.remove();
+            close.addEventListener('click', removeToast);
+            setTimeout(removeToast, timeout);
         }
-    }
+    </script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const userProfile = document.querySelector('.user-profile');
+    const dropdownMenu = document.querySelector('.dropdown-menu');
 
-    // ---------------- SHARE MODAL ----------------
-    window.showShareModal = function () {
-        const modal = document.getElementById('shareProjectModal');
-        modal.style.display = 'flex';
-        generateShareLink();
-    };
-
-    window.closeShareModal = function () {
-        document.getElementById('shareProjectModal').style.display = 'none';
-    };
-
-    function generateShareLink() {
-        const formData = new FormData();
-        formData.append('action', 'generate_share_link');
-        formData.append('project_id', currentProjectId);
-
-        fetch('update_project.php', { method: 'POST', body: formData })
-        .then(res => res.json())
-        .then(data => {
-            if (data.success) {
-                document.querySelector('.copy-link').setAttribute('data-url', data.share_url);
-            }
-        });
-    }
-
-    window.shareOnFacebook = function () {
-        const url = document.querySelector('.copy-link').getAttribute('data-url');
-        window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`, 'facebook-share', 'width=580,height=296');
-    };
-
-    window.shareOnTwitter = function () {
-        const url = document.querySelector('.copy-link').getAttribute('data-url');
-        const text = 'Check out my recycling project on EcoWaste!';
-        window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, 'twitter-share', 'width=550,height=235');
-    };
-
-    window.copyShareLink = function () {
-        const url = document.querySelector('.copy-link').getAttribute('data-url');
-        navigator.clipboard.writeText(url).then(() => alert('Link copied to clipboard!'));
-    };
-
-    // ---------------- FILTER TABS ----------------
-    const filterTabs = document.querySelectorAll('.filter-tab');
-    filterTabs.forEach(tab => {
-        tab.addEventListener('click', function() {
-            filterTabs.forEach(t => t.classList.remove('active'));
-            this.classList.add('active');
-
-            const filter = this.getAttribute('data-filter');
-            const projectCards = document.querySelectorAll('.project-card');
-
-            projectCards.forEach(card => {
-                card.style.display = (filter === 'all' || card.getAttribute('data-status') === filter)
-                    ? 'block' : 'none';
-            });
-        });
-    });
-
-    // ---------------- FEEDBACK MODAL ----------------
-    const feedbackBtn = document.getElementById("feedbackBtn");
-    const feedbackModal = document.getElementById("feedbackModal");
-    const feedbackCloseBtn = document.getElementById("feedbackCloseBtn");
-    const emojiOptions = document.querySelectorAll(".emoji-option");
-    const feedbackSubmitBtn = document.getElementById("feedbackSubmitBtn");
-    const feedbackText = document.getElementById("feedbackText");
-    const ratingError = document.getElementById("ratingError");
-    const textError = document.getElementById("textError");
-    const thankYouMessage = document.getElementById("thankYouMessage");
-    const feedbackForm = document.getElementById("feedbackForm");
-    const spinner = document.getElementById("spinner");
-
-    let selectedRating = 0;
-
-    if (feedbackBtn && feedbackModal) {
-        feedbackBtn.addEventListener("click", () => {
-            feedbackModal.style.display = "flex";
-            feedbackForm.style.display = "block";
-            thankYouMessage.style.display = "none";
-        });
-
-        feedbackCloseBtn.addEventListener("click", () => {
-            feedbackModal.style.display = "none";
-        });
-
-        window.addEventListener("click", (e) => {
-            if (e.target === feedbackModal) {
-                feedbackModal.style.display = "none";
-            }
-        });
-
-        emojiOptions.forEach(option => {
-            option.addEventListener("click", () => {
-                emojiOptions.forEach(o => o.classList.remove("selected"));
-                option.classList.add("selected");
-                selectedRating = option.getAttribute("data-rating");
-                ratingError.style.display = "none";
-            });
-        });
-
-        feedbackSubmitBtn.addEventListener("click", function (e) {
+    if (userProfile && dropdownMenu) {
+        userProfile.addEventListener('click', function(e) {
             e.preventDefault();
+            dropdownMenu.classList.toggle('show');
+        });
 
-            let valid = true;
-            if (selectedRating === 0) {
-                ratingError.style.display = "block";
-                valid = false;
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!userProfile.contains(e.target)) {
+                dropdownMenu.classList.remove('show');
             }
-            if (feedbackText.value.trim() === "") {
-                textError.style.display = "block";
-                valid = false;
-            } else {
-                textError.style.display = "none";
-            }
-            if (!valid) return;
-
-            spinner.style.display = "inline-block";
-            feedbackSubmitBtn.disabled = true;
-
-            fetch("feedback_process.php", {
-                method: "POST",
-                headers: { "Content-Type": "application/x-www-form-urlencoded" },
-                credentials: "same-origin",
-                body: `rating=${selectedRating}&feedback=${encodeURIComponent(feedbackText.value)}`
-            })
-            .then(res => res.json())
-            .then(data => {
-                spinner.style.display = "none";
-                feedbackSubmitBtn.disabled = false;
-
-                if (data.status === "success") {
-                    feedbackForm.style.display = "none";
-                    thankYouMessage.style.display = "block";
-
-                    setTimeout(() => {
-                        feedbackModal.style.display = "none";
-                        feedbackForm.style.display = "block";
-                        thankYouMessage.style.display = "none";
-                        feedbackText.value = "";
-                        selectedRating = 0;
-                        emojiOptions.forEach(o => o.classList.remove("selected"));
-                    }, 3000);
-                } else {
-                    alert(data.message || "Failed to submit feedback.");
-                }
-            })
-            .catch(err => {
-                spinner.style.display = "none";
-                feedbackSubmitBtn.disabled = false;
-                alert("Failed to submit feedback. Please try again.");
-                console.error(err);
-            });
         });
     }
 });
 </script>
-
 </body>
 </html>

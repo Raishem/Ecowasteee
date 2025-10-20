@@ -31,7 +31,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['action']) && $_GET['act
                    pm.quantity,
                    pm.unit,
                    pm.is_found,
-                   COALESCE(p.status, 'planning') as status
+                   COALESCE(p.status, 'collecting') as status
             FROM projects p
             LEFT JOIN project_materials pm ON p.project_id = pm.project_id
             WHERE p.project_id = ? AND p.user_id = ?
@@ -207,7 +207,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 exit;
             }
 
-            $allowed_statuses = ['planning', 'collecting', 'in_progress', 'completed'];
+            $allowed_statuses = ['collecting', 'in_progress', 'completed'];
             if (!in_array($_POST['status'], $allowed_statuses)) {
                 echo json_encode(['success' => false, 'message' => 'Invalid status']);
                 exit;

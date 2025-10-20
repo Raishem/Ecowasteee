@@ -25,13 +25,13 @@ try {
     )");
     
     // Insert default stages if they don't exist
+    // Default stages: Planning removed. Start with Material Collection.
     $default_stages = [
-        [1, 'Planning', 'Plan your recycling project. Define what you want to create and how you will make it.'],
-        [2, 'Material Collection', 'Gather all required materials for your project.'],
-        [3, 'Preparation', 'Clean and prepare your materials for recycling.'],
-        [4, 'Construction', 'Start building your recycled creation.'],
-        [5, 'Finishing', 'Add final touches and complete your project.'],
-        [6, 'Documentation', 'Document your completed project with photos and descriptions.']
+        [1, 'Material Collection', 'Gather all required materials for your project.'],
+        [2, 'Preparation', 'Clean and prepare your materials for recycling.'],
+        [3, 'Construction', 'Start building your recycled creation.'],
+        [4, 'Finishing', 'Add final touches and complete your project.'],
+        [5, 'Documentation', 'Document your completed project with photos and descriptions.']
     ];
     
     $stmt = $conn->prepare("INSERT IGNORE INTO stage_templates (stage_number, stage_name, description) VALUES (?, ?, ?)");

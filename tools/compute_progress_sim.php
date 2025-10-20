@@ -2,7 +2,6 @@
 require_once __DIR__ . '/../config.php';
 $project_id = isset($argv[1]) ? (int)$argv[1] : 5;
 $workflow_stages = [
-    ['name'=>'Planning'],
     ['name'=>'Preparation'],
     ['name'=>'Creation']
 ];
