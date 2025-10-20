@@ -460,15 +460,32 @@
     border: 1px solid #ebccd1;
 }
 
-/* Password Toggle */
-.password-toggle {
+.password-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+.password-wrapper input {
+    width: 100%;
+    padding-right: 45px; /* space for the icon */
+    box-sizing: border-box;
+}
+
+.toggle-password {
     position: absolute;
-    right: 15px;
+    right: 15px;     /* position inside the box */
     top: 50%;
     transform: translateY(-50%);
     cursor: pointer;
-    color: #666;
+    color: #888;
+    font-size: 18px;
+    transition: color 0.3s ease;
 }
+
+.toggle-password:hover {
+    color: #2e7d32; /* optional green accent for EcoWaste */
+}
+
 
 .form-group {
     position: relative;
