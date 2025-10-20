@@ -104,6 +104,7 @@ $stmt = $conn->prepare("
         dr.quantity_claim,
         dr.urgency_level,
         dr.requested_at,
+        dr.delivery_status,
         d.subcategory,
         d.category, 
         d.total_quantity,
@@ -276,48 +277,97 @@ while ($row = $result->fetch_assoc()) {
                     </div>
 
 
-                    <!-- My Requested Donations Tab -->
-                    <div id="my-requests" class="tab-content">
-                        <?php if (!empty($myRequests)): ?>
-                            <?php foreach ($myRequests as $rq): ?>
-                                <div class="donation-card">
-                                    <div class="donation-header">
-                                        <span class="donation-title"><?= htmlspecialchars($rq['subcategory']) ?></span>
-                                        <span class="donation-status 
-                                            <?= strtolower($rq['status']) == 'pending' ? 'status-pending' :
-                                            (strtolower($rq['status']) == 'completed' ? 'status-completed' :
-                                            (strtolower($rq['status']) == 'requested' ? 'status-received' : '')) ?>">
-                                            <?= htmlspecialchars($rq['status']) ?>
-                                        </span>
-                                    </div>
-                                    <div class="donation-details">
-                                        <p><strong>Donation By:</strong> <?= htmlspecialchars($rq['donor_first_name'] . ' ' . $rq['donor_last_name']) ?></p>
-                                        <p><strong>Project Name:</strong> <?= htmlspecialchars($rq['project_name'] ?? '—') ?></p>
-                                        <p><strong>Type of Waste:</strong> <?= htmlspecialchars($rq['category'] ?? '—') ?></p>
-                                       <p><strong>Quantity:</strong> 
-                                            <?= htmlspecialchars($rq['quantity_claim'] ?? 0) ?> /
-                                            <?= htmlspecialchars($rq['total_quantity'] ?? 0) ?> Units
-                                        </p>
-                                        <p><strong>Request Date:</strong> <?= date("M d, Y H:i", strtotime($rq['requested_at'])) ?></p>
-                                        <p><strong>Urgency Level:</strong> <?= htmlspecialchars($rq['urgency_level'] ?? 'Normal') ?></p>
-                                        <p><strong>Status:</strong> <?= htmlspecialchars($rq['status']) ?></p>
-                                    </div>
-                                    <div class="card-actions">
-                                        <button class="edit-request-btn" data-id="<?= htmlspecialchars($rq['request_id']) ?>">Edit Request</button>
-                                        <button class="cancel-request-btn" data-id="<?= htmlspecialchars($rq['request_id']) ?>">Cancel Request</button>
-                                    </div>
+<!-- My Requested Donations Tab -->
+<div id="my-requests" class="tab-content">
+    <?php if (!empty($myRequests)): ?>
+        <?php foreach ($myRequests as $rq): ?>
+            <?php $status = strtolower(trim($rq['status'] ?? '')); ?>
+            <div class="donation-card" data-request-id="<?= htmlspecialchars($rq['request_id']); ?>">
+                <div class="donation-header">
+                    <span class="donation-title"><?= htmlspecialchars($rq['subcategory'] ?? 'Donation Request') ?></span>
 
+                    <!-- Request Status Badge (top-right) -->
+                    <span class="donation-status 
+                        <?= $status == 'pending' ? 'status-pending' :
+                           ($status == 'approved' ? 'status-approved' :
+                           ($status == 'requested' ? 'status-received' : '')) ?>">
+                        <?= htmlspecialchars(ucwords($rq['status'])) ?>
+                    </span>
+                </div>
 
-                                </div>
-                            <?php endforeach; ?>
-                        <?php else: ?>
-                            <div class="empty-state">
-                                <i class="fas fa-hand-paper"></i>
-                                <h3>No donation requests</h3>
-                                <p>You haven't requested any donations yet.</p>
-                            </div>
+                <div class="donation-details">
+                    <?php if ($status === 'pending'): ?>
+                        <!-- FULL DETAILS (for Pending requests only) -->
+                        <p><strong>Donation By:</strong> <?= htmlspecialchars($rq['donor_first_name'] . ' ' . $rq['donor_last_name']) ?></p>
+                        <p><strong>Project Name:</strong> <?= htmlspecialchars($rq['project_name'] ?? '—') ?></p>
+                        <p><strong>Type of Waste:</strong> <?= htmlspecialchars($rq['category'] ?? '—') ?></p>
+                        <p><strong>Quantity:</strong> 
+                            <?= htmlspecialchars($rq['quantity_claim'] ?? 0) ?> /
+                            <?= htmlspecialchars($rq['total_quantity'] ?? 0) ?> Units
+                        </p>
+                        <p><strong>Request Date:</strong> <?= date("M d, Y H:i", strtotime($rq['requested_at'])) ?></p>
+                        <p><strong>Urgency Level:</strong> <?= htmlspecialchars($rq['urgency_level'] ?? 'Normal') ?></p>
+                        <p><strong>Status:</strong> <?= htmlspecialchars(ucwords($rq['status'])) ?></p>
+
+                    <?php else: ?>
+                        <!-- SIMPLIFIED DETAILS (for Approved and beyond) -->
+                        <?php 
+                        $deliveryStatus = strtolower($rq['delivery_status'] ?? 'pending');
+                        $showDeliveryDate = in_array($deliveryStatus, [
+                            'waiting for pickup',
+                            'at sorting facility',
+                            'on the way',
+                            'delivered'
+                        ]);
+                        ?>
+
+                        <p><strong>Donation By:</strong> <?= htmlspecialchars($rq['donor_first_name'] . ' ' . $rq['donor_last_name']) ?></p>
+                        <p><strong>Requested Date:</strong> <?= isset($rq['requested_at']) ? date("M d, Y", strtotime($rq['requested_at'])) : '—' ?></p>
+
+                        <p>
+                            <strong>Delivery Status:</strong>
+                            <span class="delivery-badge 
+                                <?= $deliveryStatus == 'pending' ? 'ds-pending' :
+                                ($deliveryStatus == 'waiting for pickup' ? 'ds-ready' :
+                                ($deliveryStatus == 'at sorting facility' ? 'ds-sorting' :
+                                ($deliveryStatus == 'on the way' ? 'ds-transit' :
+                                ($deliveryStatus == 'delivered' ? 'ds-delivered' :
+                                ($deliveryStatus == 'cancelled' ? 'ds-cancelled' : 'ds-pending'))))) ?>">
+                                <?= htmlspecialchars(ucwords($rq['delivery_status'] ?? 'Pending')) ?>
+                            </span>
+                        </p>
+
+                        <?php if ($showDeliveryDate): ?>
+                            <p><strong>Delivery Date:</strong>
+                                <?= !empty($rq['delivery_start'])
+                                    ? date("M d, Y", strtotime($rq['delivery_start']))
+                                    : '—'; ?>
+                            </p>
                         <?php endif; ?>
-                    </div>
+
+                    <?php endif; ?>
+                </div>
+
+                <div class="card-actions">
+                    <?php if ($status === 'pending'): ?>
+                        <button class="edit-request-btn" data-id="<?= htmlspecialchars($rq['request_id']); ?>">Edit Request</button>
+                        <button class="cancel-request-btn" data-id="<?= htmlspecialchars($rq['request_id']); ?>">Cancel Request</button>
+
+                    <?php else: ?>
+                        <button class="view-details-btn" data-id="<?= htmlspecialchars($rq['request_id']); ?>">View Details</button>
+                    <?php endif; ?>
+                </div>
+            </div>
+        <?php endforeach; ?>
+    <?php else: ?>
+        <div class="empty-state">
+            <i class="fas fa-hand-paper"></i>
+            <h3>No donation requests</h3>
+            <p>You haven't requested any donations yet.</p>
+        </div>
+    <?php endif; ?>
+</div>
+
 
 
                     <!-- Edit Request Modal -->
@@ -328,7 +378,13 @@ while ($row = $result->fetch_assoc()) {
                         <input type="hidden" name="request_id" id="editRequestId" value="">
                         <div class="form-row">
                             <label for="editQuantityClaim">Quantity Claimed:</label>
-                            <input type="number" name="quantity_claim" id="editQuantityClaim" min="1" required style="width:100%; padding:8px; margin-bottom:12px;">
+                            <input type="number" 
+                                id="editQuantityClaim" 
+                                name="quantity_claim" 
+                                value="<?= htmlspecialchars($rq['quantity_claim']) ?>" 
+                                max="<?= htmlspecialchars($rq['total_quantity']) ?>" 
+                                required 
+                                style="width:100%; padding:8px; margin-bottom:12px;">
                         </div>
                         <div class="form-row">
                             <label for="editUrgencyLevel">Urgency Level:</label>
@@ -347,6 +403,33 @@ while ($row = $result->fetch_assoc()) {
                     </div>
                     </div>
 
+
+                    <!-- View Details Modal -->
+                    <div id="request-details-modal" class="modal" style="display:none;">
+                    <div class="modal-content">
+                        <span class="close">&times;</span>
+                        <h3>Request Details</h3>
+                        <div class="details-body">
+                        <p><strong>Donation By:</strong> <span id="modal-donor-name"></span></p>
+                        <p><strong>Requested By:</strong> <span id="modal-requester-name">You</span></p>
+                        <p><strong>Project Name:</strong> <span id="modal-project-name"></span></p>
+                        <p><strong>Type of Waste:</strong> <span id="modal-category"></span></p>
+                        <p><strong>Quantity:</strong> <span id="modal-quantity"></span></p>
+                        <p><strong>Urgency Level:</strong> <span id="modal-urgency"></span></p>
+                        <p><strong>Request Date:</strong> <span id="modal-date"></span></p>
+                        <p><strong>Delivery Date:</strong> <span id="modal-delivery-date"></span></p>
+                        <p><strong>Delivery Status:</strong> <span id="modal-delivery-status"></span></p>
+                        <div id="modal-donation-image" style="margin-top:10px;"></div>
+                        </div>
+
+                        <div class="modal-footer" style="margin-top:20px;">
+                        <button id="modal-cancel-request" class="cancel-btn">Cancel Request</button>
+                        <p id="cancel-warning" class="warning-text" style="display:none; color:gray; font-size:0.9em; margin-top:8px;">
+                            Cannot cancel request. Delivery is in progress or is on its way.
+                        </p>
+                        </div>
+                    </div>
+                    </div>
 
 
                     <!-- Requests for My Donations Tab -->
@@ -561,76 +644,340 @@ while ($row = $result->fetch_assoc()) {
     });
 
     // Submits the edited request to server
-    $(document).on("submit", "#editRequestForm", function(e) {
-        e.preventDefault();
+ $(document).on("submit", "#editRequestForm", function(e) {
+    e.preventDefault();
 
-        const formData = $(this).serialize();
+    const maxQuantity = parseInt($("#editQuantityClaim").data("max"));
+    const requestedQuantity = parseInt($("#editQuantityClaim").val());
 
-        $.post("edit_request_process.php", formData, function(response) {
-            let res;
-            try {
-                res = typeof response === "object" ? response : JSON.parse(response);
-            } catch (e) {
-                console.error("Invalid JSON response from server:", response, e);
-                Swal.fire({
-                    icon: "error",
-                    title: "Server Error",
-                    text: "Could not update request. Please check the server and try again."
-                });
-                return;
-            }
-
-            if(res.status === "success") {
-                $("#editRequestModal").fadeOut(200);
-                Swal.fire({
-                    icon: "success",
-                    title: "Updated!",
-                    text: res.message || "Request updated successfully.",
-                    timer: 1500,
-                    showConfirmButton: false
-                });
-                setTimeout(() => {
-                    // Refresh only "My Requests" tab after update
-                    $("#my-requests").load(location.href + " #my-requests > *");
-                }, 1000);
-            } else {
-                Swal.fire({
-                    icon: "error",
-                    title: "Update Failed",
-                    text: res.message || "Failed to update request."
-                });
-            }
-        }).fail(function(jqXHR, textStatus, errorThrown){
-            console.error("AJAX request failed:", textStatus, errorThrown, jqXHR.responseText);
-            Swal.fire({
-                icon: "error",
-                title: "Server Error",
-                text: "Could not update request. Please try again."
-            });
+    if (requestedQuantity > maxQuantity) {
+        Swal.fire({
+            icon: "error",
+            title: "Invalid Quantity",
+            text: `You cannot request more than ${maxQuantity} units.`
         });
+        return;
+    }
+
+    // Continue with AJAX request
+    const formData = $(this).serialize();
+
+    $.post("edit_request_process.php", formData, function(response) {
+        let res;
+        try {
+            res = typeof response === "object" ? response : JSON.parse(response);
+        } catch (e) {
+            Swal.fire({ icon: "error", title: "Server Error", text: "Could not update request." });
+            return;
+        }
+
+        if (res.status === "success") {
+            $("#editRequestModal").fadeOut(200);
+            Swal.fire({
+                icon: "success",
+                title: "Updated!",
+                text: res.message || "Request updated successfully.",
+                timer: 1500,
+                showConfirmButton: false
+            });
+
+            // Refresh "My Requests" tab smoothly
+            $("#my-requests").load(location.href + " #my-requests > *");
+        } else {
+            Swal.fire({ icon: "error", title: "Update Failed", text: res.message || "Failed to update request." });
+        }
     });
+});
+
     // ==================== END EDIT REQUEST LOGIC ====================
 
     // ==================== CANCEL REQUEST ====================
-    $(document).on("click", ".cancel-request-btn", function() {
-        const id = $(this).data("id");
-        if (!id) return alert("Invalid request ID");
-        if (!confirm("Are you sure you want to cancel this request?")) return;
 
-        $.post("donate_process.php", { action: "cancel_request", request_id: id }, function(res) {
-            try {
-                const data = JSON.parse(res);
-                if (data.status === "success") {
-                    alert("Request canceled successfully.");
-                    location.reload();
-                } else {
-                    alert(data.message || "Failed to cancel request.");
+$(document).on("click", ".cancel-request-btn", function() {
+    const btn = $(this);
+    const requestId = btn.data("id");
+
+    if (!requestId) return Swal.fire({ icon: "error", title: "Error", text: "Invalid request ID" });
+    if (!confirm("Are you sure you want to cancel this request?")) return;
+
+    $.post("donate_process.php", { action: "cancel_request", request_id: requestId }, function(response) {
+       // inside your existing $.post(..., function(response) { ... })
+        try {
+            const data = typeof response === "object" ? response : JSON.parse(response);
+
+            if (data.status === "success") {
+                Swal.fire({
+                    icon: "success",
+                    title: "Request Canceled",
+                    text: "Your donation request has been canceled.",
+                    timer: 1500,
+                    showConfirmButton: false
+                });
+
+                // Smoothly remove the canceled request card
+                const removedCard = btn.closest(".donation-card");
+                removedCard.fadeOut(400, function() {
+                    $(this).remove();
+
+                    // --- NEW: if there are no more request cards in the My Requested tab, show empty state ---
+                    const myRequestsContainer = $("#my-requests");
+                    // If there are zero visible donation-card children, display the empty-state block.
+                    if (myRequestsContainer.find(".donation-card").length === 0) {
+                        // if an .empty-state template already exists elsewhere, clone it; otherwise insert minimal markup
+                        let empty = myRequestsContainer.find(".empty-state").first();
+                        if (empty.length === 0) {
+                            // insert a basic empty state matching the markup used elsewhere:
+                            myRequestsContainer.append(
+                                `<div class="empty-state">
+                                    <i class="fas fa-hand-paper"></i>
+                                    <h3>No donation requests</h3>
+                                    <p>You haven't requested any donations yet.</p>
+                                </div>`
+                            );
+                        } else {
+                            empty.show();
+                        }
+                    }
+                });
+
+                // Update the homepage/browse quantity if provided
+                if (data.updated_donation_id !== undefined && data.new_quantity !== undefined) {
+                    const donationCard = $(`.donation-card[data-id='${data.updated_donation_id}']`);
+                    if (donationCard.length) {
+                        donationCard.find(".donation-detail:contains('Quantity'), .info-item:contains('Quantity')").first()
+                            .html('<strong>Quantity:</strong> ' + data.new_quantity + '/' + data.total_quantity + ' Units');
+                    }
                 }
-            } catch (e) {
-                alert("Invalid server response.");
+            } else {
+                Swal.fire({ icon: "error", title: "Failed", text: data.message || "Could not cancel request." });
             }
-        });
+        } catch (e) {
+            Swal.fire({ icon: "error", title: "Error", text: "Invalid server response." });
+            console.error("Invalid JSON:", response, e);
+        }
+
     });
+});
+
+// ===================== VIEW REQUEST DETAILS MODAL ====================
+$(document).on('click', '.view-details-btn', function() {
+  const requestId = $(this).data('id');
+
+  $.ajax({
+    url: 'get_request_details.php',
+    method: 'GET',
+    data: { id: requestId },
+    dataType: 'json',
+
+    success: function(res) {
+      if (res.status === 'success' && res.data) {
+        const d = res.data;
+
+        // Populate modal fields
+        $('#modal-donor-name').text(d.donor_name || 'Unknown');
+        $('#modal-project-name').text(d.project_name || '—');
+        $('#modal-category').text((d.category || '') + (d.subcategory ? ' → ' + d.subcategory : ''));
+        $('#modal-quantity').text(d.quantity_claim || '—');
+        $('#modal-urgency').text(d.urgency_level || '—');
+        $('#modal-date').text(d.requested_at ? new Date(d.requested_at).toLocaleString() : '—');
+
+        
+        // --- DELIVERY STATUS & DATE HANDLING ---
+        const deliveryStatus = (d.delivery_status || '').toLowerCase();
+        const showDeliveryDate = ['waiting for pickup', 'at sorting facility', 'on the way', 'delivered'].includes(deliveryStatus);
+
+        // 🟩 Display Delivery Status (with color coding)
+        if (deliveryStatus) {
+        const formattedStatus = d.delivery_status.replace(/\b\w/g, c => c.toUpperCase());
+        $('#modal-delivery-status')
+            .text(formattedStatus)
+            .css({
+            padding: '4px 10px',
+            borderRadius: '6px',
+            color: '#fff',
+            fontWeight: '600',
+            display: 'inline-block',
+            backgroundColor:
+                deliveryStatus === 'waiting for pickup' ? '#ff9800' :
+                deliveryStatus === 'at sorting facility' ? '#9c27b0' :
+                deliveryStatus === 'on the way' ? '#2196f3' :
+                deliveryStatus === 'delivered' ? '#4caf50' :
+                deliveryStatus === 'cancelled' ? '#f44336' : '#9e9e9e'
+            })
+            .show();
+        } else {
+        $('#modal-delivery-status').text('Pending').css({
+            backgroundColor: '#9e9e9e',
+            color: '#fff',
+            padding: '4px 10px',
+            borderRadius: '6px'
+        });
+        }
+
+        // 🟨 Display Delivery Date only when allowed
+        if (showDeliveryDate && d.delivery_start) {
+        const start = new Date(d.delivery_start).toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+        let displayDate = start;
+
+        if (d.delivery_end) {
+            const end = new Date(d.delivery_end).toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+            displayDate = `${start} - ${end}`;
+        }
+
+        $('#modal-delivery-date').text(displayDate);
+        $('#modal-delivery-date').closest('p').show();
+        } else {
+        // Show "Pending" if no date yet and status < eligible
+        $('#modal-delivery-date').text('Pending');
+        $('#modal-delivery-date').closest('p').toggle(showDeliveryDate);
+        }
+
+
+
+
+        // Handle image display — consistent with "My Donations"
+        let imageUrl = '';
+        if (d.image_path) {
+          imageUrl = d.image_path;
+        } else if (d.image) {
+          imageUrl = `uploads/${d.image}`;
+        } else if (d.donation_image) {
+          imageUrl = `uploads/${d.donation_image}`;
+        }
+
+        $('#modal-donation-image').html(
+          imageUrl
+            ? `<img src="${imageUrl}" alt="Donation image" style="width:100%;max-height:250px;border-radius:8px;">`
+            : '<em>No image available</em>'
+        );
+
+        // ✅ Cancel Button Logic + Styling
+        const deliveryPending = !d.delivery_start && !d.delivery_end;
+
+        if (deliveryPending) {
+          // Pending → orange and active
+          $('#modal-cancel-request')
+            .prop('disabled', false)
+            .css({
+              backgroundColor: '#ff9800',
+              color: '#fff',
+              cursor: 'pointer',
+              opacity: 1,
+              transition: '0.3s'
+            })
+            .hover(
+              function() { $(this).css('backgroundColor', '#e68900'); },
+              function() { $(this).css('backgroundColor', '#ff9800'); }
+            );
+          $('#cancel-warning').hide();
+        } else {
+          // Delivery set → gray and disabled
+          $('#modal-cancel-request')
+            .prop('disabled', true)
+            .css({
+              backgroundColor: '#b0b0b0',
+              color: '#fff',
+              cursor: 'not-allowed',
+              opacity: 0.8
+            })
+            .off('mouseenter mouseleave');
+          $('#cancel-warning')
+            .text('Cannot cancel request. Delivery schedule has been set by the donor.')
+            .show();
+        }
+
+        // Store request ID for cancel logic
+        $('#modal-cancel-request').data('request-id', requestId);
+
+        // Open modal
+        $('#request-details-modal').fadeIn(200);
+      } else {
+        alert(res.message || 'Unable to fetch request details.');
+      }
+    },
+    error: function() {
+      alert('Error fetching details. Please try again.');
+    }
+  });
+});
+
+// Close modal on X click or outside click
+$(document).on('click', '.modal .close', function() {
+  $('#request-details-modal').fadeOut(200);
+});
+$(window).on('click', function(e) {
+  if ($(e.target).is('#request-details-modal')) {
+    $('#request-details-modal').fadeOut(200);
+  }
+});
+
+
+// ==================== CANCEL REQUEST INSIDE MODAL (SweetAlert Version) ====================
+$(document).on('click', '#modal-cancel-request', function () {
+  const requestId = $(this).data('request-id');
+  if (!requestId) return;
+
+  Swal.fire({
+    title: 'Cancel this request?',
+    text: 'Once cancelled, this request cannot be undone.',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'Yes, cancel it',
+    cancelButtonText: 'No, keep it',
+    reverseButtons: true,
+  }).then((result) => {
+    if (result.isConfirmed) {
+      $.post(
+        'donate_process.php',
+        { action: 'cancel_request', request_id: requestId },
+        function (response) {
+          let res = typeof response === 'object' ? response : JSON.parse(response || '{}');
+
+          if (res.status === 'success') {
+            Swal.fire({
+              icon: 'success',
+              title: 'Cancelled!',
+              text: res.message || 'Your request has been cancelled successfully.',
+              timer: 1500,
+              showConfirmButton: false,
+            });
+
+            $('#request-details-modal').fadeOut(200);
+
+            // Remove canceled card dynamically
+            $(`.request-card[data-request-id="${requestId}"]`).remove();
+
+            // If no requests left, show empty state
+            if ($('#my-requests .request-card').length === 0) {
+              $('#my-requests').html(`
+                <div class="empty-state">
+                  <i class="fas fa-hand-paper"></i>
+                  <h3>No donation requests</h3>
+                  <p>You haven't requested any donations yet.</p>
+                </div>
+              `);
+            }
+          } else {
+            Swal.fire({
+              icon: 'error',
+              title: 'Failed',
+              text: res.message || 'Unable to cancel the request.',
+            });
+          }
+        },
+        'json'
+      ).fail(() => {
+        Swal.fire({
+          icon: 'error',
+          title: 'Server Error',
+          text: 'Could not cancel the request. Please try again later.',
+        });
+      });
+    }
+  });
+});
+
+
 
     // ==================== CLOSE DONATION DETAILS MODAL ====================
     $(document).on("click", ".close-btn", function() {
@@ -775,62 +1122,62 @@ while ($row = $result->fetch_assoc()) {
     (function(){
         function postAction(action, requestId) {
             return $.ajax({
-                url: 'donate_process.php?action=' + action,
+                url: 'donate_process.php',
                 method: 'POST',
-                data: { request_id: requestId },
-                dataType: 'text',
+                data: { action: action, request_id: requestId },
+                dataType: 'json',
                 timeout: 10000
-            }).then(function(rawResponse) {
-                try {
-                    return JSON.parse(rawResponse);
-                } catch (e) {
-                    console.error("Non-JSON response for", action, requestId, "raw:", rawResponse);
-                    return { status: 'error', message: 'Invalid server response.' };
-                }
-            }, function(jqXHR, textStatus, errorThrown) {
-                console.error("AJAX error", action, requestId, textStatus, errorThrown, jqXHR.responseText);
-                return { status: 'error', message: 'Network/server error: ' + textStatus };
+            }).catch(err => {
+                console.error("AJAX error", action, requestId, err);
+                return { status: 'error', message: 'Network/server error.' };
             });
         }
 
-        // Handles approve and decline buttons
         $(document).on('click', '.approve-request-btn, .approve-btn, .decline-request-btn, .decline-btn', async function(e) {
             e.preventDefault();
             const btn = $(this);
             const isApprove = btn.hasClass('approve-request-btn') || btn.hasClass('approve-btn');
             const action = isApprove ? 'approve_request' : 'decline_request';
 
-            const container = btn.closest('[data-id], [data-request-id], .request, .donation-card');
-            const requestId = container.data('id') || container.data('request-id') || btn.data('id') || btn.data('request-id');
+            const container = btn.closest('.request, .donation-card, [data-request-id], [data-id]');
+            const requestId = container.data('request-id') || container.data('id') || btn.data('id') || btn.data('request-id');
 
-            if (!requestId) {
-                console.error("Request ID not found:", btn, container);
-                alert("Internal error: request id missing. See console.");
-                return;
-            }
+            if (!requestId) return alert("Request ID missing.");
 
             if (!confirm((isApprove ? "Approve" : "Decline") + " this donation request?")) return;
 
             btn.prop('disabled', true).text(isApprove ? 'Approving...' : 'Declining...');
-            const res = await postAction(action, requestId);
 
-            if (res && res.status === 'success') {
-                let statusSpan = container.find('.status-text span').first();
-                if (!statusSpan.length) statusSpan = container.find('.donation-status').first();
-                if (statusSpan.length) statusSpan.text(isApprove ? 'approved' : 'declined');
+            try {
+                const res = await postAction(action, requestId);
 
-                container.find('button').prop('disabled', true);
-                btn.text(isApprove ? 'Approved ✓' : 'Declined ✕');
-
-                if (res.new_quantity !== undefined && res.total_quantity !== undefined) {
-                    const qtyElem = container.closest('.donation-card').find('.donation-detail:contains("Quantity"), .info-item:contains("Quantity")').first();
-                    if (qtyElem.length) {
-                        qtyElem.html('<strong>Quantity:</strong> ' + res.new_quantity + '/' + res.total_quantity + ' Units');
-                    }
+                if (res.status === 'success') {
+                    Swal.fire({
+                        icon: "success",
+                        title: isApprove ? "Approved!" : "Declined!",
+                        text: res.message || `Request ${isApprove ? 'approved' : 'declined'} successfully.`,
+                        timer: 1500,
+                        showConfirmButton: false,
+                        willClose: () => {
+                            // Smooth refresh of "My Requests" tab
+                            $("#my-requests").load(location.href + " #my-requests > *");
+                        }
+                    });
+                } else {
+                    Swal.fire({
+                        icon: "error",
+                        title: "Error",
+                        text: res.message || "Server returned an error."
+                    });
+                    btn.prop('disabled', false).text(isApprove ? 'Approve' : 'Decline');
                 }
-            } else {
-                alert(res && res.message ? res.message : "Server returned an error. Check console.");
-                console.error("Action failed:", res);
+            } catch (err) {
+                console.error("AJAX error:", err);
+                Swal.fire({
+                    icon: "error",
+                    title: "Server Error",
+                    text: "Something went wrong. Please try again."
+                });
                 btn.prop('disabled', false).text(isApprove ? 'Approve' : 'Decline');
             }
         });

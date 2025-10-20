@@ -387,39 +387,91 @@ if ($action === 'decline_request' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // Cancel Request
 if (isset($_POST['action']) && $_POST['action'] === 'cancel_request') {
-    $request_id = $_POST['request_id'] ?? null;
+    header('Content-Type: application/json');
 
-    if (!$request_id) {
-        echo json_encode(['status' => 'error', 'message' => 'Missing request ID']);
+    if (!isset($_SESSION['user_id'])) {
+        echo json_encode(['status' => 'error', 'message' => 'Not logged in']);
         exit;
     }
 
-    $stmt = $conn->prepare("DELETE FROM donation_requests WHERE request_id = ?");
-    $stmt->bind_param("i", $request_id);
+    $request_id = intval($_POST['request_id'] ?? 0);
+    if ($request_id <= 0) {
+        echo json_encode(['status' => 'error', 'message' => 'Invalid request ID']);
+        exit;
+    }
 
-    if ($stmt->execute()) {
-        echo json_encode(['status' => 'success']);
-    } else {
-        echo json_encode(['status' => 'error', 'message' => 'Failed to cancel request']);
+    $user_id = $_SESSION['user_id'];
+
+    $conn->begin_transaction();
+    try {
+        // Fetch request with user ownership check
+        $stmt = $conn->prepare("SELECT donation_id, quantity_claim, user_id FROM donation_requests WHERE request_id = ?");
+        $stmt->bind_param("i", $request_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $request = $result->fetch_assoc();
+
+        if (!$request || $request['user_id'] != $user_id) {
+            throw new Exception("Request not found or unauthorized.");
+        }
+
+        $donation_id = intval($request['donation_id']);
+        $quantity_claim = intval($request['quantity_claim']);
+
+        // Delete request
+        $stmt = $conn->prepare("DELETE FROM donation_requests WHERE request_id = ?");
+        $stmt->bind_param("i", $request_id);
+        $stmt->execute();
+
+        // Return quantity to donation
+        if ($quantity_claim > 0) {
+            $stmt = $conn->prepare("UPDATE donations SET quantity = quantity + ? WHERE donation_id = ?");
+            $stmt->bind_param("ii", $quantity_claim, $donation_id);
+            $stmt->execute();
+        }
+
+        $conn->commit();
+        echo json_encode(['status' => 'success', 'message' => 'Request cancelled and quantity returned.']);
+    } catch (Exception $e) {
+        $conn->rollback();
+        error_log("[donate_process] cancel_request failed: " . $e->getMessage());
+        echo json_encode(['status' => 'error', 'message' => 'Failed to cancel request.']);
     }
     exit;
 }
+
+
+
+
 
 // Get request details for editing
 if ($_GET['action'] === 'get_request_details' && isset($_GET['request_id'])) {
     $id = intval($_GET['request_id']);
-    $stmt = $conn->prepare("SELECT request_id, quantity_claim, urgency_level FROM donation_requests WHERE request_id = ?");
-    $stmt->bind_param("i", $id);
+    $stmt = $conn->prepare("
+    SELECT dr.request_id, dr.quantity_claim, dr.urgency_level, dr.requested_at,
+           d.category, d.subcategory, d.image_path, 
+           d.delivery_start, d.delivery_end,
+           CONCAT(u.first_name, ' ', u.last_name) AS donor_name,
+           p.project_name
+    FROM donation_requests dr
+    JOIN donations d ON dr.donation_id = d.donation_id
+    LEFT JOIN users u ON d.donor_id = u.user_id
+    LEFT JOIN projects p ON dr.project_id = p.project_id
+    WHERE dr.request_id = ?
+");
+    $stmt->bind_param('i', $id);
     $stmt->execute();
     $result = $stmt->get_result();
     if ($result->num_rows > 0) {
         $data = $result->fetch_assoc();
-        echo json_encode(["status" => "success", "data" => $data]);
+        echo json_encode(['status' => 'success', 'data' => $data]);
     } else {
-        echo json_encode(["status" => "error", "message" => "Request not found."]);
+        echo json_encode(['status' => 'error', 'message' => 'Request not found.']);
     }
     exit;
 }
+
+
 
 // Update Request (AJAX)
 if (isset($_POST['action']) && $_POST['action'] === 'update_request') {
@@ -431,31 +483,58 @@ if (isset($_POST['action']) && $_POST['action'] === 'update_request') {
     }
 
     $request_id = intval($_POST['request_id']);
-    $quantity_claim = intval($_POST['quantity_claim']);
-    $urgency_level = $_POST['urgency_level'];
+    $new_quantity_claim = intval($_POST['quantity_claim']);
+    $urgency_level = htmlspecialchars(trim($_POST['urgency_level']));
     $user_id = $_SESSION['user_id'];
 
-    // Validate ownership
-    $check = $conn->prepare("SELECT request_id FROM donation_requests WHERE request_id = ? AND user_id = ?");
-    $check->bind_param("ii", $request_id, $user_id);
-    $check->execute();
-    $res = $check->get_result();
+    // Fetch existing request and donation
+    $stmt = $conn->prepare("
+        SELECT dr.quantity_claim, dr.donation_id, d.quantity AS donation_quantity, dr.user_id
+        FROM donation_requests dr
+        JOIN donations d ON dr.donation_id = d.donation_id
+        WHERE dr.request_id = ?
+    ");
+    $stmt->bind_param("i", $request_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $request = $result->fetch_assoc();
 
-    if ($res->num_rows === 0) {
+    if (!$request || $request['user_id'] != $user_id) {
         echo json_encode(["status" => "error", "message" => "Unauthorized or request not found."]);
         exit;
     }
 
-    // Perform update
-    $stmt = $conn->prepare("UPDATE donation_requests SET quantity_claim = ?, urgency_level = ? WHERE request_id = ?");
-    $stmt->bind_param("isi", $quantity_claim, $urgency_level, $request_id);
+    $old_quantity_claim = intval($request['quantity_claim']);
+    $donation_id = intval($request['donation_id']);
+    $available_quantity = intval($request['donation_quantity']);
+    $difference = $new_quantity_claim - $old_quantity_claim;
 
-    if ($stmt->execute()) {
-        echo json_encode(["status" => "success", "message" => "Request updated successfully."]);
-    } else {
-        echo json_encode(["status" => "error", "message" => "Database update failed."]);
+    if ($difference > 0 && $difference > $available_quantity) {
+        echo json_encode(["status" => "error", "message" => "Not enough units available. Only $available_quantity left."]);
+        exit;
     }
 
+    $conn->begin_transaction();
+    try {
+        // Adjust donation quantity
+        if ($difference != 0) {
+            $stmt = $conn->prepare("UPDATE donations SET quantity = quantity - ? WHERE donation_id = ?");
+            $stmt->bind_param("ii", $difference, $donation_id);
+            $stmt->execute();
+        }
+
+        // Update request
+        $stmt = $conn->prepare("UPDATE donation_requests SET quantity_claim = ?, urgency_level = ? WHERE request_id = ?");
+        $stmt->bind_param("isi", $new_quantity_claim, $urgency_level, $request_id);
+        $stmt->execute();
+
+        $conn->commit();
+        echo json_encode(["status" => "success", "message" => "Request updated successfully!"]);
+    } catch (Exception $e) {
+        $conn->rollback();
+        error_log("[donate_process] update_request failed: " . $e->getMessage());
+        echo json_encode(["status" => "error", "message" => "Failed to update request."]);
+    }
     exit;
 }
 
