@@ -159,13 +159,98 @@ try {
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Open+Sans:wght@400;500;600&display=swap">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="assets/css/header.css">
-    <link rel="stylesheet" href="assets/css/projects.css">
+    <link rel="stylesheet" href="assets/css/project-details.css">
     <link rel="stylesheet" href="assets/css/project-details-modern-v2.css">
     <link rel="stylesheet" href="assets/css/project-description.css">
     
+    <style>
+        /* Slightly widen the project details content area for better readability */
+        .main-content.project-details {
+            /* widened for larger screens */
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px; /* consistent padding */
+        }
+
+        /* Make the header card use more of the available width and increase inner spacing */
+        .project-header.card {
+            width: 100%;
+            padding: 24px 32px;
+            box-sizing: border-box;
+            margin-bottom: 24px;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+        }
+
+        .project-section-label {
+            display: block;
+            color: #666;
+            font-size: 0.9em;
+            margin-bottom: 8px;
+        }
+
+        .project-title {
+            margin: 0;
+            color: #2e3440;
+            font-size: 1.75em;
+        }
+
+        .project-title-section {
+            text-align: center;
+            margin-bottom: 16px;
+        }
+
+        .project-description-section {
+            margin: 24px 0;
+        }
+
+        /* Smooth collapse/expand for description */
+        .project-description {
+            overflow: hidden;
+            transition: none;
+            /* allow long unbroken text to wrap and respect newlines */
+            white-space: pre-wrap; /* preserve existing newlines but allow wrapping */
+            overflow-wrap: anywhere; /* handle very long words/URLs */
+            word-break: break-word; /* fallback for some browsers */
+            padding: 16px 20px 16px 20px; /* symmetrical padding to avoid jump */
+            line-height: 1.6;
+            text-align: left; /* prefer left-aligned content for readability */
+            border-radius: 10px;
+            border: 1px solid #eee;
+            margin-bottom: 8px; /* space between description box and toggle */
+        }
+
+        /* Use -webkit-line-clamp to clamp to 3 lines when collapsed (widely supported in modern browsers) */
+        .project-description.clamped {
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            /* line-clamp requires normal wrapping; override pre-wrap here */
+            white-space: normal;
+        }
+
+        /* expanded state: keep original pre-wrap so newlines are preserved */
+        .project-description.expanded {
+            white-space: pre-wrap;
+        }
+
+        .see-more-btn {
+            display: inline-block;
+            margin-top: 8px; /* matches description margin-bottom for visual consistency */
+            cursor: pointer;
+            background: transparent;
+            border: none;
+            color: #2e8b57;
+            font-weight: 600;
+            padding: 6px 10px;
+            border-radius: 4px;
+            box-shadow: inset 0 0 0 2px rgba(46,139,87,0.12);
+        }
+    </style>
 </head>
 <body>
-    <!-- Header -->
     <header>
         <div class="logo-container">
             <div class="logo">
@@ -173,53 +258,32 @@ try {
             </div>
             <h1>EcoWaste</h1>
         </div>
-        <div class="header-right">
-            <div class="notifications-icon" id="headerNotifications" title="Notifications">
-                <i class="fas fa-bell"></i>
-                <span class="notification-badge" id="headerUnreadCount"></span>
-                <div class="header-notifications-panel" id="headerNotificationsPanel" aria-hidden="true">
-                    <!-- notifications loaded dynamically -->
-                </div>
-            </div>
-
-            <div class="user-profile" id="userProfile">
-                <div class="profile-pic">
-                    <?= !empty($user_data['avatar']) ? '<img src="'.htmlspecialchars($user_data['avatar']).'" alt="Profile">' : strtoupper(substr(htmlspecialchars($user_data['username'] ?? 'U'), 0, 1)) ?>
-                </div>
-                <span class="profile-name"><?= htmlspecialchars($user_data['username'] ?? ($_SESSION['first_name'] ?? 'User')) ?></span>
-                <i class="fas fa-chevron-down dropdown-arrow"></i>
-                <div class="profile-dropdown">
-                    <a href="profile.php" class="dropdown-item"><i class="fas fa-user"></i> My Profile</a>
-                    <a href="settings.php" class="dropdown-item"><i class="fas fa-cog"></i> Settings</a>
-                    <div class="dropdown-divider"></div>
-                    <a href="logout.php" class="dropdown-item"><i class="fas fa-sign-out-alt"></i> Logout</a>
-                </div>
-            </div>
-        </div>
+        <div class="user-profile" id="userProfile">
+        <div class="profile-pic">
+        <?= strtoupper(substr(htmlspecialchars($_SESSION['first_name'] ?? 'User'), 0, 1)) ?>
+    </div>
+    <span class="profile-name"><?= htmlspecialchars($_SESSION['first_name'] ?? 'User') ?></span>
+    <i class="fas fa-chevron-down dropdown-arrow"></i>
+    <div class="profile-dropdown">
+        <a href="profile.php" class="dropdown-item"><i class="fas fa-user"></i> My Profile</a>
+        <a href="#" class="dropdown-item"><i class="fas fa-cog"></i> Settings</a>
+        <div class="dropdown-divider"></div>
+        <a href="logout.php" class="dropdown-item"><i class="fas fa-sign-out-alt"></i> Logout</a>
+    </div>
+</div>
     </header>
-
+    
     <div class="container">
-        <!-- Left Sidebar -->
         <aside class="sidebar">
-            <nav class="side-navigation">
-                <a href="homepage.php" class="nav-item">
-                    <i class="fas fa-home"></i> Home
-                </a>
-                <a href="browse.php" class="nav-item">
-                    <i class="fas fa-search"></i> Browse
-                </a>
-                <a href="projects.php" class="nav-item active">
-                    <i class="fas fa-recycle"></i> My Projects
-                </a>
-                <a href="donations.php" class="nav-item">
-                    <i class="fas fa-hand-holding-heart"></i> Donations
-                </a>
-                <a href="achievements.php" class="nav-item">
-                    <i class="fas fa-trophy"></i> Achievements
-                </a>
-                <a href="leaderboard.php" class="nav-item">
-                    <i class="fas fa-crown"></i> Leaderboard
-                </a>
+            <nav>
+                <ul>
+                    <li><a href="homepage.php"><i class="fas fa-home"></i>Home</a></li>
+                    <li><a href="browse.php"><i class="fas fa-search"></i>Browse</a></li>
+                    <li><a href="achievements.php"><i class="fas fa-star"></i>Achievements</a></li>
+                    <li><a href="leaderboard.php"><i class="fas fa-trophy"></i>Leaderboard</a></li>
+                    <li><a href="projects.php" class="active"><i class="fas fa-recycle"></i>Projects</a></li>
+                    <li><a href="donations.php"><i class="fas fa-hand-holding-heart"></i>Donations</a></li>
+                </ul>
             </nav>
         </aside>
 
@@ -259,84 +323,127 @@ try {
 </section>
 
 <script>
-// Single event listener for the see more/see less functionality
-document.addEventListener("DOMContentLoaded", function() {
-    console.log("DOM Content Loaded");
-    const desc = document.querySelector(".project-description");
-    const toggle = document.querySelector(".see-more-btn");
+// See more / See less logic: show toggle only when description is longer than 3 lines
+document.addEventListener('DOMContentLoaded', function() {
+    const desc = document.querySelector('.project-description');
+    const toggle = document.querySelector('.see-more-btn');
+    if (!desc || !toggle) return;
 
-    console.log("Description element:", desc);
-    console.log("Toggle button:", toggle);
-
-    if (desc && toggle) {
-        // Ensure a deterministic initial state: if neither class present, default to collapsed
-        if (!desc.classList.contains('collapsed') && !desc.classList.contains('expanded')) {
-            desc.classList.add('collapsed');
+    // Compute number of lines by measuring an unclamped clone sized to match the original
+    function computeLines(element) {
+        const style = getComputedStyle(element);
+        let lineHeight = parseFloat(style.lineHeight);
+        if (isNaN(lineHeight)) {
+            const fontSize = parseFloat(style.fontSize) || 16;
+            lineHeight = fontSize * 1.2;
         }
 
-        // Sync button text/aria with current state
-        const initiallyCollapsed = desc.classList.contains('collapsed');
-        toggle.textContent = initiallyCollapsed ? 'See more' : 'See less';
-        toggle.setAttribute('aria-expanded', initiallyCollapsed ? 'false' : 'true');
-
-        toggle.addEventListener("click", function(e) {
-            e.preventDefault();
-            console.log('See more/less button clicked');
-
-            const isCollapsed = desc.classList.contains('collapsed');
-            if (isCollapsed) {
-                desc.classList.remove('collapsed');
-                desc.classList.add('expanded');
-                toggle.textContent = 'See less';
-                toggle.setAttribute('aria-expanded', 'true');
-            } else {
-                desc.classList.remove('expanded');
-                desc.classList.add('collapsed');
-                toggle.textContent = 'See more';
-                toggle.setAttribute('aria-expanded', 'false');
-            }
-        });
-    } else {
-        console.log("Could not find description or toggle button");
+        const clone = element.cloneNode(true);
+        // copy important layout styles so wrapping matches
+        clone.style.visibility = 'hidden';
+        clone.style.position = 'absolute';
+        clone.style.left = '-9999px';
+        clone.style.top = '0';
+        clone.style.maxHeight = 'none';
+        clone.style.height = 'auto';
+        clone.style.whiteSpace = 'normal';
+        clone.style.boxSizing = 'border-box';
+        // match width and font metrics so lines wrap the same way as the original
+        const rect = element.getBoundingClientRect();
+        clone.style.width = rect.width + 'px';
+        clone.style.font = style.font;
+        clone.style.padding = style.padding;
+        clone.style.border = style.border;
+        clone.classList.remove('collapsed');
+        document.body.appendChild(clone);
+        const fullHeight = clone.scrollHeight;
+        document.body.removeChild(clone);
+        return Math.max(1, Math.round(fullHeight / lineHeight));
     }
+
+    const lines = computeLines(desc);
+
+    if (lines <= 5) {
+        // Nothing to collapse — show full content and hide toggle
+        toggle.style.display = 'none';
+        desc.classList.remove('collapsed');
+        desc.classList.add('expanded');
+        desc.style.maxHeight = 'none';
+        desc.setAttribute('aria-expanded', 'true');
+        return;
+    }
+
+    // Fallback to a pixel-based collapse to show exactly 3 lines and control padding
+    const computedStyle = getComputedStyle(desc);
+    let lh = parseFloat(computedStyle.lineHeight);
+    if (isNaN(lh)) lh = parseFloat(computedStyle.fontSize) * 1.2;
+
+    const padTop = parseFloat(computedStyle.paddingTop) || 0;
+    const padBottom = parseFloat(computedStyle.paddingBottom) || 0;
+
+    // Use consistent padding in both states
+    const collapseHeight = Math.ceil(lh * 5 + padTop + padBottom);
+
+    // Apply collapsed state
+    desc.style.maxHeight = collapseHeight + 'px';
+    desc.style.overflow = 'hidden';
+    
+    // keep original padding so the See more / See less spacing is consistent
+    desc.style.paddingBottom = padBottom + 'px';
+
+    toggle.style.display = 'inline-block';
+    toggle.textContent = 'See more';
+    toggle.setAttribute('aria-expanded', 'false');
+
+    let isCollapsed = true;
+    toggle.addEventListener('click', function() {
+        if (isCollapsed) {
+            // expand
+            desc.style.maxHeight = 'none';
+            desc.style.overflow = 'visible';
+            desc.style.whiteSpace = 'pre-wrap';
+            // restore original bottom padding so spacing stays the same
+            desc.style.paddingBottom = padBottom + 'px';
+            toggle.textContent = 'See less';
+            toggle.setAttribute('aria-expanded', 'true');
+            isCollapsed = false;
+        } else {
+            // collapse
+            desc.style.maxHeight = collapseHeight + 'px';
+            desc.style.overflow = 'hidden';
+           
+            // keep same bottom padding so the button position doesn't jump
+            desc.style.paddingBottom = padBottom + 'px';
+            toggle.textContent = 'See more';
+            toggle.setAttribute('aria-expanded', 'false');
+            // wait a moment for layout change, then center the collapsed section in the viewport
+            setTimeout(function() {
+                desc.scrollIntoView({behavior: 'smooth', block: 'center'});
+            }, 120);
+            isCollapsed = true;
+        }
+    });
 });
 </script>
 
             <section class="materials-section card">
     <div class="section-header">
         <h2 class="section-title"><i class="fas fa-box-open"></i> Materials Needed</h2>
-        <button class="add-material-btn" data-action="open-add-material"><i class="fas fa-plus"></i> Add Material</button>
+        <!-- Materials are listed read-only here; acquisition and management moved to workflow stages -->
     </div>
     
     <div class="materials-list">
         <?php if (empty($materials)): ?>
-            <p class="empty-state">No materials added yet.</p>
+            <p class="empty-state">No materials listed for this project.</p>
         <?php else: ?>
-            <?php foreach ($materials as $material):
-                $mid = (int)($material['material_id'] ?? $material['id'] ?? 0);
-                $is_completed = isset($material['status']) && $material['status'] === 'completed';
-            ?>
-                <div class="material-item">
-                    <div class="material-info">
-                        <span class="material-name"><?= htmlspecialchars($material['material_name'] ?? '') ?></span>
-                        <span class="material-quantity">Quantity: <?= htmlspecialchars($material['quantity'] ?? 0) ?></span>
-                    </div>
-                    <div class="material-actions">
-                        <form method="POST" style="display:inline;">
-                            <input type="hidden" name="material_id" value="<?= $mid ?>">
-                            <input type="hidden" name="status" value="<?= $is_completed ? 'needed' : 'completed' ?>">
-                            <button type="submit" name="update_material_status" class="action-btn check-btn" title="<?= $is_completed ? 'Mark as Needed' : 'Mark as Obtained' ?>">
-                                <i class="fas fa-square"></i>
-                            </button>
-                        </form>
-                        <span class="status-tag status-<?= htmlspecialchars($material['status'] ?? 'needed') ?>"><?= $is_completed ? 'Obtained' : ucfirst($material['status'] ?? 'needed') ?></span>
-                        <form method="POST" style="display:inline" onsubmit="return confirm('Are you sure you want to remove this material?');">
-                            <input type="hidden" name="material_id" value="<?= $mid ?>">
-                            <button type="submit" name="remove_material" class="action-btn remove-btn" title="Remove Material"><i class="fas fa-trash"></i></button>
-                        </form>
-                    </div>
-                </div>
+            <ul class="materials-list-flat">
+            <?php foreach ($materials as $material): ?>
+                <li class="material-item-flat">
+                    <strong><?= htmlspecialchars($material['material_name'] ?? '') ?></strong>
+                    <span class="material-quantity">&nbsp;—&nbsp;<?= (int)($material['quantity'] ?? 0) ?> required</span>
+                </li>
             <?php endforeach; ?>
+            </ul>
         <?php endif; ?>
     </div>
 </section>
@@ -358,23 +465,25 @@ document.addEventListener("DOMContentLoaded", function() {
                     if ($tpl_stmt) {
                         $tpl_stmt->execute();
                         $tpl_res = $tpl_stmt->get_result();
-                        while ($row = $tpl_res->fetch_assoc()) {
-                            $workflow_stages[] = [
-                                'name' => $row['stage_name'],
-                                'description' => $row['description'],
-                                'number' => (int)$row['stage_number']
-                            ];
-                        }
+                                while ($row = $tpl_res->fetch_assoc()) {
+                                    // Skip explicit 'Planning' stage — project creation serves as planning
+                                    if (trim(strtolower($row['stage_name'])) === 'planning') continue;
+                                    $workflow_stages[] = [
+                                        'name' => $row['stage_name'],
+                                        'description' => $row['description'],
+                                        'number' => (int)$row['stage_number']
+                                    ];
+                                }
                     }
                 } catch (Exception $e) {
                     $workflow_stages = [];
                 }
 
                 if (empty($workflow_stages)) {
+                    // Omit 'Planning' — project creation acts as planning
                     $workflow_stages = [
-                        ['name' => 'Planning', 'description' => 'Define project goals, list required materials, sketch your design', 'number' => 1],
-                        ['name' => 'Preparation', 'description' => 'Collect materials, clean and sort materials, prepare workspace', 'number' => 2],
-                        ['name' => 'Creation', 'description' => 'Build your project, follow safety guidelines, document progress', 'number' => 3],
+                        ['name' => 'Preparation', 'description' => 'Collect materials, clean and sort materials, prepare workspace', 'number' => 1],
+                        ['name' => 'Creation', 'description' => 'Build your project, follow safety guidelines, document progress', 'number' => 2],
                     ];
                 }
 
@@ -473,6 +582,45 @@ document.addEventListener("DOMContentLoaded", function() {
                                             <div class="stage-desc"><?= nl2br(htmlspecialchars($stage['description'] ?? '')) ?></div>
                                     </div>
                                 </div>
+                                    <?php if (trim(strtolower($stage['name'] ?? '')) === 'preparation'): ?>
+                                        <div class="materials-manager" style="margin:12px 0 8px; padding:8px; background:#f7fff7; border-radius:8px; border:1px solid #e6f4ea;">
+                                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                                                <strong style="font-size:1em;">Collect Materials</strong>
+                                                <button type="button" class="add-material-btn" data-action="open-add-material" style="background:#2e8b57;color:#fff;border:none;padding:6px 10px;border-radius:6px;cursor:pointer;">+ Add Material</button>
+                                            </div>
+                                            <div class="materials-list-inline">
+                                                <?php if (empty($materials)): ?>
+                                                    <p class="empty-state">No materials listed for this project.</p>
+                                                <?php else: ?>
+                                                    <?php foreach ($materials as $material):
+                                                        $mid = (int)($material['material_id'] ?? $material['id'] ?? 0);
+                                                        $is_completed_mat = isset($material['status']) && $material['status'] === 'completed';
+                                                    ?>
+                                                        <div class="material-row" style="display:flex;align-items:center;justify-content:space-between;padding:8px;border-radius:6px;background:#ffffff;margin-bottom:6px;border:1px solid #eef6ef;">
+                                                            <div class="material-info">
+                                                                <strong><?= htmlspecialchars($material['material_name'] ?? '') ?></strong>
+                                                                <div style="color:#666;font-size:0.95em;">Quantity: <?= (int)($material['quantity'] ?? 0) ?></div>
+                                                            </div>
+                                                            <div class="material-actions" style="display:flex;gap:8px;align-items:center;">
+                                                                <form method="POST" style="display:inline;">
+                                                                    <input type="hidden" name="material_id" value="<?= $mid ?>">
+                                                                    <input type="hidden" name="status" value="<?= $is_completed_mat ? 'needed' : 'completed' ?>">
+                                                                    <button type="submit" name="update_material_status" class="action-btn check-btn" title="<?= $is_completed_mat ? 'Mark as Needed' : 'Mark as Obtained' ?>" style="background:transparent;border:none;cursor:pointer;color:#2e8b57;font-size:1.1em;">
+                                                                        <i class="fas <?= $is_completed_mat ? 'fa-check-square' : 'fa-square' ?>"></i>
+                                                                    </button>
+                                                                </form>
+                                                                <form method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to remove this material?');">
+                                                                    <input type="hidden" name="material_id" value="<?= $mid ?>">
+                                                                    <button type="submit" name="remove_material" class="action-btn remove-btn" title="Remove Material" style="background:#ff6b6b;border:none;color:#fff;padding:6px 8px;border-radius:6px;cursor:pointer;"><i class="fas fa-trash"></i></button>
+                                                                </form>
+                                                                <span class="status-tag" style="padding:4px 8px;border-radius:12px;background:<?= $is_completed_mat ? '#e6fff0' : '#fff6e6' ?>;color:<?= $is_completed_mat ? '#117a3a' : '#a36b00' ?>;font-size:0.9em;"><?= $is_completed_mat ? 'Obtained' : ucfirst($material['status'] ?? 'needed') ?></span>
+                                                            </div>
+                                                        </div>
+                                                    <?php endforeach; ?>
+                                                <?php endif; ?>
+                                            </div>
+                                        </div>
+                                    <?php endif; ?>
                             
                             <?php
                             // Get photos for this stage (count + preview)
@@ -679,6 +827,28 @@ document.addEventListener("DOMContentLoaded", function() {
             });
             return modal;
         }
+
+        document.addEventListener("DOMContentLoaded", function () {
+            const addMaterialBtn = document.querySelector("[data-action='open-add-material']");
+            if (addMaterialBtn) {
+                addMaterialBtn.addEventListener("click", function (e) {
+                    e.preventDefault();
+                    const modal = createAddMaterialModal();
+                    if (modal) {
+                        modal.classList.add("active");
+                    }
+                });
+            }
+            // Also wire any dynamically added add-material buttons inside stages
+            document.querySelectorAll('.materials-manager .add-material-btn').forEach(btn=>{
+                btn.addEventListener('click', function(e){
+                    e.preventDefault();
+                    const modal = createAddMaterialModal();
+                    if (modal) modal.classList.add('active');
+                });
+            });
+        });
+
     </script>
     
     
@@ -877,6 +1047,7 @@ async function completeStage(stageNumber, projectId) {
             toast.innerHTML = '<i class="fas fa-check-circle"></i> Stage completed successfully!';
             document.body.appendChild(toast);
             
+            setTimeout(() => window.location
             setTimeout(() => window.location.reload(), 1000);
         } else {
             alert(data.message || 'Error completing stage');
