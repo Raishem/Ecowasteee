@@ -1,9 +1,24 @@
-.project-stages {
+/* Project stages container */
+.workflow-section {
     margin: 2rem 0;
-    padding: 1.5rem;
     background: #fff;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    border-radius: 12px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+    overflow: hidden;
+}
+
+/* Stage Navigation Tabs */
+.stage-tabs {
+    display: flex;
+    background: #f8f9fa;
+    border-bottom: 1px solid #e9ecef;
+    padding: 0;
+    margin: 0;
+    list-style: none;
+    gap: 1rem;
+    padding: 1.25rem 1.5rem 0;
+    padding-left: 2rem; /* nudge tabs slightly to the right for better centering */
+    justify-content: center;
 }
 
 .stages-timeline {
@@ -50,11 +65,32 @@
 }
 
 .workflow-stage {
-    background: var(--primary-light);
+    display: none;
+    background: #fff;
     border-radius: 8px;
-    padding: 1.5rem;
+    padding: 2rem;
     margin-bottom: 1.5rem;
     position: relative;
+}
+
+.workflow-stage.active {
+    display: block;
+}
+.stage-tab.locked {
+    opacity: 0.85;
+    cursor: not-allowed !important;
+}
+
+/* Make sure the locked cursor applies to the tab and its children with high specificity */
+body .stage-tabs .stage-tab.locked,
+body .stage-tabs .stage-tab.locked > *,
+body .stage-tabs .stage-tab.locked * {
+    cursor: not-allowed !important;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 .workflow-stage.completed {
@@ -69,8 +105,15 @@
 }
 
 .workflow-stage.locked {
-    opacity: 0.7;
-    background: #f5f5f5;
+    opacity: 0.9;
+    background: #fbfbfc;
+}
+
+.workflow-stage.locked .stage-actions .stage-btn,
+.workflow-stage.locked .stage-actions button,
+.workflow-stage.locked .material-actions .material-btn {
+    opacity: 0.6;
+    cursor: not-allowed;
     pointer-events: none;
 }
 
@@ -146,10 +189,41 @@
 
 .stage-content {
     flex: 1;
-    background: #f8f9fa;
-    padding: 1rem;
+    background: #fff;
+    padding: 2rem;
     border-radius: 8px;
-    margin-left: 1rem;
+}
+
+.stage-tab {
+    padding: 1rem 1.5rem;
+    background: transparent;
+    border: none;
+    border-radius: 8px 8px 0 0;
+    color: #495057;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: -1px;
+}
+
+.stage-tab:hover {
+    background: #e9ecef;
+    color: #212529;
+}
+
+.stage-tab.active {
+    background: #fff;
+    color: #0d6efd;
+    border: 1px solid #e9ecef;
+    border-bottom-color: #fff;
+}
+
+.stage-tab i {
+    font-size: 1.25rem;
 }
 
 .stage-card.completed .stage-content {
@@ -253,4 +327,174 @@
     max-width: 90%;
     max-height: 90vh;
     object-fit: contain;
+}
+
+/* Responsive: collapsible timeline on small screens */
+.toggle-timeline-btn {
+    display: none; /* shown in mobile via media query */
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.6rem;
+    border-radius: 6px;
+    border: 1px solid rgba(0,0,0,0.06);
+    background: #fff;
+    color: #333;
+    cursor: pointer;
+    font-size: 0.95rem;
+}
+
+@media (max-width: 768px) {
+    .toggle-timeline-btn { display: inline-flex; margin-left: 0.5rem; }
+
+    /* Collapse behavior using max-height transition */
+    .stages-timeline {
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.28s ease;
+    }
+
+    /* When expanded allow large max-height to show content */
+    .stages-timeline.expanded {
+        max-height: 6000px; /* large enough to show all stages */
+    }
+
+    /* Give stage cards a bit more compact spacing on mobile */
+    .stage-card { padding-left: 48px; }
+    .stages-timeline::before { left: 18px; }
+}
+
+/* Tabs styling */
+.stage-tabs { 
+    display: flex; 
+    gap: 8px; 
+    align-items: center; 
+    margin-bottom: 20px;
+    padding: 4px;
+    justify-content: center;
+}
+
+.stage-tab { 
+    display: inline-flex; 
+    flex-direction: column; 
+    align-items: center; 
+    gap: 8px; 
+    padding: 12px 14px; 
+    border-radius: 12px;
+    background: #fff;
+    border: 1px solid #eaecef;
+    transition: all .18s ease-out;
+    cursor: pointer;
+    margin: 0 6px;
+    min-width: 120px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+}
+
+.stage-tab:hover {
+    transform: translateY(-3px);
+    border-color: #ccd6e4;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.06);
+}
+
+.stage-tab:focus {
+    outline: none;
+    box-shadow: 0 0 0 4px rgba(13,110,253,0.12);
+}
+
+/* Final override: ensure locked stage tabs always show not-allowed cursor and keep interactive controls inside stages disabled */
+.stage-tabs .stage-tab.locked, .stage-tabs .stage-tab.locked * {
+    cursor: not-allowed !important;
+}
+.workflow-stage.locked .stage-actions button, .workflow-stage.locked .material-actions .material-btn {
+    pointer-events: none !important;
+    opacity: 0.6 !important;
+}
+
+/* Custom black 'forbidden' cursor for locked tabs to avoid platform-specific red 'no-drop' cursor */
+.stage-tabs .stage-tab.locked, .stage-tabs .stage-tab.locked * {
+    cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32'><circle cx='16' cy='16' r='12' stroke='black' stroke-width='2' fill='white'/><line x1='6' y1='26' x2='26' y2='6' stroke='black' stroke-width='3' stroke-linecap='round'/></svg>") 16 16, not-allowed !important;
+}
+
+.stage-tab.active {
+    background: #f8fafd;
+    border-color: #ccd6e4;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.stage-tab.locked {
+    opacity: 0.75;
+    cursor: not-allowed;
+}
+
+.stage-tab .tab-icon {
+    width: 48px;
+    height: 48px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    background: #f4f4f4;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    font-size: 1.25rem;
+    color: #495057;
+}
+
+.stage-tab .tab-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    max-width: 220px;
+    text-align: center;
+}
+
+.stage-tab .tab-title {
+    font-size: 0.95rem;
+    color: #234;
+}
+
+.stage-tab .tab-badge {
+    font-size: 0.75rem;
+    color: #6c757d;
+    margin-top: 4px;
+}
+
+.stage-tab .tab-meta { 
+    display: flex;
+    flex-direction: column; 
+    align-items: center; 
+    gap: 4px;
+    max-width: 220px;
+    text-align: center;
+}
+
+.tab-title { 
+    font-size: 14px;
+    line-height: 1.2;
+    font-weight: 500;
+    color: #2d3748;
+}
+
+.tab-badge { 
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+}
+
+.tab-badge.completed { 
+    background: #e6f6ea;
+    color: #1a7f37;
+}
+
+.tab-badge.current { 
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.tab-badge.locked { 
+    background: #f3f4f6;
+    color: #6b7280;
 }
