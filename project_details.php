@@ -428,26 +428,35 @@ try {
                     label.style.color = '#2f7a3a'; 
                     label.innerHTML = '<i class="fas fa-check-circle"></i> Completed'; 
                     label.className = 'complete-stage-btn ' + (showStatus === 'completed' ? 'completed' : 'incomplete');
-                    // Keep it as a button instead of replacing
-                    if (btn.parentNode) {
-                        btn.innerHTML = '<i class="fas fa-check-circle"></i> Completed';
-                        btn.style.background = '#dff3e6';
-                        btn.style.color = '#2f7a3a';
-                        btn.classList.add('completed');
+                    // Keep it as a button instead of replacing — do DOM writes with observer disabled to avoid re-triggering
+                    if (btn && btn.parentNode) {
+                        withObserverDisabled(function(){
+                            try { btn.innerHTML = '<i class="fas fa-check-circle"></i> Completed'; } catch(e){}
+                            try { btn.style.background = '#dff3e6'; } catch(e){}
+                            try { btn.style.color = '#2f7a3a'; } catch(e){}
+                            try { btn.classList.add('completed'); } catch(e){}
+                        }, 80);
                     }
                 }
                 else { 
                     label.style.background = '#f1f5f1'; 
                     label.style.color = '#566a5a'; 
                     label.innerHTML = 'Incomplete'; 
-                    if (btn.parentNode) btn.parentNode.replaceChild(label, btn);
+                    if (btn && btn.parentNode) {
+                        withObserverDisabled(function(){
+                            try { btn.parentNode.replaceChild(label, btn); } catch(e){}
+                        }, 80);
+                    }
                 }
                 return true;
             } catch(e) { return false; }
         }
 
-        // Guarded observer: ignore mutations we created ourselves (data-observer-ignore)
-        const observer = new MutationObserver(function(mutations){
+    // Guarded observer: ignore mutations we created ourselves (data-observer-ignore)
+    // Keep references to observed root/options so we can disconnect/reconnect around programmatic DOM writes
+    let __stageObserverRoot = document.body;
+    const __stageObserverOptions = { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'data-stage-number', 'data-stage-index', 'aria-disabled'] };
+    const observer = new MutationObserver(function(mutations){
             for (const m of mutations) {
                 try {
                     // if the mutation target (or its ancestor) was marked as internal update, skip
@@ -471,7 +480,19 @@ try {
                 } catch(e) { /* ignore per-mutation errors */ }
             }
         });
-        try { observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'data-stage-number', 'data-stage-index', 'aria-disabled'] }); } catch(e){}
+        try { observer.observe(__stageObserverRoot, __stageObserverOptions); } catch(e){}
+
+        // Helper to perform DOM writes without re-triggering this observer
+        function withObserverDisabled(fn, timeout = 60){
+            try {
+                // disconnect the observer while we make DOM changes
+                try { observer.disconnect(); } catch(e){}
+                try { fn(); } catch(e){}
+            } finally {
+                // Reconnect after a short delay so other external mutations can be observed
+                try { setTimeout(()=> { try { observer.observe(__stageObserverRoot, __stageObserverOptions); } catch(e){} }, timeout); } catch(e){}
+            }
+        }
 
         // also run a retry pass a short time after load to catch late scripts
         setTimeout(function(){
