@@ -22,7 +22,7 @@ if ($photo_id <= 0) {
 }
 try {
     $conn = getDBConnection();
-    $pstmt = $conn->prepare("SELECT photo_path FROM material_photos WHERE id = ? LIMIT 1");
+    $pstmt = $conn->prepare("SELECT photo_path, material_id FROM material_photos WHERE id = ? LIMIT 1");
     $pstmt->bind_param('i', $photo_id);
     $pstmt->execute();
     $pres = $pstmt->get_result();
@@ -33,7 +33,7 @@ try {
         $d->bind_param('i', $photo_id);
         $d->execute();
         header('Content-Type: application/json');
-        echo json_encode(['success' => true]);
+        echo json_encode(['success' => true, 'material_id' => (int)$row['material_id']]);
         exit();
     } else {
         header('Content-Type: application/json');

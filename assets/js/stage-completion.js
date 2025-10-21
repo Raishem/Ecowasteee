@@ -8,11 +8,20 @@ async function completeStage(event, stageNumber, projectId) {
     }
     // If button still not found, continue but note we won't be able to change its UI
     const haveBtn = !!btn;
-    // If the button is disabled, allow the click to proceed only when the dataset indicates unmet requirements
-    // (so we can re-run a runtime verification). Otherwise bail out to avoid duplicate submissions.
-    if (haveBtn && btn.disabled) {
-        if (!(btn.dataset && btn.dataset.reqOk === '0')) return;
-        // otherwise allow flow to continue and runtime check to run below
+    // If the button is disabled (or aria-disabled), allow the click only when dataset indicates unmet requirements
+    // so we can re-run a runtime verification. Otherwise bail out to avoid duplicate submissions.
+    if (haveBtn) {
+        const ariaDisabled = btn.getAttribute && btn.getAttribute('aria-disabled') === 'true';
+        if (btn.disabled || ariaDisabled) {
+            // If reqOk === '0' we want to re-run runtime check; otherwise bail unless the button text indicates it's "Completed" (user may want to toggle/uncomplete)
+            if (!(btn.dataset && btn.dataset.reqOk === '0')) {
+                const txt = (btn.textContent || '').toLowerCase();
+                if (txt.indexOf('completed') === -1 && txt.indexOf('completed!') === -1) {
+                    return;
+                }
+                // otherwise allow to continue (attempt toggle/uncomplete)
+            }
+        }
     }
 
     // capture original HTML so we can restore on error (only if we have the button)
@@ -44,11 +53,11 @@ async function completeStage(event, stageNumber, projectId) {
                     if (!(photos && photos.querySelector('.material-photo:not(.placeholder)'))) return false;
                 }
                 return true;
-            } catch (e) { console.error('isStageSatisfied failed', e); return false; }
+            } catch (e) { /* isStageSatisfied failed (silenced) */ return false; }
         }
 
         // If dataset indicates unmet requirements, re-run the runtime check before showing modal
-        if (btn.dataset && btn.dataset.reqOk === '0') {
+    if (btn && btn.dataset && btn.dataset.reqOk === '0') {
             try {
                 const runtimeOk = await isStageSatisfied(btn, stageNumber);
                 if (!runtimeOk) {
@@ -62,17 +71,17 @@ async function completeStage(event, stageNumber, projectId) {
                     return;
                 } else {
                     // update dataset to indicate ok and continue
-                    try { btn.dataset.reqOk = '1'; } catch(e){}
-                    try { btn.removeAttribute('aria-disabled'); } catch(e){}
-                    try { btn.classList.remove('is-disabled'); } catch(e){}
+                    try { if (btn) btn.dataset.reqOk = '1'; } catch(e){}
+                    try { if (btn) btn.removeAttribute('aria-disabled'); } catch(e){}
+                    try { if (btn) btn.classList.remove('is-disabled'); } catch(e){}
                 }
-            } catch (e) { console.error('runtime stage check failed', e); }
+            } catch (e) { /* runtime stage check failed (silenced) */ }
         }
 
-        btn.disabled = true;
-    if (haveBtn) try { btn.dataset.processing = '1'; } catch(e){}
-    if (haveBtn) try { btn.setAttribute('aria-busy','true'); } catch(e){}
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+        if (btn) btn.disabled = true;
+    if (haveBtn) try { if (btn) btn.dataset.processing = '1'; } catch(e){}
+    if (haveBtn) try { if (btn) btn.setAttribute('aria-busy','true'); } catch(e){}
+        if (btn) btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
 
         const response = await fetch('complete_stage.php', {
             method: 'POST',
@@ -84,65 +93,116 @@ async function completeStage(event, stageNumber, projectId) {
         });
 
     const data = await response.json().catch(()=>null);
-    // DEBUG: log server response for troubleshooting
-    try { console.debug('completeStage response', data); } catch(e){}
+    // debug: server response (silenced in production)
     const toast = (typeof window.showToast === 'function') ? window.showToast : (msg => alert(msg));
 
         if (data && data.success) {
-            if (data.action === 'completed') {
-                btn.innerHTML = '<i class="fas fa-check"></i> Completed!';
-                toast('Stage completed successfully', 'success');
-                // try to activate the next stage tab without full reload
-                try {
-                    // find current tab by data-stage-index or by matching stageNumber
-                    const currentStageNum = String(stageNumber);
-                    // find the stage tab element that corresponds to the current stage
-                    let currentTab = document.querySelector('.stage-tab.active') || document.querySelector('.stage-tab[data-stage-index][data-stage-number="' + currentStageNum + '"]') || document.querySelector('.stage-tab[data-stage-index].active');
-                    if (!currentTab) {
-                        // attempt to find a tab whose data-stage-index equals the currentStageNum
-                        currentTab = document.querySelector('.stage-tab[data-stage-index="' + currentStageNum + '"]');
+                if (data.action === 'completed') {
+                    if (btn) {
+                        try {
+                            const stageEl = btn.closest('.workflow-stage');
+                            if (stageEl) {
+                                stageEl.classList.remove('current');
+                                stageEl.classList.add('completed');
+                                const idx = parseInt(stageEl.getAttribute('data-stage-index'), 10);
+                                const tab = document.querySelector('.stage-tab[data-stage-index="' + idx + '"]');
+                                if (tab) { tab.classList.remove('active'); tab.classList.add('completed'); }
+
+                                // move to next stage
+                                let next = stageEl.nextElementSibling;
+                                while (next && !next.classList.contains('workflow-stage')) next = next.nextElementSibling;
+                                if (next) {
+                                    next.classList.remove('locked');
+                                    next.classList.add('current');
+                                    const nextIdx = parseInt(next.getAttribute('data-stage-index'), 10);
+                                    if (typeof showStageByIndex === 'function') showStageByIndex(nextIdx);
+                                }
+                            }
+                        } catch (e) { /* non-fatal */ }
                     }
-                    if (currentTab) {
-                        // find next sibling tab
-                        let next = currentTab.nextElementSibling;
-                        // if next is not a .stage-tab, search forward for the next .stage-tab
-                        while (next && !next.classList.contains('stage-tab')) next = next.nextElementSibling;
-                        if (next && next.classList.contains('stage-tab')) {
-                            // trigger click to activate it (this will also scroll into view)
-                            next.click();
-                            return;
+                    if (typeof renderStageStatusLabel === 'function') {
+                        try { renderStageStatusLabel(stageNumber, 'completed'); } catch(e) { 
+                            if (btn) {
+                                btn.innerHTML = '<i class="fas fa-check-circle"></i> Completed';
+                                btn.style.background = '#dff3e6';
+                                btn.style.color = '#2f7a3a';
+                                btn.classList.add('completed');
+                            }
+                        }
+                    } else {
+                        if (btn) {
+                            btn.innerHTML = '<i class="fas fa-check-circle"></i> Completed';
+                            btn.style.background = '#dff3e6';
+                            btn.style.color = '#2f7a3a';
+                            btn.classList.add('completed');
                         }
                     }
-                } catch (e) { console.error('navigate to next stage failed', e); }
-                // fallback: reload page to update UI
-                setTimeout(() => window.location.reload(), 900);
-            } else if (data.action === 'uncompleted') {
-                btn.innerHTML = '<i class="fas fa-undo"></i> Mark as Complete';
-                toast('Stage marked as incomplete', 'success');
-                setTimeout(() => window.location.reload(), 700);
-            } else {
-                // generic success
-                toast('Operation successful', 'success');
-                setTimeout(() => window.location.reload(), 700);
-            }
+                    toast('Stage completed successfully', 'success');
+                } else if (data.action === 'uncompleted') {
+                    // Update UI: remove completed class and ensure this becomes the current stage
+                    try {
+                        if (typeof markStageUncompletedUI === 'function') {
+                            try { markStageUncompletedUI(stageNumber); }
+                            catch(e) { if (btn) btn.innerHTML = '<i class="fas fa-undo"></i> Mark as Complete'; }
+                        } else {
+                            if (btn) btn.innerHTML = '<i class="fas fa-undo"></i> Mark as Complete';
+                        }
+                        // Find the stage element by its data-stage-number or by stageNumber param
+                        let stageEl = null;
+                        try { stageEl = document.querySelector('.workflow-stage[data-stage-number="' + stageNumber + '"]'); } catch(e) { stageEl = null; }
+                        if (!stageEl) {
+                            try { stageEl = document.querySelector('.workflow-stage[data-stage-index="' + stageNumber + '"]'); } catch(e) { stageEl = null; }
+                        }
+                        if (!stageEl && btn) {
+                            stageEl = btn.closest('.workflow-stage, .stage-card');
+                        }
+                        if (stageEl) {
+                            stageEl.classList.remove('completed');
+                            stageEl.classList.remove('current');
+                            stageEl.classList.add('current');
+                            // Update corresponding tab if present
+                            const idx = stageEl.getAttribute('data-stage-number') || stageEl.getAttribute('data-stage-index');
+                            if (idx) {
+                                const tab = document.querySelector('.stage-tab[data-stage-number="' + idx + '"]') || document.querySelector('.stage-tab[data-stage-index="' + idx + '"]');
+                                if (tab) { tab.classList.remove('completed'); tab.classList.add('active'); }
+                            }
+                        }
+                        // remove explicit uncomplete button if present
+                        try { const u = stageEl ? stageEl.querySelector('.uncomplete-stage-btn') : null; if (u) u.remove(); } catch(e){}
+                    } catch(e) { /* uncomplete UI update failed (silenced) */ }
+                    toast('Stage marked as incomplete', 'success');
+                } else {
+                    toast('Operation successful', 'success');
+                }
         } else {
-            btn.disabled = false;
-            if (haveBtn) try { btn.dataset.processing = '0'; } catch(e){}
-            if (haveBtn) try { btn.removeAttribute('aria-busy'); } catch(e){}
-            btn.innerHTML = originalHtml;
-            if (data && data.reason === 'missing_stage_photos') {
-                if (typeof window.showStagePhotoModal === 'function') window.showStagePhotoModal(stageNumber, data.missing || null, projectId);
-                toast('Please upload required stage photos', 'error');
+            // If server explicitly explains completion failed due to missing materials/photos,
+            // treat the stage as incomplete in the UI (user just added material so it should be Incomplete)
+            if (data && (data.reason === 'missing_materials' || data.reason === 'missing_after_photos' || data.reason === 'missing_stage_photos')) {
+                try {
+                    if (typeof renderStageStatusLabel === 'function') renderStageStatusLabel(stageNumber, 'incomplete');
+                    else if (typeof markStageUncompletedUI === 'function') markStageUncompletedUI(stageNumber);
+                    else if (btn) { btn.innerHTML = '<i class="fas fa-undo"></i> Mark as Complete'; }
+                } catch(e){ if (btn) btn.innerHTML = originalHtml; }
+                try { toast((data && data.message) ? data.message : 'Stage marked as incomplete', 'info'); } catch(e){}
             } else {
-                toast((data && data.message) ? data.message : 'Could not complete stage', 'error');
+                if (btn) btn.disabled = false;
+                if (haveBtn) try { if (btn) btn.dataset.processing = '0'; } catch(e){}
+                if (haveBtn) try { if (btn) btn.removeAttribute('aria-busy'); } catch(e){}
+                if (btn) btn.innerHTML = originalHtml;
+                if (data && data.reason === 'missing_stage_photos') {
+                    if (typeof window.showStagePhotoModal === 'function') window.showStagePhotoModal(stageNumber, data.missing || null, projectId);
+                    toast('Please upload required stage photos', 'error');
+                } else {
+                    toast((data && data.message) ? data.message : 'Could not complete stage', 'error');
+                }
             }
         }
     } catch (error) {
-        console.error('Error:', error);
-        btn.disabled = false;
-        if (haveBtn) try { btn.dataset.processing = '0'; } catch(e){}
-        if (haveBtn) try { btn.removeAttribute('aria-busy'); } catch(e){}
-        btn.innerHTML = originalHtml;
+        /* error during completeStage (silenced) */
+        if (btn) btn.disabled = false;
+        if (haveBtn) try { if (btn) btn.dataset.processing = '0'; } catch(e){}
+        if (haveBtn) try { if (btn) btn.removeAttribute('aria-busy'); } catch(e){}
+        if (btn) btn.innerHTML = originalHtml;
         (typeof window.showToast === 'function') ? window.showToast('Network error while completing stage', 'error') : alert('Network error while completing stage');
     }
 }

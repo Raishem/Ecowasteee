@@ -49,7 +49,7 @@ window.sharedModalAPI = (function(){
     }
 
     function open(){
-        if (!ctx.projectId) return console.warn('sharedModal: not initialized');
+        if (!ctx.projectId) return; // not initialized
         // Only allow open if project is completed: caller must ensure
         // reset UI
         summary.style.display = 'none';
@@ -80,7 +80,7 @@ window.sharedModalAPI = (function(){
                 close();
                 if (res.share_url) window.open(res.share_url, '_blank');
             } else showToast(res.message || 'Failed to share', 'error');
-        }).catch(err => { publishBtn.disabled=false; showToast('Network error', 'error'); console.error(err); });
+    }).catch(err => { publishBtn.disabled=false; showToast('Network error', 'error'); /* error logged for dev (silenced) */ });
     }
 
     // events

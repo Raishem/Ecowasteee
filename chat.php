@@ -239,7 +239,7 @@ try {
         
         // Handle connection errors
         evtSource.onerror = function() {
-            console.log('SSE connection error. Reconnecting...');
+            // debug logging removed
         };
     </script>
 </body>

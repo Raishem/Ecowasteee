@@ -42,7 +42,7 @@ $steps = $sstmt->fetchAll(PDO::FETCH_ASSOC);
         for (var k in data) fd.append(k, data[k]);
 
         fetch('update_project.php', { method: 'POST', body: fd })
-        .then(r => r.json()).then(cb).catch(e => console.error(e));
+    .then(r => r.json()).then(cb).catch(e => { /* silenced */ });
     }
 
     function toggleLike(el){
@@ -54,6 +54,18 @@ $steps = $sstmt->fetchAll(PDO::FETCH_ASSOC);
             }
         });
     }
+
+    // Silence console output on this page (non-invasive)
+    (function(){
+        try {
+            if (typeof window !== 'undefined' && !window.__silentConsolePatchApplied) {
+                ['log','debug','info','warn','error'].forEach(function(fn){
+                    try { if (console && console[fn]) console[fn] = function(){}; } catch(e){}
+                });
+                window.__silentConsolePatchApplied = true;
+            }
+        } catch(e) { /* ignore */ }
+    })();
 
     function submitComment(){
         var txt = document.getElementById('comment_text').value;
@@ -122,7 +134,7 @@ $steps = $sstmt->fetchAll(PDO::FETCH_ASSOC);
                 } else {
                     alert(res.message || 'Failed to unpublish');
                 }
-            }).catch(err => { console.error(err); alert('Error'); });
+            }).catch(err => { alert('Error'); });
         });
     }
     </script>

@@ -908,14 +908,11 @@ while ($row = $result->fetch_assoc()) $leaders[] = $row;
         const donationFormContainer = document.getElementById('donationFormContainer');
         const successPopup = document.getElementById('successPopup');
 
-        if (!donateWasteBtn || !donationPopup) {
-            console.error('Required elements not found in the DOM');
-            return;
-        }
+        if (!donateWasteBtn || !donationPopup) return;
 
         donateWasteBtn.addEventListener('click', function (e) {
             e.preventDefault();
-            console.log('Donate Waste button clicked');
+            // debug logging removed
             donationPopup.style.display = 'flex';
             donationFormContainer.style.display = 'block';
             successPopup.style.display = 'none';

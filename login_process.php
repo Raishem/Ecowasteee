@@ -22,7 +22,6 @@ if (!$email || empty($password)) {
 }
 
 try {
-    error_log("Trying to log in with email: $email");
     $conn = getDBConnection();
     $stmt = $conn->prepare("SELECT user_id, email, password_hash, first_name FROM users WHERE email = ?");
     if (!$stmt) {
@@ -34,7 +33,7 @@ try {
     $stmt->bind_param("s", $email);
     $stmt->execute();
     $result = $stmt->get_result();
-    error_log("Query executed. Num rows: " . $result->num_rows);
+    // Query executed
 
     if ($result->num_rows === 0) {
         $_SESSION['login_error'] = 'Invalid email or password';
@@ -43,7 +42,7 @@ try {
     }
 
     $user = $result->fetch_assoc();
-    error_log("User found: " . print_r($user, true));
+    // user record retrieved
 
     // Verify password
     if (!password_verify($password, $user['password_hash'])) {

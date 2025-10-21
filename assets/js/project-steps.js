@@ -27,9 +27,7 @@ function toggleStep(stepId, projectId) {
             }
         }
     })
-    .catch(error => {
-        console.error('Error:', error);
-    });
+    .catch(error => { /* step toggle failed (silenced) */ });
 }
 
 // Image viewer functionality

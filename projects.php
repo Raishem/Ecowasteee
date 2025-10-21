@@ -465,10 +465,7 @@ if (!$user) {
                         alert('Error loading project details: ' + data.message);
                     }
                 })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('Error loading project details');
-                });
+                        .catch(error => { btn.classList.remove('found'); btn.removeAttribute('disabled'); });
         }
 
         function updateMaterialsList(materials) {
@@ -547,10 +544,7 @@ if (!$user) {
                     alert('Error adding material: ' + data.message);
                 }
             })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('Error adding material');
-            });
+                .catch(error => { alert('Error adding material'); });
         }
 
         function deleteMaterial(materialId) {
@@ -573,10 +567,7 @@ if (!$user) {
                         alert('Error deleting material: ' + data.message);
                     }
                 })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('Error deleting material');
-                });
+                    .catch(error => { alert('Error deleting material'); });
             }
         }
 
@@ -632,10 +623,7 @@ if (!$user) {
                     alert('Error updating title: ' + data.message);
                 }
             })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('Error updating title');
-            });
+                    .catch(error => { alert('Error updating title'); });
         }
 
         // Function to toggle description edit form
@@ -690,10 +678,7 @@ if (!$user) {
                     alert('Error updating description: ' + data.message);
                 }
             })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('Error updating description');
-            });
+                .catch(error => { alert('Error updating description'); });
         }
 
         // Function to find material in browse section
@@ -723,11 +708,7 @@ if (!$user) {
                     btn.removeAttribute('disabled');
                 }
             })
-            .catch(error => {
-                console.error('Error:', error);
-                btn.classList.remove('found');
-                btn.removeAttribute('disabled');
-            });
+                .catch(error => { btn.classList.remove('found'); btn.removeAttribute('disabled'); });
         }
 
         // Project Steps Functions
@@ -776,10 +757,7 @@ if (!$user) {
                     alert('Error adding step: ' + data.message);
                 }
             })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('Error adding step');
-            });
+            .catch(error => { alert('Error adding step'); });
         }
 
         function toggleProjectStatus() {
@@ -825,10 +803,7 @@ if (!$user) {
                     alert('Error updating project status');
                 }
             })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('Error updating project status');
-            });
+            .catch(error => { alert('Error updating project status'); });
         }
 
         function updateProjectStatus(status) {
