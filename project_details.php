@@ -605,23 +605,69 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Detect whether content overflows more than 5 lines
     function contentOverflowsFiveLines(el) {
-        // Create a clone to measure full height
-        const clone = el.cloneNode(true);
-        clone.style.visibility = 'hidden';
-        clone.style.position = 'absolute';
-        clone.style.maxHeight = 'none';
-        clone.style.display = 'block';
-        clone.style.width = getComputedStyle(el).width;
-        document.body.appendChild(clone);
-        const fullHeight = clone.getBoundingClientRect().height;
-        document.body.removeChild(clone);
+        try {
+            // Create a clone to measure full height. Ensure the clone is not affected by
+            // any CSS line-clamp or collapsed styles by forcing display and removing classes.
+            const clone = el.cloneNode(true);
+            clone.style.visibility = 'hidden';
+            clone.style.position = 'absolute';
+            clone.style.maxHeight = 'none';
+            clone.style.display = 'block';
+            clone.style.whiteSpace = 'normal';
+            clone.style.wordBreak = 'break-word';
 
-        const lineHeight = parseFloat(getComputedStyle(el).lineHeight) || 18;
-        const maxAllowed = lineHeight * 5 + 1; // small tolerance
-        return fullHeight > maxAllowed;
+            // Remove any collapse/expanded classes that might exist on the element
+            clone.classList.remove('collapsed');
+            clone.classList.remove('expanded');
+            clone.classList.remove('has-overflow');
+
+            // Force computed width as an explicit pixel value so measurements are accurate
+            const elStyle = getComputedStyle(el);
+            const widthPx = el.getBoundingClientRect().width || parseFloat(elStyle.width) || 360;
+            clone.style.width = widthPx + 'px';
+            // Ensure line-height used for calculation is consistent with the real element
+            clone.style.lineHeight = elStyle.lineHeight || '1.8';
+
+            document.body.appendChild(clone);
+            const fullHeight = clone.getBoundingClientRect().height;
+            document.body.removeChild(clone);
+
+            const lineHeight = parseFloat(elStyle.lineHeight) || 18;
+            const maxAllowed = lineHeight * 5 + 1; // small tolerance
+            return fullHeight > maxAllowed;
+        } catch (e) {
+            // If measurement fails, be conservative and treat as overflow
+            return true;
+        }
     }
 
-    const overflow = contentOverflowsFiveLines(desc);
+    let overflow = contentOverflowsFiveLines(desc);
+    // Fallback: if measurement didn't detect overflow but the text is very long,
+    // assume overflow so the user can expand/collapse the long description.
+    try {
+        if (!overflow) {
+            const txt = (desc.textContent || '').trim();
+            if (txt.length > 400) overflow = true;
+        }
+    } catch(e) { /* ignore */ }
+
+    // Additional runtime check: compare rendered scrollHeight/clientHeight as a final guard
+    try {
+        if (!overflow) {
+            const scrollH = desc.scrollHeight || 0;
+            const clientH = desc.clientHeight || 0;
+            if (scrollH > clientH + 2) overflow = true;
+        }
+    } catch(e) { /* ignore */ }
+
+    // Debug: optional console output when ?debug=1 present
+    try {
+        const dbg = /(?:\?|&|#)debug=1\b/.test((location && (location.search || '') + (location.hash || '')) || '');
+        if (dbg || window.__ECOWASTE_DEBUG__) {
+            try { console.debug('[see-more] overflow:', overflow, 'textLen:', (desc.textContent||'').length, 'scrollH:', desc.scrollHeight, 'clientH:', desc.clientHeight); } catch(e){}
+        }
+    } catch(e) {}
+
     if (overflow) {
         toggle.style.display = '';
         desc.classList.add('has-overflow');
@@ -891,9 +937,37 @@ document.addEventListener('DOMContentLoaded', function() {
                 label.style.color = '#2f7a3a';
                 label.innerHTML = '<i class="fas fa-check-circle" aria-hidden="true"></i> Completed';
             } else {
+                // For incomplete, ensure an actionable complete button exists in .stage-actions.
                 label.style.background = '#f1f5f1';
                 label.style.color = '#566a5a';
-                label.innerHTML = 'Incomplete';
+                label.textContent = ''; // keep label styling but empty — we'll insert button in actions
+                // Try to insert a real button into the stage-actions container
+                const stageEl = document.querySelector('.workflow-stage[data-stage-number="' + stageNumber + '"]') || document.querySelector('.workflow-stage[data-stage-index="' + stageNumber + '"]') || (btn && btn.closest ? btn.closest('.workflow-stage, .stage-card') : null);
+                try {
+                    const actions = stageEl ? stageEl.querySelector('.stage-actions') : null;
+                    if (actions) {
+                        // remove existing status labels/buttons to avoid duplicates
+                        actions.querySelectorAll('.stage-status-label, button.complete-stage-btn, button[data-stage-number]').forEach(n=>n.remove());
+                        const actionBtn = document.createElement('button');
+                        actionBtn.className = 'complete-stage-btn';
+                        try { actionBtn.setAttribute('data-stage-number', stageNumber); } catch(e){}
+                        actionBtn.type = 'button';
+                        actionBtn.title = 'Attempt to complete stage';
+                        actionBtn.innerHTML = '<i class="fas fa-undo"></i> Mark as Complete';
+                        // Attach click behavior
+                        try { actionBtn.addEventListener('click', function(ev){ try { const sn = parseInt(stageNumber,10); if (typeof completeStage === 'function') completeStage(ev, sn, <?= json_encode($project_id) ?>); else if (typeof requestToggleStage === 'function') requestToggleStage(sn, <?= json_encode($project_id) ?>); } catch(e){} }); } catch(e){}
+                        actions.appendChild(actionBtn);
+                    } else {
+                        // fallback: place button inside our label so it's still usable
+                        const btnFallback = document.createElement('button');
+                        btnFallback.className = 'complete-stage-btn';
+                        try { btnFallback.setAttribute('data-stage-number', stageNumber); } catch(e){}
+                        btnFallback.type = 'button'; btnFallback.title = 'Attempt to complete stage';
+                        btnFallback.innerHTML = '<i class="fas fa-undo"></i> Mark as Complete';
+                        try { btnFallback.addEventListener('click', function(ev){ try { const sn = parseInt(stageNumber,10); if (typeof completeStage === 'function') completeStage(ev, sn, <?= json_encode($project_id) ?>); else if (typeof requestToggleStage === 'function') requestToggleStage(sn, <?= json_encode($project_id) ?>); } catch(e){} }); } catch(e){}
+                        label.appendChild(btnFallback);
+                    }
+                } catch(e) { /* ignore insertion errors */ }
             }
 
             if (btn && btn.parentNode) {

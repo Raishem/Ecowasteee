@@ -50,7 +50,10 @@
 }
 
 .project-description.collapsed {
-    max-height: 100px; /* Preview height */
+    display: -webkit-box;
+    -webkit-line-clamp: 5; /* show up to 5 lines */
+    -webkit-box-orient: vertical;
+    overflow: hidden;
 }
 
 .project-description.expanded {

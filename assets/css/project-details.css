@@ -933,9 +933,7 @@ h1, h2, h3, h4 {
     transition: max-height 0.35s ease-in-out;
 }
 
-.project-description.collapsed {
-    max-height: 100px; /* preview */
-}
+.project-description.collapsed { }
 
 .project-description.expanded {
     max-height: none; /* full */

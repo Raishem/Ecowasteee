@@ -26,24 +26,8 @@
 }
 
 /* Add a subtle ellipsis pseudo-element when content is truncated; JS will add .has-overflow when appropriate */
-.project-description.collapsed.has-overflow::after {
-    /* single-character ellipsis positioned close to the last line; use a subtle backdrop and shadow
-       to ensure visibility over varied text and backgrounds */
-    content: '\2026'; /* single ellipsis char */
-    position: absolute;
-    right: 0.9rem; /* move closer to the text */
-    bottom: 0.7rem; /* slightly higher to align with text baseline */
-    font-size: 1.08rem;
-    color: rgba(34,34,34,0.78);
-    background: var(--primary-light); /* mask underlying text for clear visibility */
-    padding: 0 6px; /* small horizontal padding so ellipsis doesn't overlap letters */
-    border-radius: 6px;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.06);
-    pointer-events: none;
-    line-height: 1;
-    white-space: nowrap;
-    font-weight: 700;
-}
+/* Removed the floating ellipsis pseudo-element because it produced awkward visual artifacts
+    in some layouts. The native -webkit-line-clamp truncation is sufficient when supported. */
 
 .see-more-btn {
     background: none;
