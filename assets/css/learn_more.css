@@ -179,11 +179,14 @@ header {
 /* Adjust main content and right sidebar top spacing */
 .main-content {
     min-height: calc(100vh - 90px); /* Adjust for new header height */
+    width: 950px;
     overflow: visible;
-    padding: 20px;
     background-color: #fff;
     grid-column: 2 / 3;
+    padding: 40px 60px !important; /* adds comfortable side padding */
+    line-height: 1.8;
 }
+
 
 .sidebar nav ul {
     list-style: none;
@@ -421,3 +424,155 @@ header {
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
+
+
+/* Give each info and education section more breathing room */
+.info-section h3 {
+    margin-top: 25px;
+}
+
+.info-section p,
+.info-section ul,
+.info-section ol {
+    margin-bottom: 20px;
+}
+
+.info-section ol {
+    padding-left: 25px;  /* adjust indentation */
+    margin-left: 10px;   /* space from the left edge */
+}
+
+.info-section ol li {
+    margin-bottom: 8px;  /* add breathing space between items */
+}
+
+.info-section ul {
+    padding-left: 25px;   /* controls distance from the left */
+    margin-left: 10px;
+}
+
+
+.education-section {
+    margin-top: 35px !important;
+    margin-bottom: 35px !important;
+}
+
+.education-section h3 {
+    margin-bottom: 10px;
+    color: #2b9348;
+}
+
+.education-section p,
+.education-section ul {
+    margin-left: 20px;
+}
+
+/* Add a bit more separation between video cards */
+.video-grid {
+    gap: 25px !important;
+}
+
+        /* Tabs Styling */
+        .tabs {
+            position: relative;
+            display: flex;
+            justify-content: space-around;
+            border-bottom: 2px solid #ccc;
+            margin-bottom: 25px;
+        }
+        .tab-btn {
+            background: none;
+            border: none;
+            padding: 12px 20px;
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+            cursor: pointer;
+            transition: color 0.3s ease;
+        }
+        .tab-btn:hover {
+            color: #2b9348;
+        }
+        .tab-btn.active {
+            color: #2b9348;
+        }
+
+        /* Underline Animation */
+        .tab-underline {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 3px;
+            width: 0;
+            background: #2b9348;
+            transition: 0.3s ease;
+        }
+
+        /* Content */
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        @keyframes fadeIn {
+            from {opacity: 0;}
+            to {opacity: 1;}
+        }
+
+        /* Videos */
+        .video-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 15px;
+        }
+        iframe {
+            width: 100%;
+            height: 250px;
+            border: none;
+            border-radius: 8px;
+        }
+
+.back-btn {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background-color: #82AA52;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 6px;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .back-btn i {
+        font-size: 16px;
+    }
+
+    .back-btn:hover {
+        background-color: #6d8f45;
+        transform: translateX(-3px);
+    }
+
+
+.action-btn {
+    display: inline-block;
+    padding: 10px 20px;
+    background-color: #82AA52;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    text-decoration: none;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.action-btn:hover {
+    background-color: #6d8f45;
+}
