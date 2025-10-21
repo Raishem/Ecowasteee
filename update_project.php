@@ -2,573 +2,193 @@
 session_start();
 require_once 'config.php';
 
-// Set JSON content type for all responses
+// Always return JSON
 header('Content-Type: application/json');
 
-// Check if user is logged in
-if (!isset($_SESSION['user_id'])) {
-    echo json_encode(['success' => false, 'message' => 'Not authenticated']);
-    exit;
-}
+// API endpoint: always return JSON. Temporary debug wrapper removed.
+
+if (!isset($_SESSION['user_id'])) { echo json_encode(['success'=>false,'message'=>'Not authenticated']); exit; }
 
 $conn = getDBConnection();
+if (!$conn) { echo json_encode(['success'=>false,'message'=>'DB connection failed']); exit; }
 
-// Handle GET requests for project details
+// (previously had a small diagnostic logger; removed at user's request)
+
+function _get_int($k) { return filter_input(INPUT_POST, $k, FILTER_VALIDATE_INT); }
+function _get_str($k) { return isset($_POST[$k]) ? trim($_POST[$k]) : null; }
+
+// GET handlers
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['action']) && $_GET['action'] === 'get_project_details') {
-    $project_id = filter_input(INPUT_GET, 'project_id', FILTER_VALIDATE_INT);
-    
-    if (!$project_id) {
-        echo json_encode(['success' => false, 'message' => 'Invalid project ID']);
-        exit;
-    }
+    $project_id = filter_input(INPUT_GET,'project_id',FILTER_VALIDATE_INT);
+    if (!$project_id) { echo json_encode(['success'=>false,'message'=>'Invalid project id']); exit; }
 
-    try {
-        // Get project details
-        $stmt = $conn->prepare("
-            SELECT p.*, 
-                   pm.material_id,
-                   pm.material_name,
-                   pm.quantity,
-                   pm.unit,
-                   pm.is_found,
-                   COALESCE(p.status, 'collecting') as status
-            FROM projects p
-            LEFT JOIN project_materials pm ON p.project_id = pm.project_id
-            WHERE p.project_id = ? AND p.user_id = ?
-        ");
-        $stmt->execute([$project_id, $_SESSION['user_id']]);
-        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    // Verify ownership and fetch project
+    $stmt = $conn->prepare("SELECT * FROM projects WHERE project_id = ? AND user_id = ?");
+    $stmt->bind_param('ii',$project_id,$_SESSION['user_id']); $stmt->execute(); $r = $stmt->get_result(); $proj = $r ? $r->fetch_assoc() : null;
+    if (!$proj) { echo json_encode(['success'=>false,'message'=>'Project not found']); exit; }
 
-        if (empty($rows)) {
-            echo json_encode(['success' => false, 'message' => 'Project not found']);
-            exit;
-        }
+    // materials
+    $m = $conn->prepare('SELECT material_id, material_name, quantity, unit, status FROM project_materials WHERE project_id = ?');
+    $m->bind_param('i',$project_id); $m->execute(); $mr = $m->get_result(); $materials = $mr ? $mr->fetch_all(MYSQLI_ASSOC) : [];
 
-        // Get project steps
-        $steps_stmt = $conn->prepare("
-            SELECT ps.*, GROUP_CONCAT(sp.photo_path) as photos
-            FROM project_steps ps
-            LEFT JOIN step_photos sp ON ps.step_id = sp.step_id
-            WHERE ps.project_id = ?
-            GROUP BY ps.step_id
-            ORDER BY ps.step_number
-        ");
-        $steps_stmt->execute([$project_id]);
-        $steps = $steps_stmt->fetchAll(PDO::FETCH_ASSOC);
+    // steps
+    $s = $conn->prepare('SELECT ps.*, GROUP_CONCAT(sp.photo_path) as photos FROM project_steps ps LEFT JOIN step_photos sp ON ps.step_id = sp.step_id WHERE ps.project_id = ? GROUP BY ps.step_id ORDER BY ps.step_number');
+    $s->bind_param('i',$project_id); $s->execute(); $sr = $s->get_result(); $steps = $sr ? $sr->fetch_all(MYSQLI_ASSOC) : [];
 
-        // Format the response
-        $project = [
-            'project_id' => $rows[0]['project_id'],
-            'project_name' => $rows[0]['project_name'],
-            'status' => $rows[0]['status'],
-            'description' => $rows[0]['description'],
-            'created_at' => $rows[0]['created_at']
-        ];
-
-        $materials = [];
-        foreach ($rows as $row) {
-            if ($row['material_id']) {
-                $materials[] = [
-                    'id' => $row['material_id'],
-                    'name' => $row['material_name'],
-                    'quantity' => $row['quantity'],
-                    'unit' => $row['unit']
-                ];
-            }
-        }
-
-        echo json_encode([
-            'success' => true,
-            'project' => $project,
-            'materials' => $materials,
-            'steps' => $steps
-        ]);
-        exit;
-    } catch (PDOException $e) {
-        echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
-        exit;
-    }
+    echo json_encode(['success'=>true,'project'=>$proj,'materials'=>$materials,'steps'=>$steps]); exit;
 }
 
-// Handle POST requests for updates
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (!isset($_POST['action']) || !isset($_POST['project_id'])) {
-        echo json_encode(['success' => false, 'message' => 'Missing parameters']);
-        exit;
+// POST handlers
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') { echo json_encode(['success'=>false,'message'=>'Invalid method']); exit; }
+if (!isset($_POST['action'])) { echo json_encode(['success'=>false,'message'=>'Missing parameters: action required']); exit; }
+
+$action = $_POST['action'];
+// For many actions we require project_id and owner verification. Only enforce per-action below.
+// Retrieve project_id if present; we'll validate it for actions that need it.
+$project_id = isset($_POST['project_id']) ? filter_input(INPUT_POST,'project_id',FILTER_VALIDATE_INT) : null;
+
+// helper: require project_id and verify ownership for actions that need project context
+function require_project_and_owner() {
+    global $project_id, $conn;
+    if (!$project_id) { echo json_encode(['success'=>false,'message'=>'Missing project_id']); exit; }
+    $chk = $conn->prepare('SELECT user_id FROM projects WHERE project_id = ?'); $chk->bind_param('i',$project_id); $chk->execute(); $cres = $chk->get_result(); $prow = $cres ? $cres->fetch_assoc() : null;
+    if (!$prow || $prow['user_id'] != $_SESSION['user_id']) { echo json_encode(['success'=>false,'message'=>'Unauthorized']); exit; }
+}
+
+try {
+    // Enforce project ownership for these actions which require a project context
+    $actionsRequireProject = ['add_material','remove_material','update_material_status','toggle_step','add_step','update_project_status','publish_shared_project','generate_share_link','update_title','update_description','delete_material','delete_material'];
+    if (in_array($action, $actionsRequireProject, true)) {
+        require_project_and_owner();
     }
 
-    $project_id = filter_input(INPUT_POST, 'project_id', FILTER_VALIDATE_INT);
-    if (!$project_id) {
-        echo json_encode(['success' => false, 'message' => 'Invalid project ID']);
-        exit;
-    }
-
-    // Verify project belongs to user
-    $check_query = $conn->prepare("SELECT user_id FROM projects WHERE project_id = ?");
-    $check_query->execute([$project_id]);
-    $project = $check_query->fetch();
-
-    if (!$project || $project['user_id'] !== $_SESSION['user_id']) {
-        echo json_encode(['success' => false, 'message' => 'Unauthorized']);
-        exit;
-    }
-
-    // Handle different actions
-    switch ($_POST['action']) {
+    switch ($action) {
         case 'add_material':
-            if (!isset($_POST['name']) || !isset($_POST['unit'])) {
-                echo json_encode(['success' => false, 'message' => 'Missing material details']);
-                exit;
-            }
-
-            try {
-                $material_stmt = $conn->prepare("
-                    INSERT INTO project_materials (project_id, material_name, unit, created_at)
-                    VALUES (?, ?, ?, NOW())
-                ");
-                $material_stmt->execute([
-                    $project_id,
-                    $_POST['name'],
-                    $_POST['unit']
-                ]);
-
-                echo json_encode(['success' => true, 'material_id' => $conn->lastInsertId()]);
-                exit;
-
-            } catch (PDOException $e) {
-                echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
-                exit;
-            }
-            break;
-
-        case 'add_step':
-            // Validate required fields
-            if (!isset($_POST['title']) || !isset($_POST['instructions'])) {
-                echo json_encode(['success' => false, 'message' => 'Missing step details']);
-                exit;
-            }
-
-            try {
-                $conn->beginTransaction();
-
-                // Get next step number
-                $step_num_stmt = $conn->prepare("
-                    SELECT COALESCE(MAX(step_number), 0) + 1 as next_step
-                    FROM project_steps
-                    WHERE project_id = ?
-                ");
-                $step_num_stmt->execute([$project_id]);
-                $next_step = $step_num_stmt->fetch()['next_step'];
-
-                // Insert step
-                $step_stmt = $conn->prepare("
-                    INSERT INTO project_steps (project_id, step_number, title, instructions)
-                    VALUES (?, ?, ?, ?)
-                ");
-                $step_stmt->execute([
-                    $project_id,
-                    $next_step,
-                    $_POST['title'],
-                    $_POST['instructions']
-                ]);
-                $step_id = $conn->lastInsertId();
-
-                // Handle photo uploads
-                if (!empty($_FILES['photos']['name'][0])) {
-                    $upload_dir = 'assets/uploads/';
-                    foreach ($_FILES['photos']['tmp_name'] as $key => $tmp_name) {
-                        $file_name = uniqid() . '_' . basename($_FILES['photos']['name'][$key]);
-                        $target_file = $upload_dir . $file_name;
-
-                        if (move_uploaded_file($tmp_name, $target_file)) {
-                            $photo_stmt = $conn->prepare("
-                                INSERT INTO step_photos (step_id, photo_path)
-                                VALUES (?, ?)
-                            ");
-                            $photo_stmt->execute([$step_id, $file_name]);
-                        }
-                    }
+            // Accept either 'name' or 'material_name' to be compatible with the dynamic modal
+            $name = _get_str('name');
+            if (!$name) $name = _get_str('material_name');
+            $unit = _get_str('unit') ?: ''; // unit is optional in the modal
+            $quantity = filter_input(INPUT_POST,'quantity',FILTER_VALIDATE_INT);
+            if (!$name) {
+                // Try to recover from alternate POST keys (some clients use material_name)
+                foreach ($_POST as $k => $v) {
+                    if (in_array($k, ['action','project_id','quantity','add_material','_'])) continue;
+                    if (is_string($v) && trim($v) !== '') { $name = trim($v); break; }
                 }
-
-                $conn->commit();
-                echo json_encode(['success' => true, 'step_id' => $step_id]);
-                exit;
-
-            } catch (PDOException $e) {
-                $conn->rollBack();
-                echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
-                exit;
             }
-            break;
+            if (!$name) { echo json_encode(['success'=>false,'message'=>'Missing material data','received_keys'=>array_values(array_keys($_POST))]); exit; }
+            $stmt = $conn->prepare('INSERT INTO project_materials (project_id, material_name, quantity, unit, created_at) VALUES (?, ?, ?, ?, NOW())');
+            $qty = is_numeric($quantity) ? (int)$quantity : 0;
+            // types: project_id (i), name (s), qty (i), unit (s)
+            $stmt->bind_param('isis',$project_id,$name,$qty,$unit);
+            $stmt->execute();
+            $mid = $conn->insert_id;
+            $f = $conn->prepare('SELECT material_id, material_name, quantity, unit, COALESCE(status,\'needed\') as status FROM project_materials WHERE material_id = ?');
+            $f->bind_param('i',$mid); $f->execute(); $fres = $f->get_result(); $mat = $fres ? $fres->fetch_assoc() : null;
 
-        case 'update_project_status':
-            if (!isset($_POST['status'])) {
-                echo json_encode(['success' => false, 'message' => 'Missing status']);
-                exit;
-            }
-
-            $allowed_statuses = ['collecting', 'in_progress', 'completed'];
-            if (!in_array($_POST['status'], $allowed_statuses)) {
-                echo json_encode(['success' => false, 'message' => 'Invalid status']);
-                exit;
-            }
-
+            // If a material was added, ensure any Material Collection stage marked completed is unset
+            // This keeps server-state authoritative and avoids UI-only toggles getting out of sync.
             try {
-                $status_stmt = $conn->prepare("
-                    UPDATE projects 
-                    SET status = ?, 
-                        completion_date = CASE WHEN ? = 'completed' THEN NOW() ELSE NULL END,
-                        updated_at = NOW()
-                    WHERE project_id = ?
-                ");
-                $status_stmt->execute([$_POST['status'], $_POST['status'], $project_id]);
+                $unset = $conn->prepare(
+                    "UPDATE project_stages ps
+                        JOIN stage_templates st ON ps.stage_number = st.stage_number
+                        SET ps.is_completed = 0, ps.completed_at = NULL
+                        WHERE ps.project_id = ? AND ps.is_completed = 1 AND LOWER(st.stage_name) LIKE '%material%'"
+                );
+                $unset->bind_param('i', $project_id);
+                $unset->execute();
+            } catch (Exception $e) { /* ignore unset failures */ }
 
-                break;
+            echo json_encode(['success'=>true,'material_id'=>$mid,'material'=>$mat]); exit;
 
-            } catch (PDOException $e) {
-                echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
-                exit;
-            }
-            break;
+        case 'remove_material':
+            $mid = filter_input(INPUT_POST,'material_id',FILTER_VALIDATE_INT); if (!$mid) { echo json_encode(['success'=>false,'message'=>'Invalid material id']); exit; }
+            $d = $conn->prepare('DELETE FROM project_materials WHERE material_id = ? AND project_id = ?'); $d->bind_param('ii',$mid,$project_id); $d->execute();
+            echo json_encode(['success'=>true,'material_id'=>$mid]); exit;
 
-        case 'mark_material_found':
-            if (!isset($_POST['material_id'])) {
-                echo json_encode(['success' => false, 'message' => 'Missing material ID']);
-                exit;
-            }
-
-            try {
-                $material_stmt = $conn->prepare("
-                    UPDATE project_materials 
-                    SET is_found = TRUE 
-                    WHERE project_id = ? AND material_id = ?
-                ");
-                $material_stmt->execute([$project_id, $_POST['material_id']]);
-
-                echo json_encode(['success' => true]);
-                exit;
-
-            } catch (PDOException $e) {
-                echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
-                exit;
-            }
-            break;
+        case 'update_material_status':
+            $mid = filter_input(INPUT_POST,'material_id',FILTER_VALIDATE_INT);
+            $status = isset($_POST['status']) ? $_POST['status'] : null;
+            $qty = isset($_POST['quantity']) ? (int)$_POST['quantity'] : null;
+            if ($qty !== null) { $up = $conn->prepare('UPDATE project_materials SET quantity = GREATEST(quantity - ?, 0) WHERE material_id = ? AND project_id = ?'); $up->bind_param('iii',$qty,$mid,$project_id); $up->execute(); }
+            if ($status !== null) { $u2 = $conn->prepare('UPDATE project_materials SET status = ? WHERE material_id = ? AND project_id = ?'); $u2->bind_param('sii',$status,$mid,$project_id); $u2->execute(); }
+            $q = $conn->prepare('SELECT quantity, status FROM project_materials WHERE material_id = ? AND project_id = ?'); $q->bind_param('ii',$mid,$project_id); $q->execute(); $qr = $q->get_result(); $row = $qr ? $qr->fetch_assoc() : null;
+            $current_qty = $row ? (int)$row['quantity'] : null; $current_status = $row ? $row['status'] : ($status ?: 'needed');
+            if (!is_null($current_qty) && $current_qty <= 0 && $current_status !== 'obtained') { $up3 = $conn->prepare("UPDATE project_materials SET status = 'obtained' WHERE material_id = ? AND project_id = ?"); $up3->bind_param('ii',$mid,$project_id); $up3->execute(); $current_status = 'obtained'; }
+            // check if all obtained
+            $cstmt = $conn->prepare('SELECT COUNT(*) AS not_obtained FROM project_materials WHERE project_id = ? AND (status IS NULL OR status <> \'obtained\')'); $cstmt->bind_param('i',$project_id); $cstmt->execute(); $cres2 = $cstmt->get_result(); $crow = $cres2 ? $cres2->fetch_assoc() : null; $not_obtained = $crow ? (int)$crow['not_obtained'] : 0;
+            $stage_completed = ($not_obtained === 0);
+            echo json_encode(['success'=>true,'material_id'=>$mid,'status'=>$current_status,'quantity'=>$current_qty,'stage_completed'=>$stage_completed]); exit;
 
         case 'toggle_step':
-            // toggle or set a step as done/undone. Enforce sequential progression.
-            $step_id = filter_input(INPUT_POST, 'step_id', FILTER_VALIDATE_INT);
-            $set_done = isset($_POST['done']) ? (int)$_POST['done'] : 1;
-            if (!$step_id) {
-                echo json_encode(['success' => false, 'message' => 'Missing step id']);
-                exit;
+            $step_id = filter_input(INPUT_POST,'step_id',FILTER_VALIDATE_INT); $set_done = isset($_POST['done']) ? (int)$_POST['done'] : 1;
+            if (!$step_id) { echo json_encode(['success'=>false,'message'=>'Missing step id']); exit; }
+            // ensure progress table exists
+            $conn->query("CREATE TABLE IF NOT EXISTS project_step_progress (id INT AUTO_INCREMENT PRIMARY KEY, project_id INT NOT NULL, step_id INT NOT NULL, is_done TINYINT(1) DEFAULT 0, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+            $s = $conn->prepare('SELECT project_id, step_number FROM project_steps WHERE step_id = ?'); $s->bind_param('i',$step_id); $s->execute(); $sres = $s->get_result(); $sinfo = $sres ? $sres->fetch_assoc() : null; if (!$sinfo) { echo json_encode(['success'=>false,'message'=>'Step not found']); exit; }
+            $projectIdFromStep = (int)$sinfo['project_id']; $stepNumber = (int)$sinfo['step_number']; if ($projectIdFromStep !== $project_id) { echo json_encode(['success'=>false,'message'=>'Step does not belong to this project']); exit; }
+            if ($set_done && $stepNumber > 1) { $prev = $conn->prepare('SELECT psp.is_done FROM project_step_progress psp JOIN project_steps ps ON ps.step_id = psp.step_id WHERE ps.project_id = ? AND ps.step_number = ?'); $prev->bind_param('ii',$projectIdFromStep,$stepNumber-1); $prev->execute(); $prevR = $prev->get_result(); $prevRow = $prevR ? $prevR->fetch_assoc() : null; if (!$prevRow || !(int)$prevRow['is_done']) { echo json_encode(['success'=>false,'message'=>'Complete previous step first']); exit; } }
+            $up = $conn->prepare('SELECT id FROM project_step_progress WHERE project_id = ? AND step_id = ?'); $up->bind_param('ii',$projectIdFromStep,$step_id); $up->execute(); $upR = $up->get_result(); $exists = $upR ? $upR->fetch_assoc() : null; if ($exists) { $u2 = $conn->prepare('UPDATE project_step_progress SET is_done = ? WHERE id = ?'); $u2->bind_param('ii',$set_done,$exists['id']); $u2->execute(); } else { $i2 = $conn->prepare('INSERT INTO project_step_progress (project_id, step_id, is_done) VALUES (?, ?, ?)'); $i2->bind_param('iii',$projectIdFromStep,$step_id,$set_done); $i2->execute(); }
+            echo json_encode(['success'=>true]); exit;
+
+        case 'add_step':
+            $title = _get_str('title'); $instructions = _get_str('instructions');
+            if (!$title) { echo json_encode(['success'=>false,'message'=>'Missing title']); exit; }
+            $conn->begin_transaction();
+            $snum = $conn->prepare('SELECT COALESCE(MAX(step_number),0)+1 as next_step FROM project_steps WHERE project_id = ?'); $snum->bind_param('i',$project_id); $snum->execute(); $snumR = $snum->get_result(); $snumRow = $snumR ? $snumR->fetch_assoc() : null; $next_step = $snumRow ? $snumRow['next_step'] : 1;
+            $ins = $conn->prepare('INSERT INTO project_steps (project_id, step_number, title, instructions) VALUES (?, ?, ?, ?)'); $ins->bind_param('iiss',$project_id,$next_step,$title,$instructions); $ins->execute(); $step_id = $conn->insert_id;
+            if (!empty($_FILES['photos']['name'][0])) {
+                $upload_dir = 'assets/uploads/';
+                foreach ($_FILES['photos']['tmp_name'] as $k=>$tmp) { $fn = uniqid().'_'.basename($_FILES['photos']['name'][$k]); $t = $upload_dir.$fn; if (move_uploaded_file($tmp,$t)) { $insP = $conn->prepare('INSERT INTO step_photos (step_id, photo_path) VALUES (?,?)'); $insP->bind_param('is',$step_id,$fn); $insP->execute(); } }
             }
+            $conn->commit(); echo json_encode(['success'=>true,'step_id'=>$step_id]); exit;
 
-            try {
-                // Best-effort: create progress table if not exists
-                $conn->exec("CREATE TABLE IF NOT EXISTS project_step_progress (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    project_id INT NOT NULL,
-                    step_id INT NOT NULL,
-                    is_done TINYINT(1) DEFAULT 0,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-
-                // Get step info (number and project_id)
-                $s_stmt = $conn->prepare("SELECT project_id, step_number FROM project_steps WHERE step_id = ?");
-                $s_stmt->execute([$step_id]);
-                $sinfo = $s_stmt->fetch(PDO::FETCH_ASSOC);
-                if (!$sinfo) {
-                    echo json_encode(['success' => false, 'message' => 'Step not found']);
-                    exit;
-                }
-
-                $projectIdFromStep = (int)$sinfo['project_id'];
-                $stepNumber = (int)$sinfo['step_number'];
-
-                // Ensure the step belongs to the project provided in POST
-                if ($projectIdFromStep !== $project_id) {
-                    echo json_encode(['success' => false, 'message' => 'Step does not belong to this project']);
-                    exit;
-                }
-
-                // Enforce progression: if marking as done, previous step must be done
-                if ($set_done) {
-                    if ($stepNumber > 1) {
-                        $prev_stmt = $conn->prepare("SELECT psp.is_done FROM project_step_progress psp
-                            JOIN project_steps ps ON ps.step_id = psp.step_id
-                            WHERE ps.project_id = ? AND ps.step_number = ?");
-                        $prev_stmt->execute([$projectIdFromStep, $stepNumber - 1]);
-                        $prev = $prev_stmt->fetch(PDO::FETCH_ASSOC);
-                        if (!$prev || !(int)$prev['is_done']) {
-                            echo json_encode(['success' => false, 'message' => 'Complete previous step first']);
-                            exit;
-                        }
-                    }
-                }
-
-                // Insert or update progress
-                $up_stmt = $conn->prepare("SELECT id FROM project_step_progress WHERE project_id = ? AND step_id = ?");
-                $up_stmt->execute([$projectIdFromStep, $step_id]);
-                $exists = $up_stmt->fetch(PDO::FETCH_ASSOC);
-                if ($exists) {
-                    $u2 = $conn->prepare("UPDATE project_step_progress SET is_done = ? WHERE id = ?");
-                    $u2->execute([$set_done, $exists['id']]);
-                } else {
-                    $i2 = $conn->prepare("INSERT INTO project_step_progress (project_id, step_id, is_done) VALUES (?, ?, ?)");
-                    $i2->execute([$projectIdFromStep, $step_id, $set_done]);
-                }
-
-                echo json_encode(['success' => true]);
-                exit;
-
-            } catch (PDOException $e) {
-                echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
-                exit;
-            }
-            break;
+        case 'update_project_status':
+            $status = isset($_POST['status']) ? $_POST['status'] : null; if (!$status) { echo json_encode(['success'=>false,'message'=>'Missing status']); exit; }
+            $allowed = ['collecting','in_progress','completed']; if (!in_array($status,$allowed)) { echo json_encode(['success'=>false,'message'=>'Invalid status']); exit; }
+            $up = $conn->prepare("UPDATE projects SET status = ?, completion_date = CASE WHEN ? = 'completed' THEN NOW() ELSE NULL END, updated_at = NOW() WHERE project_id = ?"); $up->bind_param('ssi',$status,$status,$project_id); $up->execute(); echo json_encode(['success'=>true]); exit;
 
         case 'publish_shared_project':
-            // Snapshot project into shared_* tables (requires migration run)
-            try {
-                $conn->beginTransaction();
-
-                // Fetch project data (include status to enforce publish rule)
-                $pstmt = $conn->prepare("SELECT project_name, description, cover_photo, tags, status FROM projects WHERE project_id = ?");
-                $pstmt->execute([$project_id]);
-                $pdata = $pstmt->fetch(PDO::FETCH_ASSOC);
-                if (!$pdata) {
-                    throw new Exception('Project not found');
-                }
-
-                // Only allow publishing completed projects
-                if (!isset($pdata['status']) || $pdata['status'] !== 'completed') {
-                    throw new Exception('Only completed projects can be shared');
-                }
-
-                // Insert into shared_projects
-                $ins = $conn->prepare("INSERT INTO shared_projects (project_id, user_id, title, description, cover_photo, tags, privacy, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, 'public', NOW())");
-                $ins->execute([
-                    $project_id,
-                    $_SESSION['user_id'],
-                    $pdata['project_name'],
-                    $pdata['description'],
-                    $pdata['cover_photo'] ?? null,
-                    $pdata['tags'] ?? null
-                ]);
-                $shared_id = $conn->lastInsertId();
-
-                // Copy materials
-                $mstmt = $conn->prepare("SELECT material_name, quantity, unit, is_found FROM project_materials WHERE project_id = ?");
-                $mstmt->execute([$project_id]);
-                while ($m = $mstmt->fetch(PDO::FETCH_ASSOC)) {
-                    $extra = json_encode(['unit' => $m['unit'], 'is_found' => (int)$m['is_found']]);
-                    $c = $conn->prepare("INSERT INTO shared_materials (shared_id, name, quantity, extra) VALUES (?, ?, ?, ?)");
-                    $c->execute([$shared_id, $m['material_name'], $m['quantity'], $extra]);
-                }
-
-                // Copy steps and photos
-                $sstmt = $conn->prepare("SELECT step_id, step_number, title, instructions, IFNULL(is_done,0) as is_done FROM project_steps WHERE project_id = ? ORDER BY step_number");
-                $sstmt->execute([$project_id]);
-                $step_map = [];
-                while ($s = $sstmt->fetch(PDO::FETCH_ASSOC)) {
-                    $insStep = $conn->prepare("INSERT INTO shared_steps (shared_id, step_number, title, instructions, is_done) VALUES (?, ?, ?, ?, ?)");
-                    $insStep->execute([$shared_id, $s['step_number'], $s['title'], $s['instructions'], $s['is_done']]);
-                    $new_step_id = $conn->lastInsertId();
-                    $step_map[$s['step_id']] = $new_step_id;
-
-                    // copy photos
-                    $ph = $conn->prepare("SELECT photo_path FROM step_photos WHERE step_id = ?");
-                    $ph->execute([$s['step_id']]);
-                    while ($row = $ph->fetch(PDO::FETCH_ASSOC)) {
-                        $insP = $conn->prepare("INSERT INTO shared_step_photos (step_id, path) VALUES (?, ?)");
-                        $insP->execute([$new_step_id, $row['photo_path']]);
-                    }
-                }
-
-                // Record an activity that the project was published
-                $a = $conn->prepare("INSERT INTO shared_activities (shared_id, user_id, activity_type, data, created_at) VALUES (?, ?, 'publish', ?, NOW())");
-                $a->execute([$shared_id, $_SESSION['user_id'], json_encode(['project_id' => $project_id])]);
-
-                $conn->commit();
-
-                $share_url = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http")
-                    . "://$_SERVER[HTTP_HOST]/shared_project.php?id=" . $shared_id;
-
-                echo json_encode(['success' => true, 'shared_id' => $shared_id, 'share_url' => $share_url]);
-                exit;
-            } catch (Exception $e) {
-                if ($conn->inTransaction()) $conn->rollBack();
-                echo json_encode(['success' => false, 'message' => $e->getMessage()]);
-                exit;
-            }
-            break;
+            // simplified publish: verify completed and copy minimal data
+            $conn->begin_transaction();
+            $pstmt = $conn->prepare('SELECT project_name, description, cover_photo, tags, status FROM projects WHERE project_id = ?'); $pstmt->bind_param('i',$project_id); $pstmt->execute(); $pdr = $pstmt->get_result(); $pdata = $pdr ? $pdr->fetch_assoc() : null; if (!$pdata) { throw new Exception('Project not found'); }
+            if (!isset($pdata['status']) || $pdata['status'] !== 'completed') { throw new Exception('Only completed projects can be shared'); }
+            $ins = $conn->prepare("INSERT INTO shared_projects (project_id, user_id, title, description, cover_photo, tags, privacy, created_at) VALUES (?, ?, ?, ?, ?, ?, 'public', NOW())"); $ins->bind_param('iissss',$project_id,$_SESSION['user_id'],$pdata['project_name'],$pdata['description'],$pdata['cover_photo'],$pdata['tags']); $ins->execute(); $shared_id = $conn->insert_id;
+            // copy materials
+            $mstmt = $conn->prepare('SELECT material_name, quantity, unit, is_found FROM project_materials WHERE project_id = ?'); $mstmt->bind_param('i',$project_id); $mstmt->execute(); $mr = $mstmt->get_result(); while ($m = $mr->fetch_assoc()) { $extra = json_encode(['unit'=>$m['unit'],'is_found'=>(int)$m['is_found']]); $c = $conn->prepare('INSERT INTO shared_materials (shared_id, name, quantity, extra) VALUES (?, ?, ?, ?)'); $c->bind_param('isis',$shared_id,$m['material_name'],$m['quantity'],$extra); $c->execute(); }
+            // copy steps
+            $sstmt = $conn->prepare('SELECT step_id, step_number, title, instructions, IFNULL(is_done,0) as is_done FROM project_steps WHERE project_id = ? ORDER BY step_number'); $sstmt->bind_param('i',$project_id); $sstmt->execute(); $sr = $sstmt->get_result(); while ($srow = $sr->fetch_assoc()) { $insStep = $conn->prepare('INSERT INTO shared_steps (shared_id, step_number, title, instructions, is_done) VALUES (?, ?, ?, ?, ?)'); $insStep->bind_param('iissi',$shared_id,$srow['step_number'],$srow['title'],$srow['instructions'],$srow['is_done']); $insStep->execute(); $new_step_id = $conn->insert_id; $ph = $conn->prepare('SELECT photo_path FROM step_photos WHERE step_id = ?'); $ph->bind_param('i',$srow['step_id']); $ph->execute(); $phr = $ph->get_result(); while ($prow = $phr->fetch_assoc()) { $insP = $conn->prepare('INSERT INTO shared_step_photos (step_id, path) VALUES (?, ?)'); $insP->bind_param('is',$new_step_id,$prow['photo_path']); $insP->execute(); } }
+            $a = $conn->prepare('INSERT INTO shared_activities (shared_id, user_id, activity_type, data, created_at) VALUES (?, ?, ?, ?, NOW())'); $at = 'publish'; $a->bind_param('iiss',$shared_id,$_SESSION['user_id'],$at,json_encode(['project_id'=>$project_id])); $a->execute(); $conn->commit();
+            $share_url = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST'] . '/shared_project.php?id='.$shared_id; echo json_encode(['success'=>true,'shared_id'=>$shared_id,'share_url'=>$share_url]); exit;
 
         case 'shared_activity':
-            // Record like/comment activities on a shared project
-            $shared_id = filter_input(INPUT_POST, 'shared_id', FILTER_VALIDATE_INT);
-            $atype = isset($_POST['activity_type']) ? $_POST['activity_type'] : null;
-            if (!$shared_id || !$atype) {
-                echo json_encode(['success' => false, 'message' => 'Missing parameters']);
-                exit;
-            }
-
-            try {
-                if ($atype === 'like') {
-                    // toggle like
-                    $likeStmt = $conn->prepare("SELECT id FROM shared_likes WHERE shared_id = ? AND user_id = ?");
-                    $likeStmt->execute([$shared_id, $_SESSION['user_id']]);
-                    $exists = $likeStmt->fetch(PDO::FETCH_ASSOC);
-                    if ($exists) {
-                        $d = $conn->prepare("DELETE FROM shared_likes WHERE id = ?");
-                        $d->execute([$exists['id']]);
-                        $liked = false;
-                    } else {
-                        $i = $conn->prepare("INSERT INTO shared_likes (shared_id, user_id) VALUES (?, ?)");
-                        $i->execute([$shared_id, $_SESSION['user_id']]);
-                        $liked = true;
-                    }
-                    $conn->prepare("INSERT INTO shared_activities (shared_id, user_id, activity_type, data) VALUES (?, ?, 'like', ?)")
-                        ->execute([$shared_id, $_SESSION['user_id'], json_encode(['liked' => $liked])]);
-                    echo json_encode(['success' => true, 'liked' => $liked]);
-                    exit;
-                }
-
-                if ($atype === 'comment') {
-                    $comment = trim(filter_input(INPUT_POST, 'comment', FILTER_SANITIZE_STRING));
-                    if (empty($comment)) {
-                        echo json_encode(['success' => false, 'message' => 'Empty comment']);
-                        exit;
-                    }
-                    $cstmt = $conn->prepare("INSERT INTO shared_comments (shared_id, user_id, comment, created_at) VALUES (?, ?, ?, NOW())");
-                    $cstmt->execute([$shared_id, $_SESSION['user_id'], $comment]);
-
-                    $conn->prepare("INSERT INTO shared_activities (shared_id, user_id, activity_type, data) VALUES (?, ?, 'comment', ?)")
-                        ->execute([$shared_id, $_SESSION['user_id'], json_encode(['comment_id' => $conn->lastInsertId()])]);
-
-                    echo json_encode(['success' => true, 'comment_id' => $conn->lastInsertId()]);
-                    exit;
-                }
-
-                echo json_encode(['success' => false, 'message' => 'Unknown activity type']);
-                exit;
-            } catch (Exception $e) {
-                echo json_encode(['success' => false, 'message' => $e->getMessage()]);
-                exit;
-            }
-            break;
+            $shared_id = filter_input(INPUT_POST,'shared_id',FILTER_VALIDATE_INT); $atype = isset($_POST['activity_type']) ? $_POST['activity_type'] : null; if (!$shared_id || !$atype) { echo json_encode(['success'=>false,'message'=>'Missing parameters']); exit; }
+            if ($atype === 'like') { $likeStmt = $conn->prepare('SELECT id FROM shared_likes WHERE shared_id = ? AND user_id = ?'); $likeStmt->bind_param('ii',$shared_id,$_SESSION['user_id']); $likeStmt->execute(); $lr = $likeStmt->get_result(); $exists = $lr ? $lr->fetch_assoc() : null; if ($exists) { $d = $conn->prepare('DELETE FROM shared_likes WHERE id = ?'); $d->bind_param('i',$exists['id']); $d->execute(); $liked = false; } else { $i = $conn->prepare('INSERT INTO shared_likes (shared_id, user_id) VALUES (?, ?)'); $i->bind_param('ii',$shared_id,$_SESSION['user_id']); $i->execute(); $liked = true; } $insAct = $conn->prepare('INSERT INTO shared_activities (shared_id, user_id, activity_type, data) VALUES (?, ?, ?, ?)'); $insAct->bind_param('iiss',$shared_id,$_SESSION['user_id'],$atype,json_encode(['liked'=>$liked])); $insAct->execute(); echo json_encode(['success'=>true,'liked'=>$liked]); exit; }
 
         case 'unpublish_shared_project':
-            $shared_id = filter_input(INPUT_POST, 'shared_id', FILTER_VALIDATE_INT);
-            if (!$shared_id) {
-                echo json_encode(['success' => false, 'message' => 'Missing shared id']);
-                exit;
-            }
-
-            try {
-                // Verify ownership
-                $s = $conn->prepare("SELECT user_id FROM shared_projects WHERE shared_id = ?");
-                $s->execute([$shared_id]);
-                $owner = $s->fetch(PDO::FETCH_ASSOC);
-                if (!$owner || $owner['user_id'] != $_SESSION['user_id']) {
-                    echo json_encode(['success' => false, 'message' => 'Unauthorized']);
-                    exit;
-                }
-
-                $d = $conn->prepare("DELETE FROM shared_projects WHERE shared_id = ?");
-                $d->execute([$shared_id]);
-                echo json_encode(['success' => true]);
-                exit;
-            } catch (Exception $e) {
-                echo json_encode(['success' => false, 'message' => $e->getMessage()]);
-                exit;
-            }
-            break;
+            $shared_id = filter_input(INPUT_POST,'shared_id',FILTER_VALIDATE_INT); if (!$shared_id) { echo json_encode(['success'=>false,'message'=>'Missing shared id']); exit; }
+            $s = $conn->prepare('SELECT user_id FROM shared_projects WHERE shared_id = ?'); $s->bind_param('i',$shared_id); $s->execute(); $sr = $s->get_result(); $owner = $sr ? $sr->fetch_assoc() : null; if (!$owner || $owner['user_id'] != $_SESSION['user_id']) { echo json_encode(['success'=>false,'message'=>'Unauthorized']); exit; } $d = $conn->prepare('DELETE FROM shared_projects WHERE shared_id = ?'); $d->bind_param('i',$shared_id); $d->execute(); echo json_encode(['success'=>true]); exit;
 
         case 'generate_share_link':
-            try {
-                $share_token = bin2hex(random_bytes(16));
-                
-                $share_stmt = $conn->prepare("
-                    INSERT INTO project_shares (project_id, share_token, created_at)
-                    VALUES (?, ?, NOW())
-                    ON DUPLICATE KEY UPDATE share_token = VALUES(share_token)
-                ");
-                $share_stmt->execute([$project_id, $share_token]);
+            $share_token = bin2hex(random_bytes(16)); $share_stmt = $conn->prepare('INSERT INTO project_shares (project_id, share_token, created_at) VALUES (?, ?, NOW()) ON DUPLICATE KEY UPDATE share_token = VALUES(share_token)'); $share_stmt->bind_param('is',$project_id,$share_token); $share_stmt->execute(); $share_url = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST'] . '/shared_project.php?token='.$share_token; echo json_encode(['success'=>true,'share_url'=>$share_url]); exit;
 
-                $share_url = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") 
-                            . "://$_SERVER[HTTP_HOST]/shared_project.php?token=" . $share_token;
+        case 'update_title':
+            $title = _get_str('title'); if (empty($title)) { echo json_encode(['success'=>false,'message'=>'Title required']); exit; } $u = $conn->prepare('UPDATE projects SET project_name = ? WHERE project_id = ?'); $u->bind_param('si',$title,$project_id); $u->execute(); echo json_encode(['success'=>true]); exit;
 
-                echo json_encode(['success' => true, 'share_url' => $share_url]);
-                exit;
+        case 'update_description':
+            $desc = _get_str('description'); if (empty($desc)) { echo json_encode(['success'=>false,'message'=>'Description required']); exit; } $u = $conn->prepare('UPDATE projects SET description = ? WHERE project_id = ?'); $u->bind_param('si',$desc,$project_id); $u->execute(); echo json_encode(['success'=>true]); exit;
 
-            } catch (Exception $e) {
-                echo json_encode(['success' => false, 'message' => 'Error generating share link']);
-                exit;
-            }
-            break;
+        case 'delete_material':
+            $material_id = filter_input(INPUT_POST,'material_id',FILTER_VALIDATE_INT); if (!$material_id) { echo json_encode(['success'=>false,'message'=>'Invalid material id']); exit; } $d = $conn->prepare('DELETE FROM project_materials WHERE material_id = ? AND project_id = ?'); $d->bind_param('ii',$material_id,$project_id); $d->execute(); echo json_encode(['success'=>true,'material_id'=>$material_id]); exit;
 
         default:
-            echo json_encode(['success' => false, 'message' => 'Invalid action']);
-            exit;
+            echo json_encode(['success'=>false,'message'=>'Invalid action']); exit;
     }
-
-    try {
-        switch ($_POST['action']) {
-            case 'update_title':
-                $title = trim(filter_input(INPUT_POST, 'title', FILTER_SANITIZE_STRING));
-                if (empty($title)) {
-                    throw new Exception('Title is required');
-                }
-                $stmt = $conn->prepare("UPDATE projects SET project_name = ? WHERE project_id = ?");
-                $stmt->execute([$title, $project_id]);
-                break;
-
-            case 'update_description':
-                $description = trim(filter_input(INPUT_POST, 'description', FILTER_SANITIZE_STRING));
-                if (empty($description)) {
-                    throw new Exception('Description is required');
-                }
-                $stmt = $conn->prepare("UPDATE projects SET description = ? WHERE project_id = ?");
-                $stmt->execute([$description, $project_id]);
-                break;
-
-            case 'add_material':
-                $name = trim(filter_input(INPUT_POST, 'name', FILTER_SANITIZE_STRING));
-                $quantity = filter_input(INPUT_POST, 'quantity', FILTER_VALIDATE_INT);
-                $unit = trim(filter_input(INPUT_POST, 'unit', FILTER_SANITIZE_STRING));
-
-                if (empty($name) || empty($unit) || !$quantity) {
-                    throw new Exception('Invalid material data');
-                }
-
-                $stmt = $conn->prepare("
-                    INSERT INTO project_materials (project_id, material_name, quantity, unit)
-                    VALUES (?, ?, ?, ?)
-                ");
-                $stmt->execute([$project_id, $name, $quantity, $unit]);
-                break;
-
-            case 'delete_material':
-                $material_id = filter_input(INPUT_POST, 'material_id', FILTER_VALIDATE_INT);
-                if (!$material_id) {
-                    throw new Exception('Invalid material ID');
-                }
-
-                $stmt = $conn->prepare("
-                    DELETE FROM project_materials 
-                    WHERE material_id = ? AND project_id = ?
-                ");
-                $stmt->execute([$material_id, $project_id]);
-                break;
-
-            default:
-                throw new Exception('Invalid action');
-        }
-
-        echo json_encode(['success' => true]);
-    } catch (Exception $e) {
-        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+} catch (Exception $e) {
+    // rollback if in transaction
+    if ($conn && method_exists($conn,'rollback')) {
+        // mysqli: use rollback only if in transaction -- best-effort
+        @$conn->rollback();
     }
-    exit;
+    echo json_encode(['success'=>false,'message'=>$e->getMessage()]); exit;
 }

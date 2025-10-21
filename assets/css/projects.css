@@ -266,7 +266,7 @@ input.edit-input, textarea.edit-input, .form-row input, .form-row textarea, #new
     border: none !important;
     padding: 8px 12px !important;
     border-radius: 6px !important;
-    cursor: pointer;
+    cursor: pointer !important;
 }
 
 .cancel-btn { border: 1px solid #ddd !important; background: #f8f9fa !important; color: #333 !important; }
@@ -293,28 +293,48 @@ h1, h2, h3, h4 {
     gap: 20px;
 }
 
+/* Fix Header Structure with Larger Logo */
 header {
     grid-column: 1 / -1;
     background-color: #82AA52;
     color: white;
-    padding: 15px 20px;
+    padding: 0 20px; /* Remove vertical padding, we'll use min-height */
     display: flex;
     align-items: center;
     justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    min-height: 80px; /* Increased to accommodate larger logo */
+    height: 90px; /* Fixed height for consistency */
 }
 
 .logo-container {
     display: flex;
     align-items: center;
     gap: 15px;
+    height: 100%; /* Take full header height */
 }
 
+.logo {
+    display: flex;
+    align-items: center;
+    height: 100%; /* Match header height */
+    padding: 10px 0; /* Add padding inside logo container */
+}
 
 .logo img {
-    width: 50px;
-    height: 50px;
+    width: 70px; /* Slightly smaller than 80px for better fit */
+    height: 70px;
+    object-fit: contain;
+    transition: transform 0.3s ease;
 }
 
+.logo img:hover {
+    transform: scale(1.05);
+}
+
+/* Adjust user profile to align properly with larger logo */
 .user-profile {
     display: flex;
     align-items: center;
@@ -323,26 +343,38 @@ header {
 }
 
 .profile-pic {
-    width: 40px;
-    height: 40px;
+    width: 45px; /* Slightly larger to balance with logo */
+    height: 45px;
     border-radius: 50%;
-    background-color: #fff;
     display: flex;
     align-items: center;
     justify-content: center;
     margin-right: 10px;
     overflow: hidden;
-}
-
-.profile-pic img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
+    background-color: #3d6a06ff;
+    color: white;
+    font-weight: bold;
+    font-size: 18px;
 }
 
 .profile-name {
     font-weight: 600;
     margin-right: 5px;
+    font-size: 16px; /* Slightly larger text */
+}
+
+/* Ensure dropdown positions correctly */
+.profile-dropdown {
+    position: absolute;
+    top: 100%; /* Position below the user profile area */
+    right: 0;
+    background-color: white;
+    border-radius: 5px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    width: 200px;
+    z-index: 100;
+    display: none;
+    overflow: hidden;
 }
 
 .dropdown-arrow {
@@ -395,11 +427,25 @@ header {
     margin: 5px 0;
 }
 
+/* Enhanced Sidebar Styles */
+:root {
+    --primary-green: #82AA52;
+    --dark-green: #6d8f45;
+    --light-green: #F6FFEB;
+    --accent-green: #2e8b57;
+}
+
+/* Adjust sidebar top position to account for taller header */
 .sidebar {
-    background-color: #F6FFEB;
+    background: linear-gradient(180deg, var(--light-green) 0%, #e8f5e8 100%);
     padding: 30px 20px;
-    box-shadow: 3px 0 10px rgba(0,0,0,0.1);
-    height: fit-content;
+    box-shadow: 5px 0 25px rgba(0,0,0,0.08);
+    position: sticky;
+    top: 80px; /* Changed from 80px to match new header height */
+    align-self: start;
+    height: calc(100vh - 80px); /* Adjust for new header height */
+    overflow-y: auto;
+    border: 1px solid rgba(130, 170, 82, 0.2);
 }
 
 .sidebar nav ul {
@@ -407,25 +453,29 @@ header {
 }
 
 .sidebar nav li {
-    margin-bottom: 15px;
+    margin-bottom: 12px;
 }
 
 .sidebar nav a {
     text-decoration: none;
     color: #333;
-    font-weight: 500;
+    font-weight: 600;
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 8px 12px;
-    border-radius: 5px;
+    gap: 20px;
+    padding: 12px 15px;
+    border-radius: 12px;
     transition: all 0.3s ease;
+    background: #f4fce8;
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .sidebar nav a.active,
 .sidebar nav a:hover {
-    background-color: #e0f0d8;
-    color: #2e8b57;
+    background: linear-gradient(135deg, var(--primary-green) 0%, var(--accent-green) 100%);
+    color:#F6FFEB;
+    transform: translateX(5px);
+    box-shadow: 0 5px 15px rgba(130, 170, 82, 0.3);
 }
 
 .sidebar nav a i {
@@ -434,11 +484,98 @@ header {
     font-size: 18px;
 }
 
+/* Enhanced Sidebar Scrollbar */
+.sidebar::-webkit-scrollbar {
+    width: 8px;
+}
+
+.sidebar::-webkit-scrollbar-track {
+    background: rgba(130, 170, 82, 0.1);
+    border-radius: 10px;
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, var(--primary-green) 0%, var(--dark-green) 100%);
+    border-radius: 10px;
+}
+
+.sidebar::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(135deg, var(--dark-green) 0%, #5a7537 100%);
+}
+
+/* For Firefox */
+.sidebar {
+    scrollbar-width: thin;
+    scrollbar-color: var(--primary-green) rgba(130, 170, 82, 0.1);
+}
+
 .main-content {
     padding: 30px;
     background-color: #fff;
     border-radius: 8px;
     box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    header {
+        min-height: 70px;
+        height: 70px;
+        padding: 0 15px;
+    }
+    
+    .logo img {
+        width: 55px;
+        height: 55px;
+    }
+    
+    .profile-pic {
+        width: 40px;
+        height: 40px;
+    }
+    
+    .sidebar,
+    .right-sidebar {
+        top: 70px;
+        height: calc(100vh - 70px);
+    }
+    
+    .main-content {
+        height: calc(100vh - 70px);
+    }
+}
+
+@media (max-width: 480px) {
+    header {
+        min-height: 60px;
+        height: 60px;
+        padding: 0 10px;
+    }
+    
+    .logo img {
+        width: 45px;
+        height: 45px;
+    }
+    
+    .profile-pic {
+        width: 35px;
+        height: 35px;
+        font-size: 16px;
+    }
+    
+    .profile-name {
+        font-size: 14px;
+    }
+    
+    .sidebar,
+    .right-sidebar {
+        top: 60px;
+        height: calc(100vh - 60px);
+    }
+    
+    .main-content {
+        height: calc(100vh - 60px);
+    }
 }
 
 .page-header {
@@ -735,7 +872,7 @@ header {
 /* Active States */
 .sidebar nav a.active,
 .sidebar nav a[href="projects.php"] {
-    color: #2e8b57;
+    color: #faffe8;
 }
 
 /* Project List Styles */
