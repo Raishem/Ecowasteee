@@ -101,10 +101,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST'
    Handle donation form submission
 ---------------------------- */
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['wasteType']) && !isset($_POST['submit_request_donation'])) {
+    // Validate required fields
     if (empty($_POST['wasteType']) || empty($_POST['quantity']) || empty($_POST['description'])) {
-        die('Error: All fields are required.');
+        $_SESSION['donation_error'] = 'All fields are required.';
+        header('Location: homepage.php');
+        exit();
     }
 
+    $wasteType = $_POST['wasteType'] === 'Other' ? trim($_POST['otherWaste']) : $_POST['wasteType'];
     $category = htmlspecialchars($_POST['wasteType']);
     $subcategory = !empty($_POST['subcategory']) ? htmlspecialchars($_POST['subcategory']) : null;
     $item_name = $subcategory ? "$subcategory ($category)" : $category;
@@ -114,8 +118,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['wasteType']) && !isse
     $donated_at = date('Y-m-d H:i:s');
     $image_paths_json = null;
 
-
-    // Handle photo upload (unchanged)
+    // Handle image uploads
     $image_paths = array();
     if (isset($_FILES['photos']) && count($_FILES['photos']['name']) > 0) {
         $upload_dir = 'assets/uploads/';
@@ -131,16 +134,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['wasteType']) && !isse
                 $file_tmp = $_FILES['photos']['tmp_name'][$key];
                 $file_type = mime_content_type($file_tmp);
                 $allowed_types = ['image/jpeg', 'image/png', 'image/gif'];
-                if (!in_array($file_type, $allowed_types)) {
-                    die('Error: Only JPG, PNG, and GIF files are allowed.');
-                }
-                $unique_file_name = uniqid() . '_' . basename($file_name);
-                $target_file = $upload_dir . $unique_file_name;
-                if (move_uploaded_file($file_tmp, $target_file)) {
-                    $image_paths[] = $target_file;
-                    $file_count++;
-                } else {
-                    die('Failed to upload image: ' . $file_name);
+                if (in_array($file_type, $allowed_types)) {
+                    $unique_file_name = uniqid() . '_' . basename($file_name);
+                    $target_file = $upload_dir . $unique_file_name;
+                    if (move_uploaded_file($file_tmp, $target_file)) {
+                        $image_paths[] = $target_file;
+                        $file_count++;
+                    }
                 }
             }
         }
@@ -149,28 +149,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['wasteType']) && !isse
         }
     }
 
-    // Insert donation into donations table
-    $total_quantity = $quantity; // store the original amount
-
+    // Insert into DB
     $stmt = $conn->prepare("INSERT INTO donations (item_name, quantity, total_quantity, category, subcategory, description, donor_id, donated_at, status, image_path) 
                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Available', ?)");
+    $total_quantity = $quantity;
     $stmt->bind_param("sisssssss", $item_name, $quantity, $total_quantity, $category, $subcategory, $description, $donor_id, $donated_at, $image_paths_json);
-
     $stmt->execute();
 
-    // Update USER STATS (only counts)
+    // Update stats
     $stats_check = $conn->query("SELECT * FROM user_stats WHERE user_id = $donor_id");
     if ($stats_check->num_rows === 0) {
-        $conn->query("INSERT INTO user_stats (user_id, items_donated, items_recycled, projects_completed, achievements_earned, badges_earned) 
-                      VALUES ($donor_id, $quantity, 0, 0, 0, 0)");
+        $conn->query("INSERT INTO user_stats (user_id, items_donated) VALUES ($donor_id, $quantity)");
     } else {
         $conn->query("UPDATE user_stats SET items_donated = items_donated + $quantity WHERE user_id = $donor_id");
     }
 
-    // redirect with donation success flag so frontend can show popup
-    header('Location: ' . $_SERVER['PHP_SELF'] . '?donation_success=1');
+    // ✅ Redirect with success flag
+    header("Location: homepage.php?donation_success=1");
     exit();
 }
+
 
 
 
@@ -908,8 +906,16 @@ function render_comments($comments, $donation_id, $parent_id = NULL) {
                                     <option value="Metal">Metal</option>
                                     <option value="Glass">Glass</option>
                                     <option value="Electronic">Electronic</option>
+                                    <option value="Other">Other</option> <!-- ✅ NEW -->
                                 </select>
                             </div>
+
+                            <!-- ✅ Hidden field that appears only if "Other" is selected -->
+                            <div class="form-group" id="otherWasteGroup" style="display: none;">
+                                <label for="otherWaste">Please specify:</label>
+                                <input type="text" id="otherWaste" name="otherWaste" placeholder="Type custom waste category...">
+                            </div>
+
 
                             <div class="form-group" id="subcategory-group" style="display:none;">
                                 <label for="subcategory">Subcategory:</label>
@@ -1104,14 +1110,30 @@ function render_comments($comments, $donation_id, $parent_id = NULL) {
         }
     });
     
-    document.addEventListener('DOMContentLoaded', function () {
-        const donateWasteBtn = document.getElementById('donateWasteBtn');
-        const donationPopup = document.getElementById('donationPopup');
-        const donationFormContainer = document.getElementById('donationFormContainer');
-        const successPopup = document.getElementById('successPopup');
-        const urlParams = new URLSearchParams(window.location.search);
 
-            // --- Subcategory dropdown logic for Donate Waste ---
+document.addEventListener('DOMContentLoaded', function () {
+    const donateWasteBtn = document.getElementById('donateWasteBtn');
+    const donationPopup = document.getElementById('donationPopup');
+    const donationFormContainer = document.getElementById('donationFormContainer');
+    const successPopup = document.getElementById('successPopup');
+    const urlParams = new URLSearchParams(window.location.search);
+    
+
+    // ✅ --- Show success popup if donation was successful ---
+    if (urlParams.has('donation_success')) {
+        if (donationPopup && donationFormContainer && successPopup) {
+            donationPopup.style.display = 'flex';
+            donationFormContainer.style.display = 'none';
+            successPopup.style.display = 'block';
+        } else {
+            console.warn('Success popup elements not found in DOM');
+        }
+
+        // Remove query from URL so popup doesn’t reappear on refresh
+        window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
+    // --- Subcategory dropdown logic ---
     const categorySelect = document.getElementById("wasteType");
     const subcategoryGroup = document.getElementById("subcategory-group");
     const subcategorySelect = document.getElementById("subcategory");
@@ -1125,8 +1147,14 @@ function render_comments($comments, $donation_id, $parent_id = NULL) {
         Electronic: ["Old Phones", "Chargers", "Batteries", "Broken Gadgets"]
     };
 
+    // Handle "Other" input field visibility
+    const otherWasteGroup = document.getElementById("otherWasteGroup");
+    const otherWasteInput = document.getElementById("otherWaste");
+
     categorySelect.addEventListener("change", function() {
         const selected = this.value;
+
+        // Handle subcategories
         subcategorySelect.innerHTML = "<option value=''>-- Select Subcategory --</option>";
 
         if (selected && subcategories[selected]) {
@@ -1142,11 +1170,20 @@ function render_comments($comments, $donation_id, $parent_id = NULL) {
             subcategoryGroup.style.display = "none";
             subcategorySelect.removeAttribute("required");
         }
+
+        // Show/Hide "Other" input field
+        if (selected === "Other") {
+            otherWasteGroup.style.display = "block";
+            otherWasteInput.setAttribute("required", "required");
+        } else {
+            otherWasteGroup.style.display = "none";
+            otherWasteInput.removeAttribute("required");
+            otherWasteInput.value = "";
+        }
     });
 
-
-        if (urlParams.has('request_success')) {
-        // show your request success popup if available
+    // --- Request success / error handling ---
+    if (urlParams.has('request_success')) {
         if (document.getElementById('requestSuccessPopup')) {
             document.getElementById('requestSuccessPopup').style.display = 'flex';
         } else {
@@ -1167,190 +1204,177 @@ function render_comments($comments, $donation_id, $parent_id = NULL) {
         window.history.replaceState({}, document.title, window.location.pathname);
     }
 
-        // donation_success handling (your existing logic)
-    if (urlParams.has('donation_success')) {
-        const donationPopup = document.getElementById('donationPopup');
-        const donationFormContainer = document.getElementById('donationFormContainer');
-        const successPopup = document.getElementById('successPopup');
-        if (donationPopup && donationFormContainer && successPopup) {
-            donationPopup.style.display = 'flex';
-            donationFormContainer.style.display = 'none';
-            successPopup.style.display = 'block';
-        } else {
-            alert('Donation posted successfully.');
+    // --- Open donation popup ---
+    if (!donateWasteBtn || !donationPopup) {
+        console.error('Required elements not found in the DOM');
+        return;
+    }
+
+    donateWasteBtn.addEventListener('click', function (e) {
+        e.preventDefault();
+        donationPopup.style.display = 'flex';
+        donationFormContainer.style.display = 'block';
+        successPopup.style.display = 'none';
+    });
+
+    // Close popup when clicking outside
+    donationPopup.addEventListener('click', function (e) {
+        if (e.target === donationPopup) {
+            donationPopup.style.display = 'none';
         }
-        window.history.replaceState({}, document.title, window.location.pathname);
-    }  
+    });
 
+    // Close button
+    document.querySelectorAll('.close-btn').forEach(btn => {
+        btn.addEventListener('click', function () {
+            donationPopup.style.display = 'none';
+        });
+    });
+
+    // --- Form validation ---
+    document.getElementById('donationForm').addEventListener('submit', function(e) {
+        e.preventDefault();
         
-
-        if (!donateWasteBtn || !donationPopup) {
-            console.error('Required elements not found in the DOM');
+        const wasteType = document.getElementById('wasteType').value;
+        const quantity = document.getElementById('quantity').value;
+        const description = document.getElementById('description').value;
+        
+        if (!wasteType || !quantity || !description) {
+            alert('Please fill in all required fields');
             return;
         }
+        
+        this.submit();
+    });
 
-        donateWasteBtn.addEventListener('click', function (e) {
-            e.preventDefault();
-            console.log('Donate Waste button clicked');
-            donationPopup.style.display = 'flex';
+    // --- Continue button (after success popup) ---
+    const continueBtn = document.getElementById('continueBtn');
+    if (continueBtn) {
+        continueBtn.addEventListener('click', function() {
+            donationPopup.style.display = 'none';
+            document.getElementById('donationForm').reset();
+            document.getElementById('file-chosen').textContent = 'No files chosen';
+            document.getElementById('photoPreview').innerHTML = '';
+            document.getElementById('file-count-message').style.display = 'none';
+            selectedFiles = [];
             donationFormContainer.style.display = 'block';
             successPopup.style.display = 'none';
         });
+    }
 
-        donationPopup.addEventListener('click', function (e) {
-            if (e.target === donationPopup) {
-                donationPopup.style.display = 'none';
-            }
-        });
-
-        document.querySelectorAll('.close-btn').forEach(btn => {
-            btn.addEventListener('click', function () {
-                donationPopup.style.display = 'none';
-            });
-        });
-
-        document.getElementById('donationForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            const wasteType = document.getElementById('wasteType').value;
-            const quantity = document.getElementById('quantity').value;
-            const description = document.getElementById('description').value;
-            
-            if (!wasteType || !quantity || !description) {
-                alert('Please fill in all required fields');
-                return;
-            }
-            
-            this.submit();
-        });
-
-        const continueBtn = document.getElementById('continueBtn');
-        if (continueBtn) {
-            continueBtn.addEventListener('click', function() {
-                donationPopup.style.display = 'none';
-                document.getElementById('donationForm').reset();
-                document.getElementById('file-chosen').textContent = 'No files chosen';
-                document.getElementById('photoPreview').innerHTML = '';
-                document.getElementById('file-count-message').style.display = 'none';
-                selectedFiles = [];
-                donationFormContainer.style.display = 'block';
-                successPopup.style.display = 'none';
-            });
-        }
-
-        let selectedFiles = [];
-        const photoInput = document.getElementById('photos');
-        const maxFiles = 4;
+    // --- File upload preview handling ---
+    let selectedFiles = [];
+    const photoInput = document.getElementById('photos');
+    const maxFiles = 4;
+    
+    photoInput.addEventListener('change', function() {
+        const newFiles = Array.from(this.files);
         
-        photoInput.addEventListener('change', function() {
-            const newFiles = Array.from(this.files);
+        newFiles.forEach(file => {
+            if (selectedFiles.length < maxFiles) {
+                const isDuplicate = selectedFiles.some(
+                    selectedFile => selectedFile.name === file.name && selectedFile.size === file.size
+                );
+                
+                if (!isDuplicate) {
+                    selectedFiles.push(file);
+                }
+            }
+        });
+        
+        const dataTransfer = new DataTransfer();
+        selectedFiles.forEach(file => dataTransfer.items.add(file));
+        photoInput.files = dataTransfer.files;
+        
+        updateFileDisplay();
+    });
+
+    function updateFileDisplay() {
+        const fileNames = selectedFiles.length > 0 
+            ? selectedFiles.map(f => f.name).join(', ') 
+            : 'No files chosen';
             
-            newFiles.forEach(file => {
-                if (selectedFiles.length < maxFiles) {
-                    const isDuplicate = selectedFiles.some(
-                        selectedFile => selectedFile.name === file.name && selectedFile.size === file.size
-                    );
-                    
-                    if (!isDuplicate) {
-                        selectedFiles.push(file);
-                    }
+        document.getElementById('file-chosen').textContent = fileNames;
+        
+        const photoPreview = document.getElementById('photoPreview');
+        photoPreview.innerHTML = '';
+        
+        if (selectedFiles.length > 0) {
+            selectedFiles.forEach((file, index) => {
+                if (file.type.match('image.*')) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const imageContainer = document.createElement('div');
+                        imageContainer.className = 'photo-preview-item';
+                        
+                        const img = document.createElement('img');
+                        img.src = e.target.result;
+                        img.alt = file.name;
+                        img.title = file.name;
+                        
+                        img.addEventListener('mouseover', function() {
+                            this.style.opacity = '0.8';
+                        });
+                        img.addEventListener('mouseout', function() {
+                            this.style.opacity = '1';
+                        });
+                        
+                        img.addEventListener('click', function () {
+                            openPhotoZoom(e.target.result);
+                        });
+                        
+                        const removeBtn = document.createElement('button');
+                        removeBtn.className = 'remove-image-btn';
+                        removeBtn.innerHTML = '&times;';
+                        removeBtn.title = 'Remove image';
+                        
+                        removeBtn.addEventListener('click', function(e) {
+                            e.stopPropagation();
+                            selectedFiles.splice(index, 1);
+                            
+                            const dataTransfer = new DataTransfer();
+                            selectedFiles.forEach(file => dataTransfer.items.add(file));
+                            photoInput.files = dataTransfer.files;
+                            
+                            updateFileDisplay();
+                        });
+                        
+                        imageContainer.appendChild(img);
+                        imageContainer.appendChild(removeBtn);
+                        photoPreview.appendChild(imageContainer);
+                    };
+                    reader.readAsDataURL(file);
                 }
             });
+        }
+        
+        const fileCountElement = document.getElementById('file-count-message');
+        if (selectedFiles.length > 0) {
+            fileCountElement.textContent = `Selected ${selectedFiles.length} of ${maxFiles} files`;
+            fileCountElement.style.display = 'block';
+        } else {
+            fileCountElement.style.display = 'none';
+        }
+        
+        if (selectedFiles.length > maxFiles) {
+            const warning = document.createElement('p');
+            warning.textContent = `Maximum ${maxFiles} files allowed. Only the first ${maxFiles} will be uploaded.`;
+            warning.style.color = 'red';
+            warning.style.fontSize = '12px';
+            warning.style.marginTop = '10px';
+            warning.style.width = '100%';
+            photoPreview.appendChild(warning);
+            
+            selectedFiles = selectedFiles.slice(0, maxFiles);
             
             const dataTransfer = new DataTransfer();
             selectedFiles.forEach(file => dataTransfer.items.add(file));
             photoInput.files = dataTransfer.files;
             
             updateFileDisplay();
-        });
-
-        
-        function updateFileDisplay() {
-            const fileNames = selectedFiles.length > 0 
-                ? selectedFiles.map(f => f.name).join(', ') 
-                : 'No files chosen';
-                
-            document.getElementById('file-chosen').textContent = fileNames;
-            
-            const photoPreview = document.getElementById('photoPreview');
-            photoPreview.innerHTML = '';
-            
-            if (selectedFiles.length > 0) {
-                selectedFiles.forEach((file, index) => {
-                    if (file.type.match('image.*')) {
-                        const reader = new FileReader();
-                        reader.onload = function(e) {
-                            const imageContainer = document.createElement('div');
-                            imageContainer.className = 'photo-preview-item';
-                            
-                            const img = document.createElement('img');
-                            img.src = e.target.result;
-                            img.alt = file.name;
-                            img.title = file.name;
-                            
-                            img.addEventListener('mouseover', function() {
-                                this.style.opacity = '0.8';
-                            });
-                            img.addEventListener('mouseout', function() {
-                                this.style.opacity = '1';
-                            });
-                            
-                            img.addEventListener('click', function () {
-                                openPhotoZoom(e.target.result);
-                            });
-                            
-                            const removeBtn = document.createElement('button');
-                            removeBtn.className = 'remove-image-btn';
-                            removeBtn.innerHTML = '&times;';
-                            removeBtn.title = 'Remove image';
-                            
-                            removeBtn.addEventListener('click', function(e) {
-                                e.stopPropagation();
-                                selectedFiles.splice(index, 1);
-                                
-                                const dataTransfer = new DataTransfer();
-                                selectedFiles.forEach(file => dataTransfer.items.add(file));
-                                photoInput.files = dataTransfer.files;
-                                
-                                updateFileDisplay();
-                            });
-                            
-                            imageContainer.appendChild(img);
-                            imageContainer.appendChild(removeBtn);
-                            photoPreview.appendChild(imageContainer);
-                        };
-                        reader.readAsDataURL(file);
-                    }
-                });
-            }
-            
-            const fileCountElement = document.getElementById('file-count-message');
-            if (selectedFiles.length > 0) {
-                fileCountElement.textContent = `Selected ${selectedFiles.length} of ${maxFiles} files`;
-                fileCountElement.style.display = 'block';
-            } else {
-                fileCountElement.style.display = 'none';
-            }
-            
-            if (selectedFiles.length > maxFiles) {
-                const warning = document.createElement('p');
-                warning.textContent = `Maximum ${maxFiles} files allowed. Only the first ${maxFiles} will be uploaded.`;
-                warning.style.color = 'red';
-                warning.style.fontSize = '12px';
-                warning.style.marginTop = '10px';
-                warning.style.width = '100%';
-                photoPreview.appendChild(warning);
-                
-                selectedFiles = selectedFiles.slice(0, maxFiles);
-                
-                const dataTransfer = new DataTransfer();
-                selectedFiles.forEach(file => dataTransfer.items.add(file));
-                photoInput.files = dataTransfer.files;
-                
-                updateFileDisplay();
-            }
         }
-    });
+    }
+});
 
     
 
