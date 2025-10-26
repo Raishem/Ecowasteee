@@ -313,24 +313,53 @@ header {
 }
 
         /* Browse Content Styles */
+        /* 🌿 Search Bar Styling */
         .search-bar {
-            margin-bottom: 20px;
-        }
-        
-        .search-bar input {
+            display: flex;
+            justify-content: center;
+            margin: 20px 0;
             width: 100%;
-            padding: 12px 15px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            font-size: 16px;
-            background-color: white;
-            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="%23999" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>');
-            background-repeat: no-repeat;
-            background-position: 15px center;
-            background-size: 16px;
-            padding-left: 40px;
-            margin-bottom: 20px;
         }
+
+        .search-bar form {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            width: 100%;
+            max-width: 450px;
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 30px;
+            padding: 6px 12px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+
+        .search-bar input[type="text"] {
+            flex: 1;
+            border: none;
+            outline: none;
+            font-size: 15px;
+            padding: 8px 10px;
+            border-radius: 30px;
+            color: #333;
+        }
+
+        .search-bar button {
+            background: #228b22;
+            border: none;
+            color: #fff;
+            padding: 8px 16px;
+            border-radius: 25px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .search-bar button:hover {
+            background: #1b6e1b;
+            box-shadow: 0 2px 5px rgba(34, 139, 34, 0.3);
+        }
+
 
         /* Donation Post Styles */
         .donation-post {

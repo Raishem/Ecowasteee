@@ -34,56 +34,63 @@
     }
 
 
-    // --- CATEGORY FILTERING LOGIC --- //
-    $selectedCategory = isset($_GET['category']) ? $_GET['category'] : 'All';
-    $selectedSubcategory = isset($_GET['subcategory']) ? $_GET['subcategory'] : null;
+    // --- CATEGORY & SEARCH FILTERING LOGIC --- //
+$selectedCategory = isset($_GET['category']) ? $_GET['category'] : 'All';
+$selectedSubcategory = isset($_GET['subcategory']) ? $_GET['subcategory'] : null;
+$search = isset($_GET['search']) ? trim($_GET['search']) : '';
 
-    // Base query for donations
-    $sql = "
-        SELECT d.*, u.first_name, u.last_name
-        FROM donations d
-        JOIN users u ON d.donor_id = u.user_id
-        WHERE d.status = 'Available'
-    ";
+$sql = "
+    SELECT d.*, u.first_name, u.last_name
+    FROM donations d
+    JOIN users u ON d.donor_id = u.user_id
+    WHERE d.status = 'Available'
+";
 
-    $params = [];
-    $types = '';
+$params = [];
+$types = '';
 
-    // Apply filters
-    $mainCategories = ["Plastic", "Paper", "Metal", "Glass", "Electronic"];
+$mainCategories = ["Plastic", "Paper", "Metal", "Glass", "Electronic"];
 
-    if ($selectedCategory !== 'All') {
-        if ($selectedCategory === 'Other') {
-            // Show donations NOT in the 5 main categories
-            $placeholders = implode(',', array_fill(0, count($mainCategories), '?'));
-            $sql .= " AND d.category NOT IN ($placeholders)";
-            $params = array_merge($params, $mainCategories);
-            $types .= str_repeat('s', count($mainCategories));
-        } else {
-            // Normal category filter
-            $sql .= " AND d.category = ?";
-            $params[] = $selectedCategory;
-            $types .= 's';
-        }
-    }
-
-    // Subcategory filter (works for both normal + "Other")
-    if (!empty($selectedSubcategory)) {
-        $sql .= " AND d.subcategory = ?";
-        $params[] = $selectedSubcategory;
+// Category filtering
+if ($selectedCategory !== 'All') {
+    if ($selectedCategory === 'Other') {
+        $placeholders = implode(',', array_fill(0, count($mainCategories), '?'));
+        $sql .= " AND d.category NOT IN ($placeholders)";
+        $params = array_merge($params, $mainCategories);
+        $types .= str_repeat('s', count($mainCategories));
+    } else {
+        $sql .= " AND d.category = ?";
+        $params[] = $selectedCategory;
         $types .= 's';
     }
+}
 
+// Subcategory filter
+if (!empty($selectedSubcategory)) {
+    $sql .= " AND d.subcategory = ?";
+    $params[] = $selectedSubcategory;
+    $types .= 's';
+}
 
-    $sql .= " ORDER BY d.donated_at DESC";
+// 🔍 Search filter
+if (!empty($search)) {
+    $sql .= " AND (d.category LIKE CONCAT('%', ?, '%')
+                OR d.subcategory LIKE CONCAT('%', ?, '%')
+                OR d.item_name LIKE CONCAT('%', ?, '%'))";
+    $params = array_merge($params, [$search, $search, $search]);
+    $types .= 'sss';
+}
 
-    $stmt = $conn->prepare($sql);
-    if (!empty($params)) {
-        $stmt->bind_param($types, ...$params);
-    }
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $donations = $result->fetch_all(MYSQLI_ASSOC);
+$sql .= " ORDER BY d.donated_at DESC";
+
+$stmt = $conn->prepare($sql);
+if (!empty($params)) {
+    $stmt->bind_param($types, ...$params);
+}
+$stmt->execute();
+$result = $stmt->get_result();
+$donations = $result->fetch_all(MYSQLI_ASSOC);
+
 
     // --- Fetch unique categories for buttons --- //
     $mainCategories = ["Plastic", "Paper", "Metal", "Glass", "Electronic"];
@@ -257,8 +264,13 @@
             
             <main class="main-content">
                 <div class="search-bar">
-                    <input type="text" placeholder="Search Donations...">
+                    <form action="browse.php" method="get">
+                        <input type="text" name="search" placeholder="Search Donations..." value="<?= htmlspecialchars($_GET['search'] ?? '') ?>">
+                        <button type="submit">Search</button>
+                    </form>
                 </div>
+
+
                 
                 <!-- Tab Navigation -->
                 <div class="tab-container">
@@ -270,18 +282,30 @@
                 <!-- Donations Tab Content -->
                 <div id="donations" class="tab-content" style="display: block;">
                     <div class="categories">
-                        <div class="category-scroll-container">
-                            <ul class="category-list">
-                                <li class="<?= $selectedCategory === 'All' ? 'active' : '' ?>">
-                                    <a href="browse.php">All</a>
-                                </li>
-                                <?php foreach ($categories as $cat): ?>
-                                    <li class="<?= $selectedCategory === $cat ? 'active' : '' ?>">
-                                        <a href="browse.php?category=<?= urlencode($cat) ?>"><?= htmlspecialchars($cat) ?></a>
+                        <div class="categories">
+                            <div class="category-scroll-container">
+                                <ul class="category-list">
+                                    <li class="<?= $selectedCategory === 'All' ? 'active' : '' ?>">
+                                        <a href="browse.php">All</a>
                                     </li>
-                                <?php endforeach; ?>
-                            </ul>
-                        </div>
+
+                                    <?php
+                                    // Always show main categories
+                                    $mainCategories = ["Plastic", "Paper", "Metal", "Glass", "Electronic"];
+                                    foreach ($mainCategories as $cat):
+                                    ?>
+                                        <li class="<?= $selectedCategory === $cat ? 'active' : '' ?>">
+                                            <a href="browse.php?category=<?= urlencode($cat) ?>"><?= htmlspecialchars($cat) ?></a>
+                                        </li>
+                                    <?php endforeach; ?>
+
+                                    <!-- Always show 'Other' -->
+                                    <li class="<?= $selectedCategory === 'Other' ? 'active' : '' ?>">
+                                        <a href="browse.php?category=Other">Other</a>
+                                    </li>
+                                </ul>
+                            </div>
+
                         <?php if (!empty($subcategories)): ?>
                         <div class="subcategory-container">
                             <ul class="subcategory-list">
