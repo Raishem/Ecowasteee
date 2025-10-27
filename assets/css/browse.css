@@ -1559,3 +1559,196 @@ header {
     margin-top: 6px;
 }
 
+/* --- Enhanced Comment & Reply Section --- */
+.reply-box {
+    background: #f9fafb;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    padding: 12px;
+    margin-top: 10px;
+    animation: fadeIn 0.25s ease;
+}
+
+.enhanced-textarea {
+    width: 100%;
+    min-height: 70px;
+    resize: vertical;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    font-size: 14px;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.enhanced-textarea:focus {
+    border-color: #4CAF50;
+    box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.2);
+    outline: none;
+}
+
+/* Buttons layout */
+.reply-btn-container {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 8px;
+}
+
+/* General enhanced button */
+.enhanced-btn {
+    background: #4CAF50;
+    color: white;
+    border: none;
+    padding: 8px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.25s ease;
+}
+
+.enhanced-btn:hover {
+    background: #45a049;
+    transform: translateY(-2px);
+}
+
+/* Cancel button */
+.cancel-btn {
+    background: #e53935;
+    color: #fff;
+    border: none;
+    padding: 8px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.25s ease;
+}
+
+.cancel-btn:hover {
+    background: #d32f2f;
+    transform: translateY(-2px);
+}
+
+/* Edit/Delete buttons */
+.comment-action-btn {
+    background: #f1f1f1;
+    border: none;
+    color: #333;
+    padding: 6px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    margin-left: 5px;
+    transition: all 0.25s ease;
+}
+
+.comment-action-btn:hover {
+    background: #e0e0e0;
+    transform: translateY(-1px);
+}
+
+/* Fade in animation */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* ====== COMMENT SECTION ENHANCEMENT ====== */
+
+/* Comment box */
+.comment-input {
+  width: 100%;
+  min-height: 70px;
+  resize: vertical;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 14px;
+  outline: none;
+  transition: border 0.25s, box-shadow 0.25s;
+}
+
+.comment-input:focus {
+  border-color: #4CAF50;
+  box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.15);
+}
+
+/* Button container alignment */
+.comment-form-ajax,
+.reply-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Buttons general style */
+.comment-submit,
+.comment-submit-ajax,
+.reply-cancel,
+.comment-edit,
+.comment-delete {
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.25s ease;
+}
+
+/* Post Comment / Reply */
+.comment-submit,
+.comment-submit-ajax {
+  background: #4CAF50;
+  color: white;
+}
+
+.comment-submit:hover,
+.comment-submit-ajax:hover {
+  background: #43a047;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* Cancel button */
+.reply-cancel {
+  background: #e0e0e0;
+  color: #333;
+}
+
+.reply-cancel:hover {
+  background: #d5d5d5;
+  transform: translateY(-2px);
+}
+
+/* Edit button */
+.comment-edit {
+  background: #2196F3;
+  color: #fff;
+}
+
+.comment-edit:hover {
+  background: #1976D2;
+  transform: translateY(-2px);
+}
+
+/* Delete button */
+.comment-delete {
+  background: #F44336;
+  color: #fff;
+}
+
+.comment-delete:hover {
+  background: #d32f2f;
+  transform: translateY(-2px);
+}
+
+/* Spinner beside Post Comment */
+.comment-spinner {
+  margin-left: 6px;
+  font-size: 14px;
+  color: #777;
+}
+
+/* Subtle fade animation */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
