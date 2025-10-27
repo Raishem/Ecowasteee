@@ -957,17 +957,20 @@ function render_comments($comments, $donation_id, $parent_id = NULL) {
             </div>
             
 
-     <div class="popup-content success-popup" id="successPopup" style="display: none;">
+<!-- ✅ Success Popup with Overlay -->
+<div id="successPopup" class="popup-container" style="display: none;">
+    <div class="popup-content success-popup">
         <div class="success-icon">
             <i class="fas fa-gift"></i>
         </div>
         <h2>Congratulations!</h2>
-            <p>You’ve successfully donated your waste materials! 🎉<br>
-                Please wait for others to claim your donation.
-            </p>
+        <p>You’ve successfully donated your waste materials! 🎉<br>
+            Please wait for others to claim your donation.
+        </p>
         <button class="continue-btn" id="continueBtn">Continue</button>
     </div>
 </div>
+
 
 <!-- === Request Donation Popup (with Cancel at Bottom) === -->
 <div id="requestPopup" class="popup-container" style="display:none;">
@@ -1119,19 +1122,29 @@ document.addEventListener('DOMContentLoaded', function () {
     const urlParams = new URLSearchParams(window.location.search);
     
 
-    // ✅ --- Show success popup if donation was successful ---
+        // ✅ --- Show success popup if donation was successful ---
     if (urlParams.has('donation_success')) {
-        if (donationPopup && donationFormContainer && successPopup) {
-            donationPopup.style.display = 'flex';
-            donationFormContainer.style.display = 'none';
-            successPopup.style.display = 'block';
+        // Prefer showing only the success popup — do NOT open the donation modal
+        if (successPopup) {
+            // Ensure donation popup & form are hidden
+            if (donationPopup) donationPopup.style.display = 'none';
+            if (donationFormContainer) donationFormContainer.style.display = 'none';
+
+            // Show success popup overlay (use flex so it centers)
+            successPopup.style.display = 'flex';
+            // ensure it appears above everything
+            successPopup.style.zIndex = '99999';
+
+            // Add dim class to body (if your CSS uses it)
+            document.body.classList.add('dimmed');
         } else {
-            console.warn('Success popup elements not found in DOM');
+            console.warn('Success popup element not found in DOM');
         }
 
         // Remove query from URL so popup doesn’t reappear on refresh
-        window.history.replaceState({}, document.title, window.location.pathname);
+        try { window.history.replaceState({}, document.title, window.location.pathname); } catch(e) {}
     }
+
 
     // --- Subcategory dropdown logic ---
     const categorySelect = document.getElementById("wasteType");

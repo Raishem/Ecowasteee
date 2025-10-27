@@ -2251,3 +2251,63 @@ body.popup-open {
   from { opacity: 0; transform: scale(0.95); }
   to { opacity: 1; transform: scale(1); }
 }
+
+/* Reply box container */
+.reply-box {
+  margin-top: 10px;
+}
+
+/* Textarea */
+.reply-box .comment-input {
+  width: 100%;
+  min-height: 60px;
+  padding: 8px 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 14px;
+  resize: vertical;
+  transition: border-color 0.2s ease;
+}
+.reply-box .comment-input:focus {
+  border-color: #4CAF50;
+  outline: none;
+}
+
+/* Buttons container */
+.reply-box div {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+/* Base button style */
+.reply-box button {
+  border: none;
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  transition: all 0.25s ease;
+}
+
+/* Reply button */
+.reply-box .comment-submit {
+  background-color: #28a745;  /* green */
+  color: #fff;
+}
+.reply-box .comment-submit:hover {
+  background-color: #218838;
+  transform: translateY(-1px);
+}
+
+/* Cancel button */
+.reply-box .reply-cancel {
+  background-color: #f0f0f0;
+  color: #333;
+}
+.reply-box .reply-cancel:hover {
+  background-color: #e0e0e0;
+  transform: translateY(-1px);
+}
