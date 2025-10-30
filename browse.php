@@ -444,7 +444,14 @@ $donations = $result->fetch_all(MYSQLI_ASSOC);
                                             ?>
                                             <div class="user-avatar"><?= $donor_initial ?></div>
                                             <div class="user-info">
-                                                <div class="user-name"><?= htmlspecialchars($donor['first_name']) ?></div>
+                                                <?php 
+                                                    $donorId = htmlspecialchars($donor['user_id']); 
+                                                    $donorName = htmlspecialchars($donor['first_name']); 
+                                                ?>
+                                                <div class="user-name">
+                                                    <a href="profile.php?user_id=<?= $donorId ?>" class="user-link"><?= $donorName ?></a>
+                                                </div>
+
                                                 <div class="donation-meta">
                                                     <span class="category">
                                                         Category: 
@@ -476,7 +483,7 @@ $donations = $result->fetch_all(MYSQLI_ASSOC);
                                             <?php
                                             $images = json_decode($donation['image_path'], true);
                                             if (is_array($images) && !empty($images)): ?>
-                                                <div class="donation-images">
+                                                <div class="donation-images-grid">
                                                     <?php foreach ($images as $image): ?>
                                                         <img src="<?= htmlspecialchars($image) ?>" alt="Donation Image" class="donation-image donation-image-large">
                                                     <?php endforeach; ?>
@@ -1144,5 +1151,8 @@ setInterval(refreshAllCommentTimes, 60000);
 
     </script>
 
-    </body>
+    <!-- Lightbox.js CDN -->
+<link href="https://cdnjs.cloudflare.com/ajax/libs/lightbox2/2.11.3/css/lightbox.min.css" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/lightbox2/2.11.3/js/lightbox.min.js"></script>
+</body>
     </html>

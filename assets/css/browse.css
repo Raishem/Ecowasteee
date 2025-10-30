@@ -72,6 +72,19 @@ header {
     transform: scale(1.05);
 }
 
+.user-link {
+    color: #2e8b57;
+    font-weight: 600;
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.user-link:hover {
+    color: #256b45;
+    text-decoration: underline;
+}
+
+
 /* Adjust user profile to align properly with larger logo */
 .user-profile {
     display: flex;
@@ -361,124 +374,6 @@ header {
         }
 
 
-        /* Donation Post Styles */
-        .donation-post {
-            background: white;
-            border: 1px solid #e0e0e0;
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
-        }
-
-        .donation-post:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-        }
-
-        .donation-header {
-            display: flex;
-            align-items: center;
-            margin-bottom: 15px;
-        }
-
-        .donor-avatar {
-            width: 48px;
-            height: 48px;
-            border-radius: 50%;
-            margin-right: 12px;
-            background: #82AA52;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: bold;
-            font-size: 20px;
-        }
-
-        .donation-info {
-            flex-grow: 1;
-        }
-
-        .donor-name {
-            font-weight: 600;
-            font-size: 16px;
-            color: #333;
-            margin-bottom: 4px;
-        }
-
-        .donation-category {
-            font-size: 14px;
-            color: #666;
-        }
-
-        .donation-date {
-            color: #999;
-            font-size: 14px;
-        }
-
-        .donation-image {
-            width: 100%;
-            height: 300px;
-            object-fit: cover;
-            border-radius: 8px;
-            margin: 15px 0;
-        }
-
-        .donation-details {
-            margin: 15px 0;
-        }
-
-        .donation-quantity {
-            font-size: 15px;
-            color: #333;
-            margin-bottom: 10px;
-        }
-
-        .donation-description {
-            color: #666;
-            font-size: 14px;
-            line-height: 1.6;
-            margin-bottom: 15px;
-        }
-
-        .donation-actions {
-            display: flex;
-            gap: 10px;
-            margin-top: 15px;
-        }
-
-        .request-btn {
-            background: #82AA52;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 6px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background-color 0.2s ease;
-            flex-grow: 1;
-        }
-
-        .request-btn:hover {
-            background: #6d8f45;
-        }
-
-        .comment-btn {
-            background: #f5f5f5;
-            color: #666;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 6px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background-color 0.2s ease;
-        }
-
-        .comment-btn:hover {
-            background: #e0e0e0;
-        }
         
 
 /* ==============================
@@ -1029,43 +924,105 @@ header {
    (detailed + larger layout)
 ================================ */
 
-/* Main donation card */
+/* ----- Donation Post Box (Facebook-Style Feed Layout) ----- */
 .available-item {
-    background-color: #fff;
-    border: 1px solid #e3e3e3;
-    border-radius: 16px;
-    padding: 22px;
-    margin-bottom: 25px;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-    transition: transform 0.2s ease, box-shadow 0.3s ease;
+  max-width: 700px; /* fixed width for desktop, like Facebook */
+  width: 100%;
+  margin: 20px auto; /* centers the post */
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  padding: 20px;
+  transition: box-shadow 0.25s ease, transform 0.25s ease;
 }
 
 .available-item:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
 }
 
-/* User header */
+/* ----- User Header Section ----- */
 .donation-user-header {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    margin-bottom: 15px;
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
 }
 
 .user-avatar {
-    width: 55px;
-    height: 55px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, #82AA52, #5b7a3d);
-    color: #fff;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    font-weight: 700;
-    font-size: 22px;
-    box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+  background-color: #6b8e23;
+  color: #fff;
+  font-weight: bold;
+  border-radius: 50%;
+  width: 42px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  margin-right: 10px;
 }
+
+.user-info .user-name {
+  font-weight: 600;
+  color: #333;
+}
+
+.donation-meta {
+  font-size: 13px;
+  color: #666;
+}
+
+
+/* ----- Donation Details ----- */
+.donation-description {
+  font-size: 15px;
+  color: #333;
+  margin-top: 10px;
+  line-height: 1.5;
+}
+
+.item-quantity {
+  margin-top: 6px;
+  font-size: 14px;
+  color: #444;
+}
+
+/* ----- Buttons and Comments ----- */
+.donation-actions {
+  margin-top: 14px;
+  display: flex;
+  gap: 8px;
+}
+
+.comment-btn,
+.request-btn {
+  background-color: #4caf50;
+  border: none;
+  color: white;
+  padding: 8px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+.comment-btn:hover,
+.request-btn:hover {
+  background-color: #3e8e41;
+}
+
+/* ----- Responsive: Smaller on mobile ----- */
+@media (max-width: 700px) {
+  .available-item {
+    max-width: 95%;
+    padding: 15px;
+  }
+
+  .donation-images-grid img {
+    height: 140px;
+  }
+}
+
 
 .user-info {
     display: flex;
@@ -1121,6 +1078,44 @@ header {
 .donation-image-large:hover {
     transform: scale(1.04);
 }
+
+/* === Donation Images 2x2 Adaptive Grid === */
+.donation-images-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.donation-images-grid a {
+  display: block;
+  position: relative;
+  aspect-ratio: 1 / 1; /* Makes images square */
+}
+
+.donation-images-grid img.donation-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 8px;
+  transition: transform 0.25s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.donation-images-grid img.donation-image:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Responsive adjustment (1 column for small screens) */
+@media (max-width: 480px) {
+  .donation-images-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+}
+
 
 /* Description and quantity */
 .item-quantity {
@@ -1752,3 +1747,5 @@ header {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+
