@@ -1,5 +1,7 @@
 {
     "require": {
-        "phpmailer/phpmailer": "*"
+        "phpmailer/phpmailer": "*",
+        "google/apiclient": "2.15",
+        "guzzlehttp/guzzle": "7.7"
     }
 }

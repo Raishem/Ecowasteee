@@ -126,9 +126,9 @@ if (isset($_SESSION['login_error'])) {
                     <div class="divider">or</div>
                     
                     <div class="social-login">
-                        <button type="button" class="social-btn google">
+                        <a href="google_login.php" class="social-btn google" >
                             <i class="fab fa-google"></i> Continue with Google
-                        </button>
+                    </a>
                         <button type="button" class="social-btn facebook">
                             <i class="fab fa-facebook-f"></i> Continue with Facebook
                         </button>
