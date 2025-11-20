@@ -11,9 +11,49 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true || empty($
 
 $user_id = (int)$_SESSION['user_id'];
 
+// Fetch user info
+$stmt = $conn->prepare("SELECT first_name, last_name, email FROM users WHERE user_id = ?");
+$stmt->bind_param("i", $user_id);
+$stmt->execute();
+$user_data = $stmt->get_result()->fetch_assoc();
+
+// Update session if missing
+if (!isset($_SESSION['first_name']) && isset($user_data['first_name'])) {
+    $_SESSION['first_name'] = $user_data['first_name'];
+    $_SESSION['last_name'] = $user_data['last_name'];
+    $_SESSION['user_email'] = $user_data['email'];
+}
 
 // Fetch stats
-$stats = $conn->query("SELECT * FROM user_stats WHERE user_id = $user_id")->fetch_assoc();
+// Fetch stats — ensure a row exists and normalize to integers
+$stats_row = $conn->query("SELECT * FROM user_stats WHERE user_id = $user_id")->fetch_assoc();
+
+if (!$stats_row) {
+    $conn->query("INSERT INTO user_stats (user_id, projects_completed, achievements_earned, badges_earned, items_recycled) VALUES ($user_id, 0, 0, 0, 0)");
+    $stats_row = [
+        'projects_completed' => 0,
+        'badges_earned' => 0,
+        'items_recycled' => 0
+    ];
+}
+
+// ✅ Calculate live achievements earned from claimed tasks
+$achievements_row = $conn->query("
+    SELECT COUNT(*) AS claimed_tasks 
+    FROM user_tasks 
+    WHERE user_id = $user_id AND reward_claimed = 1
+")->fetch_assoc();
+$achievements_earned = (int)($achievements_row['claimed_tasks'] ?? 0);
+
+// Build stats array using live achievements count
+$stats = [
+    'projects_completed'   => (int) ($stats_row['projects_completed'] ?? 0),
+    'achievements_earned'  => $achievements_earned,   // ✅ FIXED
+    'badges_earned'        => (int) ($stats_row['badges_earned'] ?? 0),
+    'items_recycled'       => (int) ($stats_row['items_recycled'] ?? 0)
+];
+
+
 
 // Count total donations (number of times user donated)
 $donations_result = $conn->query("SELECT COUNT(*) AS total_donations FROM donations WHERE donor_id = $user_id");
@@ -327,6 +367,10 @@ if (isset($_POST['redeem_task_id'])) {
 
         $conn->query("UPDATE user_tasks SET reward_claimed=1 WHERE task_id=$task_id");
 
+        // Increment achievements earned
+        $conn->query("UPDATE user_stats SET achievements_earned = achievements_earned + 1 WHERE user_id = $user_id");
+        $stats['achievements_earned'] = ($stats['achievements_earned'] ?? 0) + 1;
+
         // Unlock next task in same category
         $action_type = $conn->real_escape_string($task['action_type']);
         $next_task = $conn->query("SELECT * FROM user_tasks 
@@ -360,63 +404,78 @@ if (isset($_POST['redeem_task_id'])) {
 
 
 function updateTaskProgress($conn, $user_id) {
-    $stats = $conn->query("SELECT * FROM user_stats WHERE user_id = $user_id")->fetch_assoc();
+    // 1️⃣ Load or initialize user_stats
+    $stats_row = $conn->query("SELECT * FROM user_stats WHERE user_id = $user_id")->fetch_assoc();
+    if (!$stats_row) {
+        $conn->query("INSERT INTO user_stats (user_id, projects_completed, achievements_earned, badges_earned, items_recycled) 
+                      VALUES ($user_id, 0, 0, 0, 0)");
+        $stats_row = [
+            'projects_completed' => 0,
+            'badges_earned' => 0,
+            'items_recycled' => 0
+        ];
+    }
 
-    // get reliable counts
-    $donations_result = $conn->query("SELECT COUNT(*) AS total_donations FROM donations WHERE donor_id = $user_id");
-    $donations_row = $donations_result->fetch_assoc();
-    $total_donations = $donations_row['total_donations'] ?? 0;
+    // 2️⃣ Calculate achievements earned (claimed tasks)
+    $achievements_row = $conn->query("
+        SELECT COUNT(*) AS claimed_tasks 
+        FROM user_tasks 
+        WHERE user_id = $user_id AND reward_claimed = 1
+    ")->fetch_assoc();
+    $achievements_earned = (int)($achievements_row['claimed_tasks'] ?? 0);
 
-    $projects_created_row = $conn->query("SELECT COUNT(*) as c FROM projects WHERE user_id=$user_id")->fetch_assoc();
-    $total_projects_created = $projects_created_row['c'] ?? 0;
+    // 3️⃣ Get other reliable totals
+    $donations_row = $conn->query("SELECT COUNT(*) AS total_donations FROM donations WHERE donor_id = $user_id")->fetch_assoc();
+    $total_donations = (int)($donations_row['total_donations'] ?? 0);
 
-    $total_projects_completed = $stats['projects_completed'] ?? 0;
+    $projects_created_row = $conn->query("SELECT COUNT(*) AS total_projects_created FROM projects WHERE user_id = $user_id")->fetch_assoc();
+    $total_projects_created = (int)($projects_created_row['total_projects_created'] ?? 0);
 
+    $total_projects_completed = (int)($stats_row['projects_completed'] ?? 0);
+    $badges_earned = (int)($stats_row['badges_earned'] ?? 0);
+    $items_recycled = (int)($stats_row['items_recycled'] ?? 0);
+
+    // 4️⃣ Fetch and update user tasks progress
     $result = $conn->query("SELECT * FROM user_tasks WHERE user_id = $user_id ORDER BY action_type, task_id ASC");
-
-    $prev_task_values = [
-        'donations' => 0,
-        'projects_created' => 0,
-        'projects_completed' => 0
-    ];
+    $prev_task_values = ['donations' => 0, 'projects_created' => 0, 'projects_completed' => 0];
 
     while ($task = $result->fetch_assoc()) {
-        if ($task['unlocked'] == 0) continue; // skip locked
+        if ($task['unlocked'] == 0) continue; // skip locked tasks
 
-        // Pick correct total per action type
         switch ($task['action_type']) {
             case 'donations': 
-                $total_value = $total_donations;
+                $total_value = $total_donations; 
                 break;
             case 'projects_created': 
-                $total_value = $total_projects_created;
+                $total_value = $total_projects_created; 
                 break;
             case 'projects_completed': 
-                $total_value = $total_projects_completed;
+                $total_value = $total_projects_completed; 
                 break;
-            default:
+            default: 
                 $total_value = 0;
         }
 
         $current_value = $total_value - $prev_task_values[$task['action_type']];
-        if ($current_value < 0) $current_value = 0;
-        if ($current_value > $task['target_value']) $current_value = $task['target_value'];
+        $current_value = max(0, min($current_value, $task['target_value']));
 
-        $progress = "$current_value/{$task['target_value']}";
         $status = ($current_value >= $task['target_value']) ? 'Completed' : 'In Progress';
+        $progress = "$current_value/{$task['target_value']}";
 
-        $conn->query("UPDATE user_tasks 
-                      SET current_value=$current_value, progress='$progress', status='$status' 
-                      WHERE task_id={$task['task_id']} AND user_id=$user_id");
+        $conn->query("
+            UPDATE user_tasks 
+            SET current_value=$current_value, progress='$progress', status='$status' 
+            WHERE task_id={$task['task_id']} AND user_id=$user_id
+        ");
 
         if ($task['reward_claimed'] == 1) {
             $prev_task_values[$task['action_type']] += $task['target_value'];
         }
     }
 
-    // 🔥 Recalculate LEVEL + POINTS after updating tasks
+    // 5️⃣ Recalculate total points and level
     $user_points_row = $conn->query("SELECT points FROM users WHERE user_id = $user_id")->fetch_assoc();
-    $total_points = $user_points_row['points'] ?? 0;
+    $total_points = (int)($user_points_row['points'] ?? 0);
 
     $level = 0;
     $remaining_points = $total_points;
@@ -428,15 +487,18 @@ function updateTaskProgress($conn, $user_id) {
         } else break;
     }
 
-    // Save recalculated values to session (so HTML shows updated ones instantly)
+    $progress_percentage = ($remaining_points / getPointsForLevel($level)) * 100;
+
+    // 6️⃣ Update session variables
+    $_SESSION['achievements_earned'] = $achievements_earned;
     $_SESSION['total_points'] = $total_points;
     $_SESSION['level'] = $level;
     $_SESSION['progress_points'] = $remaining_points;
-    $_SESSION['progress_percentage'] = ($remaining_points / getPointsForLevel($level)) * 100;
+    $_SESSION['progress_percentage'] = $progress_percentage;
 
+    // 7️⃣ Return updated tasks
     return $conn->query("SELECT * FROM user_tasks WHERE user_id = $user_id ORDER BY task_id ASC");
 }
-
 
 
 
@@ -553,20 +615,20 @@ while ($row = $result->fetch_assoc()) $tasks[] = $row;
         <!-- Stats -->
         <div class="stats-grid">
             <div class="stat-item">
-                <div class="stat-number"><?= htmlspecialchars($stats['projects_completed'] ?? 0) ?></div>
+                <div class="stat-number"><?= (int) ($stats['projects_completed'] ?? 0) ?></div>
                 <div class="stat-label">Projects Completed</div></div>
             <div class="stat-item">
-                <div class="stat-number"><?= htmlspecialchars($stats['achievements_earned'] ?? 0) ?></div>
+                <div class="stat-number"><?= (int) ($stats['achievements_earned'] ?? 0) ?></div>
                 <div class="stat-label">Achievements Earned</div></div>
             <div class="stat-item">
-                <div class="stat-number"><?= htmlspecialchars($stats['badges_earned'] ?? 0) ?></div>
+                <div class="stat-number"><?= (int) ($stats['badges_earned'] ?? 0) ?></div>
                 <div class="stat-label">Badges Earned</div></div>
             <div class="stat-item">
                 <div class="stat-number"><?= htmlspecialchars($total_donations) ?></div>
                 <div class="stat-label">Total Donations</div></div>
 
             <div class="stat-item">
-                <div class="stat-number"><?= htmlspecialchars($stats['items_recycled'] ?? 0) ?></div>
+                <div class="stat-number"><?= (int) ($stats['items_recycled'] ?? 0) ?></div>
                 <div class="stat-label">Total Items Recycled</div></div>
             <div class="stat-item">
                 <div class="stat-number"><?= htmlspecialchars($total_points) ?></div>
