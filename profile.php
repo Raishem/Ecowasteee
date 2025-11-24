@@ -27,7 +27,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
     
     if ($update_query->execute()) {
         $success_message = "Profile updated successfully!";
-        // Refresh user data
         $_SESSION['success_message'] = $success_message;
         header("Location: profile.php");
         exit();
@@ -36,6 +35,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
     }
 }
 
+// ----------------------
+// Total Eco Points from database
+$stmt = $conn->prepare("SELECT total_points FROM user_stats WHERE user_id = ?");
+$stmt->bind_param("i", $user_id);
+$stmt->execute();
+$res = $stmt->get_result();
+$total_claimed_points = (int)($res->fetch_assoc()['total_points'] ?? 0);
+$stmt->close();
+
+
+// Update user's points in the users table
+$conn->query("UPDATE users SET points = $total_claimed_points WHERE user_id = $user_id");
+
+
+// ----------------------
 // Create necessary tables if they don't exist
 $create_tables_sql = [
     "CREATE TABLE IF NOT EXISTS user_activities (
@@ -80,7 +94,6 @@ foreach ($create_tables_sql as $sql) {
     try {
         $conn->query($sql);
     } catch (Exception $e) {
-        // Log error but continue execution
         error_log("Table creation error: " . $e->getMessage());
     }
 }
@@ -89,31 +102,28 @@ foreach ($create_tables_sql as $sql) {
 $check_badges = $conn->query("SELECT COUNT(*) as count FROM badges");
 if ($check_badges->fetch_assoc()['count'] == 0) {
     $sample_badges = [
-        "('Eco Beginner', 'Completed your first eco activity', 'fas fa-seedling', 10)",
-        "('Recycling Pro', 'Recycled 10+ items', 'fas fa-recycle', 50)",
-        "('Donation Hero', 'Donated 5+ items', 'fas fa-hand-holding-heart', 75)",
-        "('Project Master', 'Completed 3+ projects', 'fas fa-project-diagram', 100)",
-        "('Eco Warrior', 'Earned 200+ points', 'fas fa-trophy', 200)"
+        "('EcoWaste Beginner', 'Completed your first eco activity', 'fas fa-seedling', 10)",
+        "('Rising Donor', 'Completed your first donation', 'fas fa-hand-holding-heart', 10)",
+        "('Eco Beginner', 'Started your first recycling project', 'fas fa-recycle', 10)",
+        "('Eco Star', 'Completed a recycling project', 'fas fa-star', 15)",
+        "('Donation Starter', 'Donated 1 item', 'fas fa-hand-holding-heart', 20)",
+        "('Donation Hero', 'Donated 5+ items', 'fas fa-heart', 75)",
+        "('Donation Champion', 'Donated 15+ items', 'fas fa-gift', 225)",
+        "('Generous Giver', 'Completed 20 donations', 'fas fa-hands-helping', 400)",
+        "('Charity Champion', 'Completed 30 donations', 'fas fa-award', 600)",
+        "('Recycling Starter', 'Recycled 1 item', 'fas fa-recycle', 10)",
+        "('Recycling Pro', 'Recycled 5+ items', 'fas fa-recycle', 50)",
+        "('Recycling Expert', 'Recycled 15+ items', 'fas fa-recycle', 150)",
+        "('Zero Waste Hero', 'Created 25 recycling projects', 'fas fa-project-diagram', 375)",
+        "('Earth Saver', 'Created 30 recycling projects', 'fas fa-globe', 450)",
+        "('Eco Pro', 'Completed 20 recycling projects', 'fas fa-seedling', 300)",
+        "('Eco Legend', 'Completed 30 recycling projects', 'fas fa-trophy', 450)",
+        "('EcoWaste Rookie', 'Earned 50+ points', 'fas fa-star', 50)",
+        "('EcoWaste Master', 'Earned 100+ points', 'fas fa-medal', 100)",
+        "('EcoWaste Warrior', 'Earned 200+ points', 'fas fa-trophy', 200)",
+        "('EcoWaste Legend', 'Earned 500+ points', 'fas fa-crown', 500)"
     ];
-    
     $conn->query("INSERT INTO badges (badge_name, description, icon, points_required) VALUES " . implode(',', $sample_badges));
-}
-
-// Insert sample activities if none exist for this user
-$check_activities = $conn->prepare("SELECT COUNT(*) as count FROM user_activities WHERE user_id = ?");
-$check_activities->bind_param("i", $user_id);
-$check_activities->execute();
-$activity_count = $check_activities->get_result()->fetch_assoc()['count'];
-
-if ($activity_count == 0) {
-    $sample_activities = [
-        "($user_id, 'recycling', 'Recycled plastic bottles', 15)",
-        "($user_id, 'donation', 'Donated old clothes', 20)",
-        "($user_id, 'badge', 'Earned Eco Beginner badge', 10)",
-        "($user_id, 'project', 'Completed Community Cleanup project', 25)"
-    ];
-    
-    $conn->query("INSERT INTO user_activities (user_id, activity_type, description, points_earned) VALUES " . implode(',', $sample_activities));
 }
 
 // Ensure user has stats record
@@ -121,10 +131,9 @@ $check_stats = $conn->prepare("SELECT COUNT(*) as count FROM user_stats WHERE us
 $check_stats->bind_param("i", $user_id);
 $check_stats->execute();
 $stats_count = $check_stats->get_result()->fetch_assoc()['count'];
-
 if ($stats_count == 0) {
     $conn->query("INSERT INTO user_stats (user_id, projects_completed, achievements_earned, badges_earned, items_donated, items_recycled) 
-                  VALUES ($user_id, 1, 1, 1, 1, 1)");
+                  VALUES ($user_id, 0, 0, 0, 0, 0)");
 }
 
 // Fetch user data
@@ -134,98 +143,217 @@ $user_query->execute();
 $user_result = $user_query->get_result();
 $user_data = $user_result->fetch_assoc();
 
-// Fetch user stats
-$stats_query = $conn->prepare("SELECT projects_completed, achievements_earned, badges_earned, items_donated, items_recycled FROM user_stats WHERE user_id = ?");
+// Fetch stats once
+$stats_query = $conn->prepare("
+    SELECT projects_completed, projects_created, achievements_earned, badges_earned, items_donated, items_recycled 
+    FROM user_stats 
+    WHERE user_id = ?
+");
 $stats_query->bind_param("i", $user_id);
 $stats_query->execute();
 $stats_result = $stats_query->get_result();
 $stats_data = $stats_result->fetch_assoc();
 
+// Ensure stats are integers
+$stats_data = [
+    'items_donated'      => (int)($stats_data['items_donated'] ?? 0),
+    'items_recycled'     => (int)($stats_data['items_recycled'] ?? 0),
+    'projects_created'   => (int)($stats_data['projects_created'] ?? 0),
+    'projects_completed' => (int)($stats_data['projects_completed'] ?? 0),
+];
+
 // Calculate level based on points
-$level = floor(($user_data['points'] ?? 0) / 25);
+$level = 1 + floor(($user_data['points'] ?? 0) / 25);
 
-// Fetch user badges
-$badges = [];
-$badges_query = $conn->prepare("
-    SELECT b.badge_name, b.description, b.icon 
-    FROM user_badges ub 
-    JOIN badges b ON ub.badge_id = b.badge_id 
-    WHERE ub.user_id = ? 
-    ORDER BY ub.earned_date DESC 
-    LIMIT 5
-");
-$badges_query->bind_param("i", $user_id);
-$badges_query->execute();
-$badges_result = $badges_query->get_result();
-while ($row = $badges_result->fetch_assoc()) {
-    $badges[] = $row;
+// ----------------------
+// BADGE LOGIC (UPDATED)
+// ----------------------
+
+// Fetch all badges from DB
+$all_badges = [];
+$result = $conn->query("SELECT * FROM badges ORDER BY badge_id ASC");
+while ($row = $result->fetch_assoc()) {
+    $all_badges[$row['badge_id']] = $row;
 }
 
-// If no badges but user has points, auto-assign appropriate badges
-if (empty($badges) && isset($user_data['points'])) {
-    $points = $user_data['points'];
-    $auto_badges = $conn->prepare("SELECT badge_id FROM badges WHERE points_required <= ? ORDER BY points_required DESC");
-    $auto_badges->bind_param("i", $points);
-    $auto_badges->execute();
-    $auto_badges_result = $auto_badges->get_result();
-    
-    while ($badge = $auto_badges_result->fetch_assoc()) {
-        // Assign badge to user
-        $assign_badge = $conn->prepare("INSERT IGNORE INTO user_badges (user_id, badge_id) VALUES (?, ?)");
-        $assign_badge->bind_param("ii", $user_id, $badge['badge_id']);
-        $assign_badge->execute();
-        
-        // Add to badges array for display
-        $badge_info = $conn->prepare("SELECT badge_name, description, icon FROM badges WHERE badge_id = ?");
-        $badge_info->bind_param("i", $badge['badge_id']);
-        $badge_info->execute();
-        $badge_info_result = $badge_info->get_result();
-        if ($badge_data = $badge_info_result->fetch_assoc()) {
-            $badges[] = $badge_data;
-        }
-    }
-    
-    // Update badges earned count
-    if (!empty($badges)) {
-        $conn->query("UPDATE user_stats SET badges_earned = " . count($badges) . " WHERE user_id = $user_id");
-    }
+// Fetch badges already earned by user
+$user_badges = [];
+$stmt = $conn->prepare("SELECT badge_id FROM user_badges WHERE user_id = ?");
+$stmt->bind_param("i", $user_id);
+$stmt->execute();
+$res = $stmt->get_result();
+while ($row = $res->fetch_assoc()) {
+    $user_badges[$row['badge_id']] = true;
 }
 
-// Fetch recent activities
+// ---------------------------
+// Compute action-based stats
+// ---------------------------
+
+// Total items donated
+$stmt = $conn->prepare("SELECT SUM(quantity) as total_items FROM donations WHERE donor_id = ?");
+$stmt->bind_param("i", $user_id);
+$stmt->execute();
+$res = $stmt->get_result();
+$total_items_donated = (int)($res->fetch_assoc()['total_items'] ?? 0);
+$stmt->close();
+
+// Total donation posts
+$stmt = $conn->prepare("SELECT COUNT(*) as donation_posts FROM donations WHERE donor_id = ?");
+$stmt->bind_param("i", $user_id);
+$stmt->execute();
+$res = $stmt->get_result();
+$total_donation_posts = (int)($res->fetch_assoc()['donation_posts'] ?? 0);
+$stmt->close();
+
+// Total eco activities
+$stmt = $conn->prepare("SELECT COUNT(*) as activity_count FROM user_activities WHERE user_id = ?");
+$stmt->bind_param("i", $user_id);
+$stmt->execute();
+$res = $stmt->get_result();
+$total_activities = (int)($res->fetch_assoc()['activity_count'] ?? 0);
+$stmt->close();
+
+// ---------------------------
+// ASSIGN BADGES BASED ON POINTS & ACTIONS
+// ---------------------------
+$badge_progress = [];
+foreach ($all_badges as $badge) {
+    $earned = false;
+
+    switch ($badge['badge_name']) {
+
+        // Points-based badges
+        case "EcoWaste Rookie":
+        case "EcoWaste Master":
+        case "EcoWaste Warrior":
+        case "EcoWaste Legend":
+            $current = (int)($user_data['points'] ?? 0); // Use actual user points
+            $required = (int)$badge['points_required'];
+            $earned = $current >= $required;
+            break;
+
+
+        // Action-based badges
+        case "EcoWaste Beginner": $earned = $total_activities >= 1; $current = $total_activities; $required = 1; break;
+        case "Donation Starter": $earned = $total_items_donated >= 1; $current = $total_items_donated; $required = 1; break;
+        case "Rising Donor": $earned = $total_donation_posts >= 1; $current = $total_donation_posts; $required = 1; break;
+        case "Donation Hero": $earned = $total_items_donated >= 5; $current = $total_items_donated; $required = 5; break;
+        case "Donation Champion": $earned = $total_items_donated >= 15; $current = $total_items_donated; $required = 15; break;
+        case "Generous Giver": $earned = $total_donation_posts >= 20; $current = $total_donation_posts; $required = 20; break;
+        case "Charity Champion": $earned = $total_donation_posts >= 30; $current = $total_donation_posts; $required = 30; break;
+        case "Eco Star": $earned = $stats_data['projects_completed'] >= 1; $current = $stats_data['projects_completed']; $required = 1; break;
+        case "Recycling Starter": $earned = $stats_data['items_recycled'] >= 1; $current = $stats_data['items_recycled']; $required = 1; break;
+        case "Recycling Pro": $earned = $stats_data['items_recycled'] >= 10; $current = $stats_data['items_recycled']; $required = 10; break;
+        case "Recycling Expert": $earned = $stats_data['items_recycled'] >= 15; $current = $stats_data['items_recycled']; $required = 15; break;
+        case "Project Master": $earned = $stats_data['projects_completed'] >= 3; $current = $stats_data['projects_completed']; $required = 3; break;
+        case "Eco Pro": $earned = $stats_data['projects_completed'] >= 20; $current = $stats_data['projects_completed']; $required = 20; break;
+        case "Eco Legend": $earned = $stats_data['projects_completed'] >= 30; $current = $stats_data['projects_completed']; $required = 30; break;
+        case "Zero Waste Hero": $earned = $stats_data['projects_created'] >= 25; $current = $stats_data['projects_created']; $required = 25; break;
+        case "Earth Saver": $earned = $stats_data['projects_created'] >= 30; $current = $stats_data['projects_created']; $required = 30; break;
+
+        default:
+            $earned = false;
+            $current = 0;
+            $required = 1;
+            break;
+    }
+
+    // Insert badge if earned and not already added
+    if ($earned && !isset($user_badges[$badge['badge_id']])) {
+        $stmt = $conn->prepare("INSERT INTO user_badges (user_id, badge_id) VALUES (?, ?)");
+        $stmt->bind_param("ii", $user_id, $badge['badge_id']);
+        $stmt->execute();
+        $stmt->close();
+        $user_badges[$badge['badge_id']] = true;
+
+        // Insert points for badge into user_activities
+        $points_for_badge = (int)$badge['points_required'];
+        $desc = "Earned badge: {$badge['badge_name']}";
+        $stmt = $conn->prepare("
+            INSERT INTO user_activities (user_id, activity_type, description, points_earned)
+            VALUES (?, 'badge', ?, ?)
+        ");
+        $stmt->bind_param("isi", $user_id, $desc, $points_for_badge);
+        $stmt->execute();
+        $stmt->close();
+    }
+
+    // Save progress values for badge display
+    $badge_progress[$badge['badge_id']] = [
+        'current' => $current,
+        'required' => $required
+    ];
+}
+
+// Update badges earned count
+$conn->query("UPDATE user_stats SET badges_earned = " . count($user_badges) . " WHERE user_id = $user_id");
+
+// ----------------------
+// Fetch activities
+// ----------------------
 $activities = [];
-$activities_query = $conn->prepare("
-    SELECT activity_type, description, points_earned, created_at 
-    FROM user_activities 
-    WHERE user_id = ? 
-    ORDER BY created_at DESC 
-    LIMIT 4
-");
-if ($activities_query) {
-    $activities_query->bind_param("i", $user_id);
-    $activities_query->execute();
-    $activities_result = $activities_query->get_result();
-    while ($row = $activities_result->fetch_assoc()) {
-        $activities[] = $row;
-    }
+
+// Donations
+$stmt = $conn->prepare("SELECT item_name, quantity, donated_at FROM donations WHERE donor_id = ? ORDER BY donated_at DESC LIMIT 10");
+$stmt->bind_param("i", $user_id);
+$stmt->execute();
+$res = $stmt->get_result();
+while ($row = $res->fetch_assoc()) {
+    $activities[] = [
+        'activity_type' => 'donation',
+        'description' => "You donated {$row['quantity']} {$row['item_name']}",
+        'points_earned' => null,
+        'created_at' => $row['donated_at']
+    ];
 }
 
-// Get activity icon based on type
+// Badges
+$stmt = $conn->prepare("SELECT b.badge_name, ub.earned_date FROM user_badges ub JOIN badges b ON ub.badge_id = b.badge_id WHERE ub.user_id = ? ORDER BY ub.earned_date DESC LIMIT 10");
+$stmt->bind_param("i", $user_id);
+$stmt->execute();
+$res = $stmt->get_result();
+while ($row = $res->fetch_assoc()) {
+    $activities[] = [
+        'activity_type' => 'badge',
+        'description' => "Earned badge: {$row['badge_name']}",
+        'points_earned' => null,
+        'created_at' => $row['earned_date']
+    ];
+}
+
+// Projects
+$stmt = $conn->prepare("SELECT project_name, created_at, status FROM projects WHERE user_id = ? ORDER BY created_at DESC LIMIT 10");
+$stmt->bind_param("i", $user_id);
+$stmt->execute();
+$res = $stmt->get_result();
+while ($row = $res->fetch_assoc()) {
+    $status = strtolower($row['status']);
+    $activities[] = [
+        'activity_type' => 'project',
+        'description' => ucfirst($status) . " project: {$row['project_name']}",
+        'points_earned' => null,
+        'created_at' => $row['created_at']
+    ];
+}
+
+// Sort by newest first and limit to 10
+usort($activities, function($a, $b) { return strtotime($b['created_at']) - strtotime($a['created_at']); });
+$activities = array_slice($activities, 0, 10);
+
+// ----------------------
+// Helper functions
+// ----------------------
 function getActivityIcon($type) {
     switch ($type) {
-        case 'recycling':
-            return 'fas fa-recycle';
-        case 'donation':
-            return 'fas fa-hand-holding-heart';
-        case 'badge':
-            return 'fas fa-trophy';
-        case 'project':
-            return 'fas fa-project-diagram';
-        default:
-            return 'fas fa-star';
+        case 'recycling': return 'fas fa-recycle';
+        case 'donation': return 'fas fa-hand-holding-heart';
+        case 'badge': return 'fas fa-trophy';
+        case 'project': return 'fas fa-project-diagram';
+        default: return 'fas fa-star';
     }
 }
 
-// Format date
 function formatDate($date) {
     $now = new DateTime();
     $date = new DateTime($date);
@@ -239,7 +367,6 @@ function formatDate($date) {
     return 'Just now';
 }
 
-// Get full name
 function getFullName($first, $middle, $last) {
     $name = $first;
     if (!empty($middle)) $name .= ' ' . $middle;
@@ -247,6 +374,8 @@ function getFullName($first, $middle, $last) {
     return $name;
 }
 ?>
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -440,56 +569,124 @@ function getFullName($first, $middle, $last) {
                 </div>
                 <div class="stat-card">
                     <i class="fas fa-star"></i>
-                    <h3><?= htmlspecialchars($user_data['points'] ?? 0) ?></h3>
+                    <h3><?= htmlspecialchars($total_claimed_points) ?></h3>
                     <p>Eco Points</p>
                 </div>
             </div>
 
+
             <div class="profile-section">
                 <div class="section-header">
                     <h3>Eco Badges</h3>
-                    <a href="achievements.php" class="view-all">View All</a>
+                    <a href="#" class="view-all" id="toggleBadges">View All</a>
                 </div>
-                
+
                 <?php
-                // Fetch all available badges
-                $all_badges_query = $conn->query("SELECT * FROM badges ORDER BY points_required");
-                $all_badges = [];
-                while ($row = $all_badges_query->fetch_assoc()) {
-                    $all_badges[] = $row;
-                }
-                
-                // Check which badges user has earned
-                $earned_badges = [];
-                if (!empty($badges)) {
-                    foreach ($badges as $badge) {
-                        $earned_badges[] = $badge['badge_name'];
-                    }
-                }
+                // ----------------------
+                // Badges Logic
+                // ----------------------
+
+                // Update badges earned count in stats
+                $conn->query("UPDATE user_stats SET badges_earned = " . count($user_badges) . " WHERE user_id = $user_id");
                 ?>
-                
-                <div class="badges-grid">
-                    <?php foreach ($all_badges as $badge): 
-                        $is_earned = in_array($badge['badge_name'], $earned_badges);
-                        $progress = min(100, ($user_data['points'] / $badge['points_required']) * 100);
-                    ?>
-                    <div class="badge-item <?php echo $is_earned ? 'earned' : 'locked'; ?>">
-                        <div class="badge-icon">
-                            <i class="<?php echo htmlspecialchars($badge['icon']); ?>"></i>
-                        </div>
-                        <h4><?php echo htmlspecialchars($badge['badge_name']); ?></h4>
-                        <p><?php echo htmlspecialchars($badge['description']); ?></p>
-                        
-                        <?php if (!$is_earned): ?>
-                        <div class="badge-progress">
-                            <div class="progress-bar" style="width: <?php echo $progress; ?>%"></div>
-                        </div>
-                        <small><?php echo $user_data['points']; ?> / <?php echo $badge['points_required']; ?> points</small>
-                        <?php endif; ?>
+
+                <div class="badges-grid" style="display:flex; flex-wrap:wrap; gap:15px;">
+                <?php
+                    $badge_count = 0;
+                    foreach ($all_badges as $badge_id => $badge):
+                        $is_earned = isset($user_badges[$badge_id]);
+                        $badge_count++;
+                        $extra_class = $badge_count > 5 ? 'extra-badge hidden-badge' : '';
+
+                        // Determine progress for badges
+                        $current = $badge_progress[$badge_id]['current'] ?? 0;
+                        $required = $badge_progress[$badge_id]['required'] ?? 1;
+
+                        // Adjust current based on badge type
+                        switch ($badge['badge_name']) {
+
+                        // Points-based badges
+                        case "EcoWaste Rookie":
+                        case "EcoWaste Master":
+                        case "EcoWaste Warrior":
+                        case "EcoWaste Legend":
+                            $current = $user_data['points'];  // <-- use actual points
+                            break;
+
+                        // Donation badges by items
+                        case "Rising Donor":
+                        case "Donation Starter":
+                        case "Donation Hero":
+                        case "Donation Champion":
+                            $current = $total_items_donated;
+                            break;
+
+                        // Donation badges by posts
+                        case "Generous Giver":
+                        case "Charity Champion":
+                            $current = $total_donation_posts;
+                            break;
+
+                        // Project creation badges
+                        case "Eco Beginner":
+                        case "Eco Builder":
+                        case "Nature Keeper":
+                        case "Conservation Expert":
+                        case "Zero Waste Hero":
+                        case "Earth Saver":
+                            $current = $stats_data['projects_created'];
+                            break;
+
+                        // Project completion badges
+                        case "Eco Star":
+                        case "Eco Warrior":
+                        case "Eco Elite":
+                        case "Eco Pro":
+                        case "Eco Master":
+                        case "Eco Legend":
+                            $current = $stats_data['projects_completed'];
+                            break;
+
+                        // Recycling badges
+                        case "Recycling Starter":
+                        case "Recycling Pro":
+                        case "Recycling Expert":
+                            $current = $stats_data['items_recycled'];
+                            break;
+
+                        default:
+                            $current = 0;
+                            break;
+                    }
+
+
+                        $progress = min(100, ($current / max(1, $required)) * 100);
+                ?>
+                <div class="badge-item <?= $is_earned ? 'earned' : 'locked'; ?> <?= $extra_class; ?>" 
+                    style="<?= $badge_count > 5 ? 'display:none;' : ''; ?> 
+                            border:1px solid #ccc; border-radius:10px; padding:10px; width:180px; text-align:center;">
+                    
+                    <div class="badge-icon" style="font-size:24px; margin-bottom:8px;">
+                        <i class="<?= htmlspecialchars($badge['icon']); ?>" 
+                        style="<?= $is_earned ? 'color:gold;' : 'color:#aaa;' ?>"></i>
                     </div>
-                    <?php endforeach; ?>
+                    
+                    <h4 style="margin-bottom:5px;"><?= htmlspecialchars($badge['badge_name']); ?></h4>
+                    <p style="font-size:13px; margin-bottom:5px;"><?= htmlspecialchars($badge['description']); ?></p>
+                    
+                    <?php if (!$is_earned): ?>
+                        <div class="badge-progress" style="background:#eee; border-radius:5px; height:8px; overflow:hidden; margin-bottom:5px;">
+                            <div class="progress-bar" style="width: <?= $progress; ?>%; background:#4caf50; height:100%;"></div>
+                        </div>
+                        <small style="font-size:12px; color:#555;"><?= $current ?> / <?= $required ?> completed</small>
+                    <?php else: ?>
+                        <small style="font-size:12px; color:gold;">Earned!</small>
+                    <?php endif; ?>
                 </div>
+                <?php endforeach; ?>
             </div>
+
+
 
             <div class="profile-section">
                 <div class="section-header">
@@ -516,7 +713,8 @@ function getFullName($first, $middle, $last) {
                 <?php else: ?>
                 <div class="no-data-message">
                     <i class="fas fa-history"></i>
-                    <p>No recent activities. Start recycling, donating, or joining projects to see your activity here!</p>
+                    <p>No recent activities. </p>
+                    <p>Start recycling, donating, or joining projects to see your activity here!</p>
                 </div>
                 <?php endif; ?>
             </div>
@@ -554,22 +752,47 @@ function getFullName($first, $middle, $last) {
             </div>
         </div>
     </div>
-    <script>
-        document.getElementById('userProfile').addEventListener('click', function() {
+   <script>
+document.addEventListener('DOMContentLoaded', function() {
+
+    // -------------------------
+    // User Profile Dropdown
+    // -------------------------
+    const userProfile = document.getElementById('userProfile');
+    if(userProfile){
+        userProfile.addEventListener('click', function() {
             this.classList.toggle('active');
         });
         document.addEventListener('click', function(event) {
-            const userProfile = document.getElementById('userProfile');
             if (!userProfile.contains(event.target)) {
                 userProfile.classList.remove('active');
             }
         });
+    }
 
-            // Edit Profile Modal Functionality
-        const editProfileBtn = document.getElementById('editProfileBtn');
-        const editProfileModal = document.getElementById('editProfileModal');
-        const editProfileCloseBtn = document.getElementById('editProfileCloseBtn');
+    // -------------------------
+    // Badge Toggle
+    // -------------------------
+    const toggleBtn = document.getElementById('toggleBadges');
+    if(toggleBtn){
+        toggleBtn.addEventListener('click', function(event) {
+            event.preventDefault(); // prevent page jump
+            const hiddenBadges = document.querySelectorAll('.extra-badge'); // fixed selector
+            hiddenBadges.forEach(b => {
+                b.style.display = b.style.display === 'none' || b.style.display === '' ? 'block' : 'none';
+            });
+            toggleBtn.textContent = toggleBtn.textContent === 'View All' ? 'Hide' : 'View All';
+        });
+    }
 
+    // -------------------------
+    // Edit Profile Modal
+    // -------------------------
+    const editProfileBtn = document.getElementById('editProfileBtn');
+    const editProfileModal = document.getElementById('editProfileModal');
+    const editProfileCloseBtn = document.getElementById('editProfileCloseBtn');
+
+    if(editProfileBtn && editProfileModal && editProfileCloseBtn){
         editProfileBtn.addEventListener('click', () => {
             editProfileModal.style.display = 'flex';
         });
@@ -583,83 +806,99 @@ function getFullName($first, $middle, $last) {
                 editProfileModal.style.display = 'none';
             }
         });
-        
-        document.addEventListener('DOMContentLoaded', function() {
-            const feedbackBtn = document.getElementById('feedbackBtn');
-            const feedbackModal = document.getElementById('feedbackModal');
-            const feedbackCloseBtn = document.getElementById('feedbackCloseBtn');
-            const emojiOptions = document.querySelectorAll('.emoji-option');
-            const feedbackForm = document.getElementById('feedbackForm');
-            const thankYouMessage = document.getElementById('thankYouMessage');
-            const feedbackSubmitBtn = document.getElementById('feedbackSubmitBtn');
-            const spinner = document.getElementById('spinner');
-            const ratingError = document.getElementById('ratingError');
-            const textError = document.getElementById('textError');
-            const feedbackText = document.getElementById('feedbackText');
-            let selectedRating = 0;
-            emojiOptions.forEach(option => {
-                option.addEventListener('click', () => {
-                    emojiOptions.forEach(opt => opt.classList.remove('selected'));
-                    option.classList.add('selected');
-                    selectedRating = option.getAttribute('data-rating');
-                    ratingError.style.display = 'none';
-                });
-            });
-            feedbackForm.addEventListener('submit', function(e) {
-                e.preventDefault();
-                let isValid = true;
-                if (selectedRating === 0) {
-                    ratingError.style.display = 'block';
-                    isValid = false;
-                } else {
-                    ratingError.style.display = 'none';
-                }
-                if (feedbackText.value.trim() === '') {
-                    textError.style.display = 'block';
-                    isValid = false;
-                } else {
-                    textError.style.display = 'none';
-                }
-                if (!isValid) return;
-                feedbackSubmitBtn.disabled = true;
-                spinner.style.display = 'block';
-                setTimeout(() => {
-                    spinner.style.display = 'none';
-                    feedbackForm.style.display = 'none';
-                    thankYouMessage.style.display = 'block';
-                    setTimeout(() => {
-                        feedbackModal.style.display = 'none';
-                        feedbackForm.style.display = 'block';
-                        thankYouMessage.style.display = 'none';
-                        feedbackText.value = '';
-                        emojiOptions.forEach(opt => opt.classList.remove('selected'));
-                        selectedRating = 0;
-                        feedbackSubmitBtn.disabled = false;
-                    }, 3000);
-                }, 1500);
-            });
-            feedbackBtn.addEventListener('click', () => {
-                feedbackModal.style.display = 'flex';
-            });
-            feedbackCloseBtn.addEventListener('click', closeFeedbackModal);
-            window.addEventListener('click', (event) => {
-                if (event.target === feedbackModal) {
-                    closeFeedbackModal();
-                }
-            });
-            function closeFeedbackModal() {
-                feedbackModal.style.display = 'none';
-                feedbackForm.style.display = 'block';
-                thankYouMessage.style.display = 'none';
-                feedbackText.value = '';
+    }
+
+    // -------------------------
+    // Feedback Modal
+    // -------------------------
+    const feedbackBtn = document.getElementById('feedbackBtn');
+    const feedbackModal = document.getElementById('feedbackModal');
+    const feedbackCloseBtn = document.getElementById('feedbackCloseBtn');
+    const emojiOptions = document.querySelectorAll('.emoji-option');
+    const feedbackForm = document.getElementById('feedbackForm');
+    const thankYouMessage = document.getElementById('thankYouMessage');
+    const feedbackSubmitBtn = document.getElementById('feedbackSubmitBtn');
+    const spinner = document.getElementById('spinner');
+    const ratingError = document.getElementById('ratingError');
+    const textError = document.getElementById('textError');
+    const feedbackText = document.getElementById('feedbackText');
+    let selectedRating = 0;
+
+    if(feedbackBtn && feedbackModal && feedbackCloseBtn && feedbackForm){
+        // Emoji selection
+        emojiOptions.forEach(option => {
+            option.addEventListener('click', () => {
                 emojiOptions.forEach(opt => opt.classList.remove('selected'));
-                selectedRating = 0;
+                option.classList.add('selected');
+                selectedRating = option.getAttribute('data-rating');
                 ratingError.style.display = 'none';
+            });
+        });
+
+        // Submit feedback
+        feedbackForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            let isValid = true;
+
+            if (selectedRating === 0) {
+                ratingError.style.display = 'block';
+                isValid = false;
+            } else {
+                ratingError.style.display = 'none';
+            }
+
+            if (feedbackText.value.trim() === '') {
+                textError.style.display = 'block';
+                isValid = false;
+            } else {
                 textError.style.display = 'none';
-                feedbackSubmitBtn.disabled = false;
+            }
+
+            if (!isValid) return;
+
+            feedbackSubmitBtn.disabled = true;
+            spinner.style.display = 'block';
+
+            setTimeout(() => {
                 spinner.style.display = 'none';
+                feedbackForm.style.display = 'none';
+                thankYouMessage.style.display = 'block';
+
+                setTimeout(() => {
+                    closeFeedbackModal();
+                }, 3000);
+
+            }, 1500);
+        });
+
+        // Open/Close feedback modal
+        feedbackBtn.addEventListener('click', () => {
+            feedbackModal.style.display = 'flex';
+        });
+        feedbackCloseBtn.addEventListener('click', closeFeedbackModal);
+        window.addEventListener('click', (event) => {
+            if (event.target === feedbackModal) {
+                closeFeedbackModal();
             }
         });
-    </script>
+    }
+
+    function closeFeedbackModal() {
+        feedbackModal.style.display = 'none';
+        feedbackForm.style.display = 'block';
+        thankYouMessage.style.display = 'none';
+        feedbackText.value = '';
+        emojiOptions.forEach(opt => opt.classList.remove('selected'));
+        selectedRating = 0;
+        ratingError.style.display = 'none';
+        textError.style.display = 'none';
+        feedbackSubmitBtn.disabled = false;
+        spinner.style.display = 'none';
+    }
+
+});
+</script>
+
+
 </body>
 </html>

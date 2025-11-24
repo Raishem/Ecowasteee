@@ -24,18 +24,38 @@ if (!isset($_SESSION['first_name']) && isset($user_data['first_name'])) {
     $_SESSION['user_email'] = $user_data['email'];
 }
 
-// Fetch stats
-// Fetch stats — ensure a row exists and normalize to integers
-$stats_row = $conn->query("SELECT * FROM user_stats WHERE user_id = $user_id")->fetch_assoc();
+// ================= Legacy Accounts Fix =================
+// Sum all claimed points from user_tasks for this user
+$claimed_points_row = $conn->query("
+    SELECT IFNULL(SUM(reward_value),0) AS total_claimed
+    FROM user_tasks
+    WHERE user_id = $user_id AND reward_claimed = 1
+")->fetch_assoc();
 
+$total_claimed_points = (int)($claimed_points_row['total_claimed'] ?? 0);
+
+// Ensure user_stats row exists for this user
+$stats_row = $conn->query("SELECT * FROM user_stats WHERE user_id = $user_id")->fetch_assoc();
 if (!$stats_row) {
-    $conn->query("INSERT INTO user_stats (user_id, projects_completed, achievements_earned, badges_earned, items_recycled) VALUES ($user_id, 0, 0, 0, 0)");
+    $conn->query("INSERT INTO user_stats (user_id, projects_completed, achievements_earned, badges_earned, items_recycled, total_points) 
+                  VALUES ($user_id, 0, 0, 0, 0, $total_claimed_points)");
     $stats_row = [
         'projects_completed' => 0,
+        'achievements_earned' => 0,
         'badges_earned' => 0,
-        'items_recycled' => 0
+        'items_recycled' => 0,
+        'total_points' => $total_claimed_points
     ];
+} else {
+    // Update total_points for legacy accounts
+    $conn->query("UPDATE user_stats SET total_points = $total_claimed_points WHERE user_id = $user_id");
 }
+// ========================================================
+
+
+// ✅ Use total_points from user_stats
+$total_points = (int)($stats_row['total_points'] ?? 0);
+
 
 // ✅ Calculate live achievements earned from claimed tasks
 $achievements_row = $conn->query("
@@ -60,10 +80,6 @@ $donations_result = $conn->query("SELECT COUNT(*) AS total_donations FROM donati
 $donations_row = $donations_result->fetch_assoc();
 $total_donations = $donations_row['total_donations'] ?? 0;
 
-
-// ✅ Fetch user points
-$user_points_row = $conn->query("SELECT points FROM users WHERE user_id = $user_id")->fetch_assoc();
-$total_points = $user_points_row['points'] ?? 0;
 
 // ✅ Function: points needed per level
 function getPointsForLevel($level) {
@@ -361,17 +377,19 @@ if (isset($_POST['redeem_task_id'])) {
     if ($task && $task['status'] == 'Completed' && !$task['reward_claimed']) {
         $reward_value = (int)$task['reward_value'];
 
+        // SAVE POINTS TO THE CORRECT TABLE
         if ($task['reward_type'] == 'points') {
-            $conn->query("UPDATE users SET points = points + $reward_value WHERE user_id = $user_id");
+            $conn->query("UPDATE user_stats SET total_points = total_points + $reward_value WHERE user_id = $user_id");
         }
 
+        // Mark reward claimed
         $conn->query("UPDATE user_tasks SET reward_claimed=1 WHERE task_id=$task_id");
 
         // Increment achievements earned
         $conn->query("UPDATE user_stats SET achievements_earned = achievements_earned + 1 WHERE user_id = $user_id");
         $stats['achievements_earned'] = ($stats['achievements_earned'] ?? 0) + 1;
 
-        // Unlock next task in same category
+        // Unlock next task
         $action_type = $conn->real_escape_string($task['action_type']);
         $next_task = $conn->query("SELECT * FROM user_tasks 
                                    WHERE user_id=$user_id AND action_type='$action_type' 
@@ -380,9 +398,9 @@ if (isset($_POST['redeem_task_id'])) {
             $conn->query("UPDATE user_tasks SET unlocked=1 WHERE task_id={$next_task['task_id']}");
         }
 
-        // ✅ Recalculate level after reward
-        $user_points_row = $conn->query("SELECT points FROM users WHERE user_id = $user_id")->fetch_assoc();
-        $total_points = $user_points_row['points'] ?? 0;
+        // Recalculate level (based on total_points)
+        $user_points_row = $conn->query("SELECT total_points FROM user_stats WHERE user_id = $user_id")->fetch_assoc();
+        $total_points = $user_points_row['total_points'] ?? 0;
 
         $level = 0;
         $remaining_points = $total_points;
@@ -393,6 +411,7 @@ if (isset($_POST['redeem_task_id'])) {
                 $level++;
             } else break;
         }
+
         $current_level_points = $remaining_points;
         $progress_percentage = ($current_level_points / getPointsForLevel($level)) * 100;
     }
@@ -400,6 +419,7 @@ if (isset($_POST['redeem_task_id'])) {
     header("Location: achievements.php");
     exit;
 }
+
 
 
 
@@ -474,8 +494,8 @@ function updateTaskProgress($conn, $user_id) {
     }
 
     // 5️⃣ Recalculate total points and level
-    $user_points_row = $conn->query("SELECT points FROM users WHERE user_id = $user_id")->fetch_assoc();
-    $total_points = (int)($user_points_row['points'] ?? 0);
+    $stats_row = $conn->query("SELECT * FROM user_stats WHERE user_id = $user_id")->fetch_assoc();
+    $total_points = (int)($stats_row['total_points'] ?? 0);
 
     $level = 0;
     $remaining_points = $total_points;

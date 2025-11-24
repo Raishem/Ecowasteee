@@ -366,31 +366,41 @@ function getTimeAgo($timestamp) {
                         <!-- Eco Badges -->
                         <div class="section-title">Eco Badges</div>
                         <div class="badges-grid">
-                            <div class="badge-item">
-                                <div class="badge-icon"><i class="fas fa-recycle"></i></div>
-                                <div class="badge-name">Recycler</div>
+                        <?php
+                        // Fetch badges earned by the viewed user with badge info
+                        $stmt = $conn->prepare("
+                            SELECT b.badge_name, b.description, b.icon 
+                            FROM user_badges ub
+                            JOIN badges b ON ub.badge_id = b.badge_id
+                            WHERE ub.user_id = ?
+                            ORDER BY b.badge_id ASC
+                        ");
+                        $stmt->bind_param("i", $viewed_user_id);
+                        $stmt->execute();
+                        $result = $stmt->get_result();
+
+                        // Check if the user has earned any badges
+                        if ($result->num_rows === 0):
+                        ?>
+                            <div class="no-content">No badges earned yet.</div>
+                        <?php
+                        else:
+                            while ($badge = $result->fetch_assoc()):
+                        ?>
+                            <div class="badge-item earned">
+                                <div class="badge-icon">
+                                    <i class="<?= htmlspecialchars($badge['icon']); ?>" style="color:gold;"></i>
+                                </div>
+                                <div class="badge-name"><?= htmlspecialchars($badge['badge_name']); ?></div>
+                                <div class="badge-description" style="font-size:11px; color:#555;"><?= htmlspecialchars($badge['description']); ?></div>
                             </div>
-                            <div class="badge-item">
-                                <div class="badge-icon"><i class="fas fa-seedling"></i></div>
-                                <div class="badge-name">Eco Warrior</div>
-                            </div>
-                            <div class="badge-item">
-                                <div class="badge-icon"><i class="fas fa-hand-holding-heart"></i></div>
-                                <div class="badge-name">Donor</div>
-                            </div>
-                            <div class="badge-item">
-                                <div class="badge-icon"><i class="fas fa-award"></i></div>
-                                <div class="badge-name">Achiever</div>
-                            </div>
-                            <div class="badge-item">
-                                <div class="badge-icon"><i class="fas fa-leaf"></i></div>
-                                <div class="badge-name">Green Hero</div>
-                            </div>
-                            <div class="badge-item">
-                                <div class="badge-icon"><i class="fas fa-trophy"></i></div>
-                                <div class="badge-name">Champion</div>
-                            </div>
+                        <?php
+                            endwhile;
+                        endif;
+                        $stmt->close();
+                        ?>
                         </div>
+
 
                         <!-- Recent Donations -->
                         <div class="section-title">Recent Donations</div>

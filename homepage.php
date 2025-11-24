@@ -156,6 +156,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['wasteType']) && !isse
     $stmt->bind_param("sisssssss", $item_name, $quantity, $total_quantity, $category, $subcategory, $description, $donor_id, $donated_at, $image_paths_json);
     $stmt->execute();
 
+    // Get donation ID
+    $donation_id = $stmt->insert_id;
+
     // Update stats
     $stats_check = $conn->query("SELECT * FROM user_stats WHERE user_id = $donor_id");
     if ($stats_check->num_rows === 0) {
@@ -164,12 +167,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['wasteType']) && !isse
         $conn->query("UPDATE user_stats SET items_donated = items_donated + $quantity WHERE user_id = $donor_id");
     }
 
-    // ✅ Redirect with success flag
+    // ✅ Log activity to user_activities
+    $activity_desc = "You donated {$quantity} {$subcategory} ({$category})";
+    $points_earned = $quantity * 5; // example points per item
+    $activity_stmt = $conn->prepare("
+        INSERT INTO user_activities (user_id, activity_type, description, points_earned)
+        VALUES (?, 'donation', ?, ?)
+    ");
+    $activity_stmt->bind_param("isi", $donor_id, $activity_desc, $points_earned);
+    $activity_stmt->execute();
+    $activity_stmt->close();
+
+    // Redirect with success
     header("Location: homepage.php?donation_success=1");
     exit();
+
 }
-
-
 
 
 /* ----------------------------
