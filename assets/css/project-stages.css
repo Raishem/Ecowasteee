@@ -378,14 +378,14 @@ body .stage-tabs .stage-tab.locked * {
     flex-direction: column; 
     align-items: center; 
     gap: 8px; 
-    padding: 12px 14px; 
+    padding: 14px 18px; /* slightly larger padding for better spacing */
     border-radius: 12px;
     background: #fff;
     border: 1px solid #eaecef;
     transition: all .18s ease-out;
     cursor: pointer;
-    margin: 0 6px;
-    min-width: 120px;
+    margin: 0 8px;
+    min-width: 140px; /* give more room so title + badge fit comfortably */
     box-shadow: 0 1px 2px rgba(0,0,0,0.03);
 }
 
@@ -442,9 +442,10 @@ body .stage-tabs .stage-tab.locked * {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 4px;
+    gap: 6px; /* a touch more breathing room between title and badge */
     max-width: 220px;
     text-align: center;
+    padding-top: 4px;
 }
 
 .stage-tab .tab-title {
@@ -477,12 +478,15 @@ body .stage-tabs .stage-tab.locked * {
 .tab-badge { 
     display: inline-flex;
     align-items: center;
-    padding: 4px 10px;
+    padding: 6px 12px; /* slightly larger for readability */
     border-radius: 20px;
     font-size: 12px;
-    font-weight: 500;
+    font-weight: 600;
     letter-spacing: 0.02em;
 }
+
+/* Ensure any leftover in-stage labels are hidden so status appears only in the tab badge */
+.stage-actions .stage-status-label { display: none !important; }
 
 .tab-badge.completed { 
     background: #e6f6ea;
