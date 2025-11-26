@@ -1,11 +1,7 @@
 <?php
-
 session_start();
 require_once 'config.php';
-$conn = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
-if ($conn->connect_error) {
-    die('Connection failed: ' . $conn->connect_error);
-}
+$conn = getDBConnection();
 $user_id = $_SESSION['user_id'];
 
 // Check login
@@ -28,6 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
     // Update user data in database
     $update_query = $conn->prepare("UPDATE users SET first_name = ?, middle_name = ?, last_name = ?, email = ?, contact_number = ?, address = ?, city = ?, zip_code = ? WHERE user_id = ?");
     $update_query->bind_param("ssssssssi", $first_name, $middle_name, $last_name, $email, $contact_number, $address, $city, $zip_code, $user_id);
+    
     if ($update_query->execute()) {
         $success_message = "Profile updated successfully!";
         $_SESSION['success_message'] = $success_message;
@@ -38,6 +35,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
     }
 }
 
+// ----------------------
+// Total Eco Points from database
+$stmt = $conn->prepare("SELECT total_points FROM user_stats WHERE user_id = ?");
+$stmt->bind_param("i", $user_id);
+$stmt->execute();
+$res = $stmt->get_result();
+$total_claimed_points = (int)($res->fetch_assoc()['total_points'] ?? 0);
+$stmt->close();
+
+
+// Update user's points in the users table
+$conn->query("UPDATE users SET points = $total_claimed_points WHERE user_id = $user_id");
+
+
+// ----------------------
 // Create necessary tables if they don't exist
 $create_tables_sql = [
     "CREATE TABLE IF NOT EXISTS user_activities (
@@ -82,158 +94,266 @@ foreach ($create_tables_sql as $sql) {
     try {
         $conn->query($sql);
     } catch (Exception $e) {
-        // Log error but continue execution
         error_log("Table creation error: " . $e->getMessage());
     }
 }
 
 // Insert sample badges if none exist
-// MySQLi version
 $check_badges = $conn->query("SELECT COUNT(*) as count FROM badges");
-$badge_count_row = $check_badges->fetch_assoc();
-if ($badge_count_row && $badge_count_row['count'] == 0) {
+if ($check_badges->fetch_assoc()['count'] == 0) {
     $sample_badges = [
-        "('Eco Beginner', 'Completed your first eco activity', 'fas fa-seedling', 10)",
-        "('Recycling Pro', 'Recycled 10+ items', 'fas fa-recycle', 50)",
-        "('Donation Hero', 'Donated 5+ items', 'fas fa-hand-holding-heart', 75)",
-        "('Project Master', 'Completed 3+ projects', 'fas fa-project-diagram', 100)",
-        "('Eco Warrior', 'Earned 200+ points', 'fas fa-trophy', 200)"
+        "('EcoWaste Beginner', 'Completed your first eco activity', 'fas fa-seedling', 10)",
+        "('Rising Donor', 'Completed your first donation', 'fas fa-hand-holding-heart', 10)",
+        "('Eco Beginner', 'Started your first recycling project', 'fas fa-recycle', 10)",
+        "('Eco Star', 'Completed a recycling project', 'fas fa-star', 15)",
+        "('Donation Starter', 'Donated 1 item', 'fas fa-hand-holding-heart', 20)",
+        "('Donation Hero', 'Donated 5+ items', 'fas fa-heart', 75)",
+        "('Donation Champion', 'Donated 15+ items', 'fas fa-gift', 225)",
+        "('Generous Giver', 'Completed 20 donations', 'fas fa-hands-helping', 400)",
+        "('Charity Champion', 'Completed 30 donations', 'fas fa-award', 600)",
+        "('Recycling Starter', 'Recycled 1 item', 'fas fa-recycle', 10)",
+        "('Recycling Pro', 'Recycled 5+ items', 'fas fa-recycle', 50)",
+        "('Recycling Expert', 'Recycled 15+ items', 'fas fa-recycle', 150)",
+        "('Zero Waste Hero', 'Created 25 recycling projects', 'fas fa-project-diagram', 375)",
+        "('Earth Saver', 'Created 30 recycling projects', 'fas fa-globe', 450)",
+        "('Eco Pro', 'Completed 20 recycling projects', 'fas fa-seedling', 300)",
+        "('Eco Legend', 'Completed 30 recycling projects', 'fas fa-trophy', 450)",
+        "('EcoWaste Rookie', 'Earned 50+ points', 'fas fa-star', 50)",
+        "('EcoWaste Master', 'Earned 100+ points', 'fas fa-medal', 100)",
+        "('EcoWaste Warrior', 'Earned 200+ points', 'fas fa-trophy', 200)",
+        "('EcoWaste Legend', 'Earned 500+ points', 'fas fa-crown', 500)"
     ];
-    
     $conn->query("INSERT INTO badges (badge_name, description, icon, points_required) VALUES " . implode(',', $sample_badges));
 }
 
-// Insert sample activities if none exist for this user
-
-
-$check_activities = $conn->prepare("SELECT COUNT(*) as count FROM user_activities WHERE user_id = ?");
-$check_activities->bind_param("i", $user_id);
-$check_activities->execute();
-$result = $check_activities->get_result();
-$activity_count_row = $result->fetch_assoc();
-$activity_count = $activity_count_row ? $activity_count_row['count'] : 0;
-
-if ($activity_count == 0) {
-    $sample_activities = [
-        "($user_id, 'recycling', 'Recycled plastic bottles', 15)",
-        "($user_id, 'donation', 'Donated old clothes', 20)",
-        "($user_id, 'badge', 'Earned Eco Beginner badge', 10)",
-        "($user_id, 'project', 'Completed Community Cleanup project', 25)"
-    ];
-    
-    $conn->query("INSERT INTO user_activities (user_id, activity_type, description, points_earned) VALUES " . implode(',', $sample_activities));
-}
-
 // Ensure user has stats record
-
-
 $check_stats = $conn->prepare("SELECT COUNT(*) as count FROM user_stats WHERE user_id = ?");
 $check_stats->bind_param("i", $user_id);
 $check_stats->execute();
-$result = $check_stats->get_result();
-$stats_count_row = $result->fetch_assoc();
-$stats_count = $stats_count_row ? $stats_count_row['count'] : 0;
-
+$stats_count = $check_stats->get_result()->fetch_assoc()['count'];
 if ($stats_count == 0) {
     $conn->query("INSERT INTO user_stats (user_id, projects_completed, achievements_earned, badges_earned, items_donated, items_recycled) 
-                  VALUES ($user_id, 1, 1, 1, 1, 1)");
+                  VALUES ($user_id, 0, 0, 0, 0, 0)");
 }
 
 // Fetch user data
-
-
 $user_query = $conn->prepare("SELECT user_id, email, first_name, middle_name, last_name, contact_number, address, city, zip_code, created_at, points FROM users WHERE user_id = ?");
 $user_query->bind_param("i", $user_id);
 $user_query->execute();
-$result = $user_query->get_result();
-$user_data = $result->fetch_assoc();
+$user_result = $user_query->get_result();
+$user_data = $user_result->fetch_assoc();
 
-// Fetch user stats
-
-
-$stats_query = $conn->prepare("SELECT projects_completed, achievements_earned, badges_earned, items_donated, items_recycled FROM user_stats WHERE user_id = ?");
+// Fetch stats once
+$stats_query = $conn->prepare("
+    SELECT projects_completed, projects_created, achievements_earned, badges_earned, items_donated, items_recycled 
+    FROM user_stats 
+    WHERE user_id = ?
+");
 $stats_query->bind_param("i", $user_id);
 $stats_query->execute();
-$result = $stats_query->get_result();
-$stats_data = $result->fetch_assoc();
+$stats_result = $stats_query->get_result();
+$stats_data = $stats_result->fetch_assoc();
+
+// Ensure stats are integers
+$stats_data = [
+    'items_donated'      => (int)($stats_data['items_donated'] ?? 0),
+    'items_recycled'     => (int)($stats_data['items_recycled'] ?? 0),
+    'projects_created'   => (int)($stats_data['projects_created'] ?? 0),
+    'projects_completed' => (int)($stats_data['projects_completed'] ?? 0),
+];
 
 // Calculate level based on points
-$level = floor(($user_data['points'] ?? 0) / 25);
+$level = 1 + floor(($user_data['points'] ?? 0) / 25);
 
-// Fetch user badges
+// ----------------------
+// BADGE LOGIC (UPDATED)
+// ----------------------
 
-$badges = [];
-$badges_query = $conn->prepare("
-    SELECT b.badge_name, b.description, b.icon 
-    FROM user_badges ub 
-    JOIN badges b ON ub.badge_id = b.badge_id 
-    WHERE ub.user_id = ? 
-    LIMIT 5
-");
-$badges_query->bind_param("i", $user_id);
-$badges_query->execute();
-$result = $badges_query->get_result();
+// Fetch all badges from DB
+$all_badges = [];
+$result = $conn->query("SELECT * FROM badges ORDER BY badge_id ASC");
 while ($row = $result->fetch_assoc()) {
-    $badges[] = $row;
+    $all_badges[$row['badge_id']] = $row;
 }
 
-// If no badges but user has points, auto-assign appropriate badges
-if (empty($badges) && isset($user_data['points'])) {
-    $points = $user_data['points'];
-    $auto_badges = $conn->prepare("SELECT badge_id FROM badges WHERE points_required <= ? ORDER BY points_required DESC");
-    $auto_badges->execute([$points]);
-    $auto_badges = $auto_badges->get_result();
-    while ($badge = $auto_badges->fetch_assoc()) {
-        // Assign badge to user
-        $assign_badge = $conn->prepare("INSERT IGNORE INTO user_badges (user_id, badge_id) VALUES (?, ?)");
-        $assign_badge->execute([$user_id, $badge['badge_id']]);
-        // Add to badges array for display
-        $badge_info = $conn->prepare("SELECT badge_name, description, icon FROM badges WHERE badge_id = ?");
-        $badge_info->execute([$badge['badge_id']]);
-        $badge_result = $badge_info->get_result();
-        if ($badge_data = $badge_result->fetch_assoc()) {
-            $badges[] = $badge_data;
-        }
-    }
-    // Update badges earned count
-    if (!empty($badges)) {
-        $conn->query("UPDATE user_stats SET badges_earned = " . count($badges) . " WHERE user_id = $user_id");
-    }
+// Fetch badges already earned by user
+$user_badges = [];
+$stmt = $conn->prepare("SELECT badge_id FROM user_badges WHERE user_id = ?");
+$stmt->bind_param("i", $user_id);
+$stmt->execute();
+$res = $stmt->get_result();
+while ($row = $res->fetch_assoc()) {
+    $user_badges[$row['badge_id']] = true;
 }
 
-// Fetch recent activities
+// ---------------------------
+// Compute action-based stats
+// ---------------------------
+
+// Total items donated
+$stmt = $conn->prepare("SELECT SUM(quantity) as total_items FROM donations WHERE donor_id = ?");
+$stmt->bind_param("i", $user_id);
+$stmt->execute();
+$res = $stmt->get_result();
+$total_items_donated = (int)($res->fetch_assoc()['total_items'] ?? 0);
+$stmt->close();
+
+// Total donation posts
+$stmt = $conn->prepare("SELECT COUNT(*) as donation_posts FROM donations WHERE donor_id = ?");
+$stmt->bind_param("i", $user_id);
+$stmt->execute();
+$res = $stmt->get_result();
+$total_donation_posts = (int)($res->fetch_assoc()['donation_posts'] ?? 0);
+$stmt->close();
+
+// Total eco activities
+$stmt = $conn->prepare("SELECT COUNT(*) as activity_count FROM user_activities WHERE user_id = ?");
+$stmt->bind_param("i", $user_id);
+$stmt->execute();
+$res = $stmt->get_result();
+$total_activities = (int)($res->fetch_assoc()['activity_count'] ?? 0);
+$stmt->close();
+
+// ---------------------------
+// ASSIGN BADGES BASED ON POINTS & ACTIONS
+// ---------------------------
+$badge_progress = [];
+foreach ($all_badges as $badge) {
+    $earned = false;
+
+    switch ($badge['badge_name']) {
+
+        // Points-based badges
+        case "EcoWaste Rookie":
+        case "EcoWaste Master":
+        case "EcoWaste Warrior":
+        case "EcoWaste Legend":
+            $current = (int)($user_data['points'] ?? 0); // Use actual user points
+            $required = (int)$badge['points_required'];
+            $earned = $current >= $required;
+            break;
+
+
+        // Action-based badges
+        case "EcoWaste Beginner": $earned = $total_activities >= 1; $current = $total_activities; $required = 1; break;
+        case "Donation Starter": $earned = $total_items_donated >= 1; $current = $total_items_donated; $required = 1; break;
+        case "Rising Donor": $earned = $total_donation_posts >= 1; $current = $total_donation_posts; $required = 1; break;
+        case "Donation Hero": $earned = $total_items_donated >= 5; $current = $total_items_donated; $required = 5; break;
+        case "Donation Champion": $earned = $total_items_donated >= 15; $current = $total_items_donated; $required = 15; break;
+        case "Generous Giver": $earned = $total_donation_posts >= 20; $current = $total_donation_posts; $required = 20; break;
+        case "Charity Champion": $earned = $total_donation_posts >= 30; $current = $total_donation_posts; $required = 30; break;
+        case "Eco Star": $earned = $stats_data['projects_completed'] >= 1; $current = $stats_data['projects_completed']; $required = 1; break;
+        case "Recycling Starter": $earned = $stats_data['items_recycled'] >= 1; $current = $stats_data['items_recycled']; $required = 1; break;
+        case "Recycling Pro": $earned = $stats_data['items_recycled'] >= 10; $current = $stats_data['items_recycled']; $required = 10; break;
+        case "Recycling Expert": $earned = $stats_data['items_recycled'] >= 15; $current = $stats_data['items_recycled']; $required = 15; break;
+        case "Project Master": $earned = $stats_data['projects_completed'] >= 3; $current = $stats_data['projects_completed']; $required = 3; break;
+        case "Eco Pro": $earned = $stats_data['projects_completed'] >= 20; $current = $stats_data['projects_completed']; $required = 20; break;
+        case "Eco Legend": $earned = $stats_data['projects_completed'] >= 30; $current = $stats_data['projects_completed']; $required = 30; break;
+        case "Zero Waste Hero": $earned = $stats_data['projects_created'] >= 25; $current = $stats_data['projects_created']; $required = 25; break;
+        case "Earth Saver": $earned = $stats_data['projects_created'] >= 30; $current = $stats_data['projects_created']; $required = 30; break;
+
+        default:
+            $earned = false;
+            $current = 0;
+            $required = 1;
+            break;
+    }
+
+    // Insert badge if earned and not already added
+    if ($earned && !isset($user_badges[$badge['badge_id']])) {
+        $stmt = $conn->prepare("INSERT INTO user_badges (user_id, badge_id) VALUES (?, ?)");
+        $stmt->bind_param("ii", $user_id, $badge['badge_id']);
+        $stmt->execute();
+        $stmt->close();
+        $user_badges[$badge['badge_id']] = true;
+
+        // Insert points for badge into user_activities
+        $points_for_badge = (int)$badge['points_required'];
+        $desc = "Earned badge: {$badge['badge_name']}";
+        $stmt = $conn->prepare("
+            INSERT INTO user_activities (user_id, activity_type, description, points_earned)
+            VALUES (?, 'badge', ?, ?)
+        ");
+        $stmt->bind_param("isi", $user_id, $desc, $points_for_badge);
+        $stmt->execute();
+        $stmt->close();
+    }
+
+    // Save progress values for badge display
+    $badge_progress[$badge['badge_id']] = [
+        'current' => $current,
+        'required' => $required
+    ];
+}
+
+// Update badges earned count
+$conn->query("UPDATE user_stats SET badges_earned = " . count($user_badges) . " WHERE user_id = $user_id");
+
+// ----------------------
+// Fetch activities
+// ----------------------
 $activities = [];
-$activities_query = $conn->prepare("
-    SELECT activity_type, description, points_earned, created_at 
-    FROM user_activities 
-    WHERE user_id = ? 
-    ORDER BY created_at DESC 
-    LIMIT 4
-");
-$activities_query->bind_param("i", $user_id);
-$activities_query->execute();
-$result = $activities_query->get_result();
-while ($row = $result->fetch_assoc()) {
-    $activities[] = $row;
+
+// Donations
+$stmt = $conn->prepare("SELECT item_name, quantity, donated_at FROM donations WHERE donor_id = ? ORDER BY donated_at DESC LIMIT 10");
+$stmt->bind_param("i", $user_id);
+$stmt->execute();
+$res = $stmt->get_result();
+while ($row = $res->fetch_assoc()) {
+    $activities[] = [
+        'activity_type' => 'donation',
+        'description' => "You donated {$row['quantity']} {$row['item_name']}",
+        'points_earned' => null,
+        'created_at' => $row['donated_at']
+    ];
 }
 
-// Get activity icon based on type
+// Badges
+$stmt = $conn->prepare("SELECT b.badge_name, ub.earned_date FROM user_badges ub JOIN badges b ON ub.badge_id = b.badge_id WHERE ub.user_id = ? ORDER BY ub.earned_date DESC LIMIT 10");
+$stmt->bind_param("i", $user_id);
+$stmt->execute();
+$res = $stmt->get_result();
+while ($row = $res->fetch_assoc()) {
+    $activities[] = [
+        'activity_type' => 'badge',
+        'description' => "Earned badge: {$row['badge_name']}",
+        'points_earned' => null,
+        'created_at' => $row['earned_date']
+    ];
+}
+
+// Projects
+$stmt = $conn->prepare("SELECT project_name, created_at, status FROM projects WHERE user_id = ? ORDER BY created_at DESC LIMIT 10");
+$stmt->bind_param("i", $user_id);
+$stmt->execute();
+$res = $stmt->get_result();
+while ($row = $res->fetch_assoc()) {
+    $status = strtolower($row['status']);
+    $activities[] = [
+        'activity_type' => 'project',
+        'description' => ucfirst($status) . " project: {$row['project_name']}",
+        'points_earned' => null,
+        'created_at' => $row['created_at']
+    ];
+}
+
+// Sort by newest first and limit to 10
+usort($activities, function($a, $b) { return strtotime($b['created_at']) - strtotime($a['created_at']); });
+$activities = array_slice($activities, 0, 10);
+
+// ----------------------
+// Helper functions
+// ----------------------
 function getActivityIcon($type) {
     switch ($type) {
-        case 'recycling':
-            return 'fas fa-recycle';
-        case 'donation':
-            return 'fas fa-hand-holding-heart';
-        case 'badge':
-            return 'fas fa-trophy';
-        case 'project':
-            return 'fas fa-project-diagram';
-        default:
-            return 'fas fa-star';
+        case 'recycling': return 'fas fa-recycle';
+        case 'donation': return 'fas fa-hand-holding-heart';
+        case 'badge': return 'fas fa-trophy';
+        case 'project': return 'fas fa-project-diagram';
+        default: return 'fas fa-star';
     }
 }
 
-// Format date
 function formatDate($date) {
     $now = new DateTime();
     $date = new DateTime($date);
@@ -247,7 +367,6 @@ function formatDate($date) {
     return 'Just now';
 }
 
-// Get full name
 function getFullName($first, $middle, $last) {
     $name = $first;
     if (!empty($middle)) $name .= ' ' . $middle;
@@ -255,6 +374,8 @@ function getFullName($first, $middle, $last) {
     return $name;
 }
 ?>
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -263,833 +384,8 @@ function getFullName($first, $middle, $last) {
     <title>User Profile | EcoWaste</title>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&family=Open+Sans&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Open Sans', sans-serif;
-        }
-
-        body {
-            background-color: #f5f5f5;
-            color: #333;
-            line-height: 1.6;
-        }
-
-        h1, h2, h3, h4 {
-            font-family: 'Montserrat', sans-serif;
-        }
-
-        .container {
-            display: grid;
-            grid-template-columns: 250px 1fr;
-            max-width: 1200px;
-            margin: 0 auto;
-            gap: 20px;
-            padding: 0 20px;
-        }
-
-        header {
-            grid-column: 1 / -1;
-            background-color: #82AA52;
-            color: white;
-            padding: 15px 20px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        .logo-container {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-
-        .logo img {
-            width: 50px;
-            height: 50px;
-        }
-
-        .user-profile {
-            display: flex;
-            align-items: center;
-            position: relative;
-            cursor: pointer;
-        }
-
-        .profile-pic {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background-color: #fff;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-right: 10px;
-            overflow: hidden;
-        }
-
-        .profile-pic img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-
-        .profile-name {
-            font-weight: 600;
-            margin-right: 5px;
-        }
-
-        .dropdown-arrow {
-            transition: transform 0.3s;
-        }
-
-        .user-profile.active .dropdown-arrow {
-            transform: rotate(180deg);
-        }
-
-        .profile-dropdown {
-            position: absolute;
-            top: 100%;
-            right: 0;
-            background-color: white;
-            border-radius: 5px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            width: 200px;
-            z-index: 100;
-            display: none;
-            overflow: hidden;
-        }
-
-        .user-profile.active .profile-dropdown {
-            display: block;
-        }
-
-        .dropdown-item {
-            padding: 10px 15px;
-            color: #333;
-            display: flex;
-            align-items: center;
-            text-decoration: none;
-            transition: background-color 0.2s;
-        }
-
-        .dropdown-item i {
-            margin-right: 10px;
-            width: 20px;
-            text-align: center;
-        }
-
-        .dropdown-item:hover {
-            background-color: #f5f5f5;
-        }
-
-        .dropdown-divider {
-            height: 1px;
-            background-color: #eee;
-            margin: 5px 0;
-        }
-
-        .sidebar {
-            background-color: #F6FFEB;
-            padding: 30px 20px;
-            box-shadow: 3px 0 10px rgba(0,0,0,0.1);
-            height: fit-content;
-            border-radius: 10px;
-            position: sticky;
-            top: 20px;
-        }
-
-        .sidebar nav ul {
-            list-style: none;
-        }
-
-        .sidebar nav li {
-            margin-bottom: 15px;
-        }
-
-        .sidebar nav a {
-            text-decoration: none;
-            color: #333;
-            font-weight: 500;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 8px 12px;
-            border-radius: 5px;
-            transition: all 0.3s ease;
-        }
-
-
-        .sidebar nav a.active,
-        .sidebar nav a:hover {
-            background-color: #e0f0d8;
-            color: #2e8b57;
-        }
-
-        .sidebar nav a i {
-            width: 20px;
-            text-align: center;
-            font-size: 18px;
-        }
-
-        .main-content {
-            padding: 30px;
-            background-color: #fff;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-        }
-
-        .profile-header {
-            display: flex;
-            align-items: center;
-            margin-bottom: 30px;
-            padding-bottom: 20px;
-            border-bottom: 1px solid #eee;
-        }
-
-        .profile-avatar {
-            width: 120px;
-            height: 120px;
-            border-radius: 50%;
-            overflow: hidden;
-            margin-right: 25px;
-            border: 5px solid #F6FFEB;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background-color: #82AA52;
-            color: white;
-            font-size: 48px;
-            font-weight: bold;
-        }
-
-        .profile-info h2 {
-            color: #82AA52;
-            font-size: 28px;
-            margin-bottom: 5px;
-        }
-
-        .profile-info p {
-            color: #666;
-            margin-bottom: 10px;
-        }
-
-        .profile-level {
-            display: inline-block;
-            background-color: #F6FFEB;
-            padding: 5px 12px;
-            border-radius: 20px;
-            font-weight: 600;
-            color: #82AA52;
-            font-size: 14px;
-        }
-
-        .profile-stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            margin-bottom: 40px;
-        }
-
-        .stat-card {
-            background-color: #F6FFEB;
-            padding: 20px;
-            border-radius: 10px;
-            text-align: center;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-        }
-
-        .stat-card i {
-            font-size: 24px;
-            color: #82AA52;
-            margin-bottom: 10px;
-        }
-
-        .stat-card h3 {
-            font-size: 32px;
-            color: #82AA52;
-            margin-bottom: 5px;
-        }
-
-        .stat-card p {
-            color: #666;
-            font-size: 14px;
-        }
-
-        .profile-section {
-            margin-bottom: 40px;
-        }
-
-        .section-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            padding-bottom: 10px;
-            border-bottom: 1px solid #eee;
-        }
-
-        .section-header h3 {
-            color: #82AA52;
-            font-size: 22px;
-            margin: 0;
-        }
-
-        .view-all {
-            color: #82AA52;
-            text-decoration: none;
-            font-weight: 600;
-            font-size: 14px;
-        }
-
-        .view-all:hover {
-            text-decoration: underline;
-        }
-
-        .badges-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-            gap: 15px;
-        }
-
-        .badge-item {
-            background-color: #F6FFEB;
-            border-radius: 10px;
-            padding: 15px;
-            text-align: center;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-        }
-
-        .badge-icon {
-            width: 60px;
-            height: 60px;
-            background-color: #82AA52;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 10px;
-            color: white;
-            font-size: 24px;
-        }
-
-        .badge-item h4 {
-            font-size: 14px;
-            color: #333;
-            margin-bottom: 5px;
-        }
-
-        .badge-item p {
-            font-size: 12px;
-            color: #666;
-        }
-
-                /* Badge states */
-        .badge-item.locked {
-            opacity: 0.7;
-            position: relative;
-        }
-
-        .badge-item.locked::after {
-            content: '🔒';
-            position: absolute;
-            top: 5px;
-            right: 5px;
-            font-size: 14px;
-        }
-
-        .badge-item.earned .badge-icon {
-            background: linear-gradient(135deg, #82AA52, #4CAF50);
-            box-shadow: 0 4px 10px rgba(130, 170, 82, 0.3);
-        }
-
-        /* Progress bar for badges */
-        .badge-progress {
-            height: 5px;
-            background-color: #e0e0e0;
-            border-radius: 5px;
-            margin-top: 8px;
-            overflow: hidden;
-        }
-
-        .progress-bar {
-            height: 100%;
-            background-color: #82AA52;
-            border-radius: 5px;
-            transition: width 0.5s ease;
-        }
-
-        .badge-item small {
-            display: block;
-            margin-top: 5px;
-            font-size: 11px;
-            color: #888;
-        }
-
-        .badge-item {
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-        }
-
-        .badge-item:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-        }
-
-        .recent-activity {
-            list-style: none;
-        }
-
-        .activity-item {
-            display: flex;
-            align-items: center;
-            padding: 15px 0;
-            border-bottom: 1px solid #f0f0f0;
-        }
-
-        .activity-item:last-child {
-            border-bottom: none;
-        }
-
-        .activity-icon {
-            width: 40px;
-            height: 40px;
-            background-color: #F6FFEB;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-right: 15px;
-            color: #82AA52;
-        }
-
-        .activity-content {
-            flex: 1;
-        }
-
-        .activity-content h4 {
-            font-size: 16px;
-            margin-bottom: 5px;
-            color: #333;
-        }
-
-        .activity-content p {
-            font-size: 14px;
-            color: #666;
-        }
-
-        .activity-time {
-            font-size: 12px;
-            color: #999;
-        }
-
-        .edit-profile-btn {
-            background-color: #82AA52;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 5px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background-color 0.3s;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .edit-profile-btn:hover {
-            background-color: #6d8f45;
-        }
-
-        .user-details {
-            background-color: #F6FFEB;
-            padding: 20px;
-            border-radius: 10px;
-            margin-bottom: 30px;
-        }
-
-        .user-details h3 {
-            color: #82AA52;
-            margin-bottom: 15px;
-        }
-
-        .details-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 15px;
-        }
-
-        .detail-item {
-            display: flex;
-            margin-bottom: 10px;
-        }
-
-        .detail-label {
-            font-weight: 600;
-            min-width: 120px;
-            color: #555;
-        }
-
-        .detail-value {
-            color: #333;
-        }
-
-        /* Feedback System */
-        .feedback-btn {
-            position: fixed;
-            bottom: 30px;
-            right: 30px;
-            width: 60px;
-            height: 60px;
-            background-color: #82AA52;
-            color: white;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 28px;
-            cursor: pointer;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-            z-index: 100;
-            transition: all 0.3s ease;
-        }
-
-        .feedback-btn:hover {
-            transform: scale(1.1);
-            background-color: #6d8f45;
-        }
-
-        .feedback-modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0,0,0,0.5);
-            z-index: 2000;
-            justify-content: center;
-            align-items: center;
-        }
-
-        .feedback-content {
-            background-color: white;
-            padding: 30px;
-            border-radius: 8px;
-            width: 90%;
-            max-width: 500px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-            position: relative;
-        }
-
-        .feedback-close-btn {
-            position: absolute;
-            top: 15px;
-            right: 15px;
-            font-size: 24px;
-            cursor: pointer;
-            color: #777;
-        }
-
-        .feedback-close-btn:hover {
-            color: #333;
-        }
-
-        .feedback-form h3 {
-            color: #82AA52;
-            margin-bottom: 20px;
-            font-family: 'Montserrat', sans-serif;
-        }
-
-        .emoji-rating {
-            display: flex;
-            justify-content: space-between;
-            margin: 20px 0;
-        }
-
-        .emoji-option {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            cursor: pointer;
-            transition: transform 0.2s;
-            padding: 5px;
-            border-radius: 50%;
-        }
-
-        .emoji-option:hover {
-            transform: scale(1.2);
-            background-color: #f0f7e8;
-        }
-
-        .emoji-option.selected {
-            transform: scale(1.3);
-            background-color: #e0f0d8;
-        }
-
-        .emoji {
-            font-size: 30px;
-            margin-bottom: 5px;
-        }
-
-        .emoji-label {
-            font-size: 12px;
-            color: #666;
-        }
-
-        .feedback-detail {
-            font-size: 14px;
-            color: #666;
-            margin-bottom: 10px;
-        }
-
-        .feedback-form textarea {
-            width: 100%;
-            padding: 15px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            resize: vertical;
-            min-height: 150px;
-            margin-bottom: 20px;
-            font-family: 'Open Sans', sans-serif;
-        }
-
-        .feedback-submit-btn {
-            background-color: #82AA52;
-            color: white;
-            border: none;
-            padding: 12px 25px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: 600;
-            transition: background-color 0.3s;
-            width: 100%;
-        }
-
-        .feedback-submit-btn:hover {
-            background-color: #6d8f45;
-        }
-
-        .thank-you-message {
-            display: none;
-            text-align: center;
-            padding: 20px;
-        }
-
-        .thank-you-message h3 {
-            color: #82AA52;
-            margin-bottom: 15px;
-        }
-
-        .thank-you-emoji {
-            font-size: 50px;
-            margin-bottom: 20px;
-        }
-
-        .error-message {
-            color: #e74c3c;
-            font-size: 13px;
-            margin-top: 5px;
-            display: none;
-        }
-
-        .spinner {
-            display: none;
-            width: 20px;
-            height: 20px;
-            border: 3px solid rgba(255,255,255,0.3);
-            border-radius: 50%;
-            border-top-color: white;
-            animation: spin 1s ease-in-out infinite;
-            margin-left: 10px;
-        }
-
-                /* Add these new styles for the edit profile modal */
-        .edit-profile-modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0,0,0,0.5);
-            z-index: 2000;
-            justify-content: center;
-            align-items: center;
-        }
-
-        .edit-profile-content {
-            background-color: white;
-            padding: 30px;
-            border-radius: 8px;
-            width: 90%;
-            max-width: 600px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-            position: relative;
-            max-height: 80vh;
-            overflow-y: auto;
-        }
-
-        .edit-profile-close-btn {
-            position: absolute;
-            top: 15px;
-            right: 15px;
-            font-size: 24px;
-            cursor: pointer;
-            color: #777;
-        }
-
-        .edit-profile-close-btn:hover {
-            color: #333;
-        }
-
-        .edit-profile-form h3 {
-            color: #82AA52;
-            margin-bottom: 20px;
-            font-family: 'Montserrat', sans-serif;
-        }
-
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: 600;
-            color: #555;
-        }
-
-        .form-group input,
-        .form-group textarea {
-            width: 100%;
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-family: 'Open Sans', sans-serif;
-        }
-
-        .form-group textarea {
-            resize: vertical;
-            min-height: 80px;
-        }
-
-        .form-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-        }
-
-        @media (max-width: 600px) {
-            .form-row {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        .edit-profile-submit-btn {
-            background-color: #82AA52;
-            color: white;
-            border: none;
-            padding: 12px 25px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: 600;
-            transition: background-color 0.3s;
-            width: 100%;
-        }
-
-        .edit-profile-submit-btn:hover {
-            background-color: #6d8f45;
-        }
-
-        .success-message {
-            color: #82AA52;
-            font-size: 14px;
-            margin-bottom: 15px;
-            padding: 10px;
-            background-color: #F6FFEB;
-            border-radius: 4px;
-            text-align: center;
-        }
-
-                .back-navigation {
-            display: flex;
-            align-items: center;
-            margin-bottom: 20px;
-            padding-bottom: 15px;
-            border-bottom: 1px solid #eee;
-        }
-        
-        .back-button {
-            display: flex;
-            align-items: center;
-            text-decoration: none;
-            color: #82AA52;
-            font-weight: 600;
-            margin-right: 15px;
-            transition: color 0.3s;
-        }
-        
-        .back-button:hover {
-            color: #6d8f45;
-        }
-        
-        .back-button i {
-            margin-right: 8px;
-        }
-        
-        .page-title {
-            font-size: 24px;
-            color: #82AA52;
-            font-weight: 700;
-            margin: 0;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        /* Responsive adjustments */
-        @media (max-width: 900px) {
-            .container {
-                grid-template-columns: 1fr;
-            }
-            
-            .sidebar {
-                display: none;
-            }
-            
-            .profile-stats {
-                grid-template-columns: 1fr 1fr;
-            }
-            
-            .profile-header {
-                flex-direction: column;
-                text-align: center;
-            }
-            
-            .profile-avatar {
-                margin-right: 0;
-                margin-bottom: 20px;
-            }
-            
-            .details-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        @media (max-width: 600px) {
-            .profile-stats {
-                grid-template-columns: 1fr;
-            }
-            
-            .badges-grid {
-                grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
-            }
-        }
-    </style>
+    <link rel="stylesheet" href="assets/css/profile.css">
+    
 </head>
 <body>
     <header>
@@ -1109,7 +405,9 @@ function getFullName($first, $middle, $last) {
             <i class="fas fa-chevron-down dropdown-arrow"></i>
             <div class="profile-dropdown">
                 <a href="profile.php" class="dropdown-item"><i class="fas fa-user"></i> My Profile</a>
-                <a href="#" class="dropdown-item"><i class="fas fa-cog"></i> Settings</a>
+                <a href="#" class="dropdown-item" id="settingsLink">
+                    <i class="fas fa-cog"></i> Settings
+                </a>
                 <div class="dropdown-divider"></div>
                 <a href="logout.php" class="dropdown-item"><i class="fas fa-sign-out-alt"></i> Logout</a>
             </div>
@@ -1125,11 +423,30 @@ function getFullName($first, $middle, $last) {
                     <li><a href="achievements.php"><i class="fas fa-star"></i>Achievements</a></li>
                     <li><a href="leaderboard.php"><i class="fas fa-trophy"></i>Leaderboard</a></li>
                     <li><a href="projects.php"><i class="fas fa-recycle"></i>Projects</a></li>
-                    <li><a href="donations.php"><i class="fas fa-box"></i>Donations</a></li>
+                    <li><a href="donations.php"><i class="fas fa-hand-holding-heart"></i>Donations</a></li>
                 </ul>
             </nav>
         </aside>
         <main class="main-content">
+            <!-- Success/Error Messages -->
+        <?php if (isset($_SESSION['password_success'])): ?>
+            <div class="alert alert-success" style="margin: 20px; padding: 15px; background: #d4edda; color: #155724; border: 1px solid #c3e6cb; border-radius: 5px;">
+                <?php echo htmlspecialchars($_SESSION['password_success']); ?>
+                <?php unset($_SESSION['password_success']); ?>
+            </div>
+        <?php endif; ?>
+        
+        <?php if (isset($_SESSION['password_error'])): ?>
+            <div class="alert alert-danger" style="margin: 20px; padding: 15px; background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; border-radius: 5px;">
+                <?php echo htmlspecialchars($_SESSION['password_error']); ?>
+                <?php unset($_SESSION['password_error']); ?>
+            </div>
+        <?php endif; ?>
+
+        <!-- Include Settings Modal -->
+    <?php include 'includes/settings_modal.php'; ?>
+
+
             <!-- Back navigation and page title -->
             <div class="back-navigation">
                 <a href="homepage.php" class="back-button">
@@ -1273,56 +590,124 @@ function getFullName($first, $middle, $last) {
                 </div>
                 <div class="stat-card">
                     <i class="fas fa-star"></i>
-                    <h3><?= htmlspecialchars($user_data['points'] ?? 0) ?></h3>
+                    <h3><?= htmlspecialchars($total_claimed_points) ?></h3>
                     <p>Eco Points</p>
                 </div>
             </div>
 
+
             <div class="profile-section">
                 <div class="section-header">
                     <h3>Eco Badges</h3>
-                    <a href="achievements.php" class="view-all">View All</a>
+                    <a href="#" class="view-all" id="toggleBadges">View All</a>
                 </div>
-                
+
                 <?php
-                // Fetch all available badges
-                $all_badges_query = $conn->query("SELECT * FROM badges ORDER BY points_required");
-                $all_badges = [];
-                while ($row = $all_badges_query->fetch_assoc()) {
-                    $all_badges[] = $row;
-                }
-                
-                // Check which badges user has earned
-                $earned_badges = [];
-                if (!empty($badges)) {
-                    foreach ($badges as $badge) {
-                        $earned_badges[] = $badge['badge_name'];
-                    }
-                }
+                // ----------------------
+                // Badges Logic
+                // ----------------------
+
+                // Update badges earned count in stats
+                $conn->query("UPDATE user_stats SET badges_earned = " . count($user_badges) . " WHERE user_id = $user_id");
                 ?>
-                
-                <div class="badges-grid">
-                    <?php foreach ($all_badges as $badge): 
-                        $is_earned = in_array($badge['badge_name'], $earned_badges);
-                        $progress = min(100, ($user_data['points'] / $badge['points_required']) * 100);
-                    ?>
-                    <div class="badge-item <?php echo $is_earned ? 'earned' : 'locked'; ?>">
-                        <div class="badge-icon">
-                            <i class="<?php echo htmlspecialchars($badge['icon']); ?>"></i>
-                        </div>
-                        <h4><?php echo htmlspecialchars($badge['badge_name']); ?></h4>
-                        <p><?php echo htmlspecialchars($badge['description']); ?></p>
-                        
-                        <?php if (!$is_earned): ?>
-                        <div class="badge-progress">
-                            <div class="progress-bar" style="width: <?php echo $progress; ?>%"></div>
-                        </div>
-                        <small><?php echo $user_data['points']; ?> / <?php echo $badge['points_required']; ?> points</small>
-                        <?php endif; ?>
+
+                <div class="badges-grid" style="display:flex; flex-wrap:wrap; gap:15px;">
+                <?php
+                    $badge_count = 0;
+                    foreach ($all_badges as $badge_id => $badge):
+                        $is_earned = isset($user_badges[$badge_id]);
+                        $badge_count++;
+                        $extra_class = $badge_count > 5 ? 'extra-badge hidden-badge' : '';
+
+                        // Determine progress for badges
+                        $current = $badge_progress[$badge_id]['current'] ?? 0;
+                        $required = $badge_progress[$badge_id]['required'] ?? 1;
+
+                        // Adjust current based on badge type
+                        switch ($badge['badge_name']) {
+
+                        // Points-based badges
+                        case "EcoWaste Rookie":
+                        case "EcoWaste Master":
+                        case "EcoWaste Warrior":
+                        case "EcoWaste Legend":
+                            $current = $user_data['points'];  // <-- use actual points
+                            break;
+
+                        // Donation badges by items
+                        case "Rising Donor":
+                        case "Donation Starter":
+                        case "Donation Hero":
+                        case "Donation Champion":
+                            $current = $total_items_donated;
+                            break;
+
+                        // Donation badges by posts
+                        case "Generous Giver":
+                        case "Charity Champion":
+                            $current = $total_donation_posts;
+                            break;
+
+                        // Project creation badges
+                        case "Eco Beginner":
+                        case "Eco Builder":
+                        case "Nature Keeper":
+                        case "Conservation Expert":
+                        case "Zero Waste Hero":
+                        case "Earth Saver":
+                            $current = $stats_data['projects_created'];
+                            break;
+
+                        // Project completion badges
+                        case "Eco Star":
+                        case "Eco Warrior":
+                        case "Eco Elite":
+                        case "Eco Pro":
+                        case "Eco Master":
+                        case "Eco Legend":
+                            $current = $stats_data['projects_completed'];
+                            break;
+
+                        // Recycling badges
+                        case "Recycling Starter":
+                        case "Recycling Pro":
+                        case "Recycling Expert":
+                            $current = $stats_data['items_recycled'];
+                            break;
+
+                        default:
+                            $current = 0;
+                            break;
+                    }
+
+
+                        $progress = min(100, ($current / max(1, $required)) * 100);
+                ?>
+                <div class="badge-item <?= $is_earned ? 'earned' : 'locked'; ?> <?= $extra_class; ?>" 
+                    style="<?= $badge_count > 5 ? 'display:none;' : ''; ?> 
+                            border:1px solid #ccc; border-radius:10px; padding:10px; width:180px; text-align:center;">
+                    
+                    <div class="badge-icon" style="font-size:24px; margin-bottom:8px;">
+                        <i class="<?= htmlspecialchars($badge['icon']); ?>" 
+                        style="<?= $is_earned ? 'color:gold;' : 'color:#aaa;' ?>"></i>
                     </div>
-                    <?php endforeach; ?>
+                    
+                    <h4 style="margin-bottom:5px;"><?= htmlspecialchars($badge['badge_name']); ?></h4>
+                    <p style="font-size:13px; margin-bottom:5px;"><?= htmlspecialchars($badge['description']); ?></p>
+                    
+                    <?php if (!$is_earned): ?>
+                        <div class="badge-progress" style="background:#eee; border-radius:5px; height:8px; overflow:hidden; margin-bottom:5px;">
+                            <div class="progress-bar" style="width: <?= $progress; ?>%; background:#4caf50; height:100%;"></div>
+                        </div>
+                        <small style="font-size:12px; color:#555;"><?= $current ?> / <?= $required ?> completed</small>
+                    <?php else: ?>
+                        <small style="font-size:12px; color:gold;">Earned!</small>
+                    <?php endif; ?>
                 </div>
+                <?php endforeach; ?>
             </div>
+
+
 
             <div class="profile-section">
                 <div class="section-header">
@@ -1349,7 +734,8 @@ function getFullName($first, $middle, $last) {
                 <?php else: ?>
                 <div class="no-data-message">
                     <i class="fas fa-history"></i>
-                    <p>No recent activities. Start recycling, donating, or joining projects to see your activity here!</p>
+                    <p>No recent activities. </p>
+                    <p>Start recycling, donating, or joining projects to see your activity here!</p>
                 </div>
                 <?php endif; ?>
             </div>
@@ -1387,22 +773,47 @@ function getFullName($first, $middle, $last) {
             </div>
         </div>
     </div>
-    <script>
-        document.getElementById('userProfile').addEventListener('click', function() {
+   <script>
+document.addEventListener('DOMContentLoaded', function() {
+
+    // -------------------------
+    // User Profile Dropdown
+    // -------------------------
+    const userProfile = document.getElementById('userProfile');
+    if(userProfile){
+        userProfile.addEventListener('click', function() {
             this.classList.toggle('active');
         });
         document.addEventListener('click', function(event) {
-            const userProfile = document.getElementById('userProfile');
             if (!userProfile.contains(event.target)) {
                 userProfile.classList.remove('active');
             }
         });
+    }
 
-            // Edit Profile Modal Functionality
-        const editProfileBtn = document.getElementById('editProfileBtn');
-        const editProfileModal = document.getElementById('editProfileModal');
-        const editProfileCloseBtn = document.getElementById('editProfileCloseBtn');
+    // -------------------------
+    // Badge Toggle
+    // -------------------------
+    const toggleBtn = document.getElementById('toggleBadges');
+    if(toggleBtn){
+        toggleBtn.addEventListener('click', function(event) {
+            event.preventDefault(); // prevent page jump
+            const hiddenBadges = document.querySelectorAll('.extra-badge'); // fixed selector
+            hiddenBadges.forEach(b => {
+                b.style.display = b.style.display === 'none' || b.style.display === '' ? 'block' : 'none';
+            });
+            toggleBtn.textContent = toggleBtn.textContent === 'View All' ? 'Hide' : 'View All';
+        });
+    }
 
+    // -------------------------
+    // Edit Profile Modal
+    // -------------------------
+    const editProfileBtn = document.getElementById('editProfileBtn');
+    const editProfileModal = document.getElementById('editProfileModal');
+    const editProfileCloseBtn = document.getElementById('editProfileCloseBtn');
+
+    if(editProfileBtn && editProfileModal && editProfileCloseBtn){
         editProfileBtn.addEventListener('click', () => {
             editProfileModal.style.display = 'flex';
         });
@@ -1416,83 +827,99 @@ function getFullName($first, $middle, $last) {
                 editProfileModal.style.display = 'none';
             }
         });
-        
-        document.addEventListener('DOMContentLoaded', function() {
-            const feedbackBtn = document.getElementById('feedbackBtn');
-            const feedbackModal = document.getElementById('feedbackModal');
-            const feedbackCloseBtn = document.getElementById('feedbackCloseBtn');
-            const emojiOptions = document.querySelectorAll('.emoji-option');
-            const feedbackForm = document.getElementById('feedbackForm');
-            const thankYouMessage = document.getElementById('thankYouMessage');
-            const feedbackSubmitBtn = document.getElementById('feedbackSubmitBtn');
-            const spinner = document.getElementById('spinner');
-            const ratingError = document.getElementById('ratingError');
-            const textError = document.getElementById('textError');
-            const feedbackText = document.getElementById('feedbackText');
-            let selectedRating = 0;
-            emojiOptions.forEach(option => {
-                option.addEventListener('click', () => {
-                    emojiOptions.forEach(opt => opt.classList.remove('selected'));
-                    option.classList.add('selected');
-                    selectedRating = option.getAttribute('data-rating');
-                    ratingError.style.display = 'none';
-                });
-            });
-            feedbackForm.addEventListener('submit', function(e) {
-                e.preventDefault();
-                let isValid = true;
-                if (selectedRating === 0) {
-                    ratingError.style.display = 'block';
-                    isValid = false;
-                } else {
-                    ratingError.style.display = 'none';
-                }
-                if (feedbackText.value.trim() === '') {
-                    textError.style.display = 'block';
-                    isValid = false;
-                } else {
-                    textError.style.display = 'none';
-                }
-                if (!isValid) return;
-                feedbackSubmitBtn.disabled = true;
-                spinner.style.display = 'block';
-                setTimeout(() => {
-                    spinner.style.display = 'none';
-                    feedbackForm.style.display = 'none';
-                    thankYouMessage.style.display = 'block';
-                    setTimeout(() => {
-                        feedbackModal.style.display = 'none';
-                        feedbackForm.style.display = 'block';
-                        thankYouMessage.style.display = 'none';
-                        feedbackText.value = '';
-                        emojiOptions.forEach(opt => opt.classList.remove('selected'));
-                        selectedRating = 0;
-                        feedbackSubmitBtn.disabled = false;
-                    }, 3000);
-                }, 1500);
-            });
-            feedbackBtn.addEventListener('click', () => {
-                feedbackModal.style.display = 'flex';
-            });
-            feedbackCloseBtn.addEventListener('click', closeFeedbackModal);
-            window.addEventListener('click', (event) => {
-                if (event.target === feedbackModal) {
-                    closeFeedbackModal();
-                }
-            });
-            function closeFeedbackModal() {
-                feedbackModal.style.display = 'none';
-                feedbackForm.style.display = 'block';
-                thankYouMessage.style.display = 'none';
-                feedbackText.value = '';
+    }
+
+    // -------------------------
+    // Feedback Modal
+    // -------------------------
+    const feedbackBtn = document.getElementById('feedbackBtn');
+    const feedbackModal = document.getElementById('feedbackModal');
+    const feedbackCloseBtn = document.getElementById('feedbackCloseBtn');
+    const emojiOptions = document.querySelectorAll('.emoji-option');
+    const feedbackForm = document.getElementById('feedbackForm');
+    const thankYouMessage = document.getElementById('thankYouMessage');
+    const feedbackSubmitBtn = document.getElementById('feedbackSubmitBtn');
+    const spinner = document.getElementById('spinner');
+    const ratingError = document.getElementById('ratingError');
+    const textError = document.getElementById('textError');
+    const feedbackText = document.getElementById('feedbackText');
+    let selectedRating = 0;
+
+    if(feedbackBtn && feedbackModal && feedbackCloseBtn && feedbackForm){
+        // Emoji selection
+        emojiOptions.forEach(option => {
+            option.addEventListener('click', () => {
                 emojiOptions.forEach(opt => opt.classList.remove('selected'));
-                selectedRating = 0;
+                option.classList.add('selected');
+                selectedRating = option.getAttribute('data-rating');
                 ratingError.style.display = 'none';
+            });
+        });
+
+        // Submit feedback
+        feedbackForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            let isValid = true;
+
+            if (selectedRating === 0) {
+                ratingError.style.display = 'block';
+                isValid = false;
+            } else {
+                ratingError.style.display = 'none';
+            }
+
+            if (feedbackText.value.trim() === '') {
+                textError.style.display = 'block';
+                isValid = false;
+            } else {
                 textError.style.display = 'none';
-                feedbackSubmitBtn.disabled = false;
+            }
+
+            if (!isValid) return;
+
+            feedbackSubmitBtn.disabled = true;
+            spinner.style.display = 'block';
+
+            setTimeout(() => {
                 spinner.style.display = 'none';
+                feedbackForm.style.display = 'none';
+                thankYouMessage.style.display = 'block';
+
+                setTimeout(() => {
+                    closeFeedbackModal();
+                }, 3000);
+
+            }, 1500);
+        });
+
+        // Open/Close feedback modal
+        feedbackBtn.addEventListener('click', () => {
+            feedbackModal.style.display = 'flex';
+        });
+        feedbackCloseBtn.addEventListener('click', closeFeedbackModal);
+        window.addEventListener('click', (event) => {
+            if (event.target === feedbackModal) {
+                closeFeedbackModal();
             }
         });
-    </script>
+    }
+
+    function closeFeedbackModal() {
+        feedbackModal.style.display = 'none';
+        feedbackForm.style.display = 'block';
+        thankYouMessage.style.display = 'none';
+        feedbackText.value = '';
+        emojiOptions.forEach(opt => opt.classList.remove('selected'));
+        selectedRating = 0;
+        ratingError.style.display = 'none';
+        textError.style.display = 'none';
+        feedbackSubmitBtn.disabled = false;
+        spinner.style.display = 'none';
+    }
+
+});
+</script>
+
+
 </body>
 </html>

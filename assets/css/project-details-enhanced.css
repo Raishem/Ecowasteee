@@ -1,0 +1,244 @@
+/* Project Details Enhanced Styles */
+
+.project-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.project-header {
+    background: white;
+    border-radius: 12px;
+    padding: 30px;
+    box-shadow: 0 2px 20px rgba(0, 0, 0, 0.08);
+    margin-bottom: 30px;
+}
+
+.project-title {
+    font-size: 2.4em;
+    color: #2c3e50;
+    margin: 0 0 16px 0;
+    line-height: 1.2;
+    font-weight: 700;
+    font-family: 'Arial', sans-serif;
+}
+
+.project-meta {
+    color: #666;
+    font-size: 0.9em;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.project-meta i {
+    color: #2e7d32;
+}
+
+.project-description {
+    color: #444;
+    line-height: 1.7;
+    font-size: 1.05em;
+    margin-top: 20px;
+    padding: 20px;
+    background: #f8faf8;
+    border-radius: 8px;
+    border: 1px solid #e8f0e8;
+}
+
+/* Project Actions */
+.project-actions {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.edit-btn, .share-btn {
+    padding: 10px 20px;
+    border-radius: 6px;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s ease;
+    border: none;
+    cursor: pointer;
+}
+
+.edit-btn {
+    background: #2e7d32;
+    color: white;
+}
+
+.edit-btn:hover {
+    background: #1b5e20;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(46, 125, 50, 0.2);
+}
+
+.share-btn {
+    background: #f0f7f0;
+    color: #2e7d32;
+}
+
+.share-btn:hover {
+    background: #e8f5e9;
+    transform: translateY(-1px);
+}
+
+/* Materials Section */
+.materials-section {
+    background: white;
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 30px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.section-title {
+    font-size: 1.4em;
+    color: #2c3e50;
+    margin-bottom: 20px;
+    font-weight: 600;
+}
+
+.materials-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 16px;
+}
+
+.material-item {
+    background: #f8faf8;
+    padding: 16px;
+    border-radius: 8px;
+    border: 1px solid #e8f0e8;
+}
+
+.material-name {
+    font-weight: 600;
+    color: #2c3e50;
+    display: block;
+    margin-bottom: 8px;
+}
+
+.material-quantity {
+    color: #666;
+    font-size: 0.9em;
+}
+
+/* Steps Section */
+.steps-section {
+    background: white;
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.step-item {
+    border: 1px solid #e8f0e8;
+    border-radius: 8px;
+    margin-bottom: 16px;
+    background: #f8faf8;
+    transition: all 0.2s ease;
+}
+
+.step-item:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.step-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px;
+    border-bottom: 1px solid #e8f0e8;
+}
+
+.step-title {
+    font-size: 1.1em;
+    color: #2c3e50;
+    font-weight: 600;
+    margin: 0;
+}
+
+.step-description {
+    padding: 16px;
+    color: #444;
+    line-height: 1.6;
+}
+
+.step-progress {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.step-checkbox {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+    accent-color: #2e7d32;
+}
+
+/* Alert Messages */
+.alert {
+    padding: 12px 20px;
+    border-radius: 6px;
+    margin-bottom: 20px;
+}
+
+.alert-success {
+    background: #e8f5e9;
+    color: #1b5e20;
+    border: 1px solid #c8e6c9;
+}
+
+.alert-error {
+    background: #ffebee;
+    color: #c62828;
+    border: 1px solid #ffcdd2;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .project-header {
+        padding: 20px;
+    }
+
+    .project-title {
+        font-size: 1.8em;
+    }
+
+    .materials-list {
+        grid-template-columns: 1fr;
+    }
+
+    .project-actions {
+        flex-direction: column;
+    }
+
+    .edit-btn, .share-btn {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.project-header,
+.materials-section,
+.steps-section {
+    animation: fadeIn 0.3s ease-out;
+}

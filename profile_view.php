@@ -75,7 +75,7 @@ function getTimeAgo($timestamp) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= htmlspecialchars(($viewed_user['first_name'] ?? 'User') . ' ' . ($viewed_user['last_name'] ?? '')) ?> | EcoWaste</title>
-    <link rel="stylesheet" href="assets/css/homepage.css">
+    <link rel="stylesheet" href="assets/css/profile_view.css">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&family=Open+Sans&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -294,7 +294,9 @@ function getTimeAgo($timestamp) {
             <i class="fas fa-chevron-down dropdown-arrow"></i>
             <div class="profile-dropdown">
                 <a href="profile.php" class="dropdown-item"><i class="fas fa-user"></i> My Profile</a>
-                <a href="#" class="dropdown-item"><i class="fas fa-cog"></i> Settings</a>
+                <a href="#" class="dropdown-item" id="settingsLink">
+                    <i class="fas fa-cog"></i> Settings
+                </a>
                 <div class="dropdown-divider"></div>
                 <a href="logout.php" class="dropdown-item"><i class="fas fa-sign-out-alt"></i> Logout</a>
             </div>
@@ -310,12 +312,30 @@ function getTimeAgo($timestamp) {
                     <li><a href="achievements.php"><i class="fas fa-star"></i>Achievements</a></li>
                     <li><a href="leaderboard.php"><i class="fas fa-trophy"></i>Leaderboard</a></li>
                     <li><a href="projects.php"><i class="fas fa-recycle"></i>Projects</a></li>
-                    <li><a href="donations.php"><i class="fas fa-box"></i>Donations</a></li>
+                    <li><a href="donations.php"><i class="fas fa-hand-holding-heart"></i>Donations</a></li>
                 </ul>
             </nav>
         </aside>
 
         <main class="main-content">
+            <!-- Success/Error Messages -->
+        <?php if (isset($_SESSION['password_success'])): ?>
+            <div class="alert alert-success" style="margin: 20px; padding: 15px; background: #d4edda; color: #155724; border: 1px solid #c3e6cb; border-radius: 5px;">
+                <?php echo htmlspecialchars($_SESSION['password_success']); ?>
+                <?php unset($_SESSION['password_success']); ?>
+            </div>
+        <?php endif; ?>
+        
+        <?php if (isset($_SESSION['password_error'])): ?>
+            <div class="alert alert-danger" style="margin: 20px; padding: 15px; background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; border-radius: 5px;">
+                <?php echo htmlspecialchars($_SESSION['password_error']); ?>
+                <?php unset($_SESSION['password_error']); ?>
+            </div>
+        <?php endif; ?>
+
+        <!-- Include Settings Modal -->
+    <?php include 'includes/settings_modal.php'; ?>
+
             <div class="combined-layout">
                 <div class="main-content-column">
                     <!-- User Profile Header -->
@@ -366,31 +386,41 @@ function getTimeAgo($timestamp) {
                         <!-- Eco Badges -->
                         <div class="section-title">Eco Badges</div>
                         <div class="badges-grid">
-                            <div class="badge-item">
-                                <div class="badge-icon"><i class="fas fa-recycle"></i></div>
-                                <div class="badge-name">Recycler</div>
+                        <?php
+                        // Fetch badges earned by the viewed user with badge info
+                        $stmt = $conn->prepare("
+                            SELECT b.badge_name, b.description, b.icon 
+                            FROM user_badges ub
+                            JOIN badges b ON ub.badge_id = b.badge_id
+                            WHERE ub.user_id = ?
+                            ORDER BY b.badge_id ASC
+                        ");
+                        $stmt->bind_param("i", $viewed_user_id);
+                        $stmt->execute();
+                        $result = $stmt->get_result();
+
+                        // Check if the user has earned any badges
+                        if ($result->num_rows === 0):
+                        ?>
+                            <div class="no-content">No badges earned yet.</div>
+                        <?php
+                        else:
+                            while ($badge = $result->fetch_assoc()):
+                        ?>
+                            <div class="badge-item earned">
+                                <div class="badge-icon">
+                                    <i class="<?= htmlspecialchars($badge['icon']); ?>" style="color:gold;"></i>
+                                </div>
+                                <div class="badge-name"><?= htmlspecialchars($badge['badge_name']); ?></div>
+                                <div class="badge-description" style="font-size:11px; color:#555;"><?= htmlspecialchars($badge['description']); ?></div>
                             </div>
-                            <div class="badge-item">
-                                <div class="badge-icon"><i class="fas fa-seedling"></i></div>
-                                <div class="badge-name">Eco Warrior</div>
-                            </div>
-                            <div class="badge-item">
-                                <div class="badge-icon"><i class="fas fa-hand-holding-heart"></i></div>
-                                <div class="badge-name">Donor</div>
-                            </div>
-                            <div class="badge-item">
-                                <div class="badge-icon"><i class="fas fa-award"></i></div>
-                                <div class="badge-name">Achiever</div>
-                            </div>
-                            <div class="badge-item">
-                                <div class="badge-icon"><i class="fas fa-leaf"></i></div>
-                                <div class="badge-name">Green Hero</div>
-                            </div>
-                            <div class="badge-item">
-                                <div class="badge-icon"><i class="fas fa-trophy"></i></div>
-                                <div class="badge-name">Champion</div>
-                            </div>
+                        <?php
+                            endwhile;
+                        endif;
+                        $stmt->close();
+                        ?>
                         </div>
+
 
                         <!-- Recent Donations -->
                         <div class="section-title">Recent Donations</div>

@@ -1,4 +1,32 @@
 <?php
+require_once "config.php";
+$conn = getDBConnection();
+
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
+    $email = trim($_POST["email"]);
+
+    // Check if email exists
+    $stmt = $conn->prepare("SELECT user_id FROM users WHERE email = ?");
+    $stmt->bind_param("s", $email);
+    $stmt->execute();
+    $stmt->store_result();
+
+    if ($stmt->num_rows > 0) {
+        $_SESSION['signup_error'] = "Email already exists. Please use another one.";
+        header("Location: signup.php");
+        exit();
+    }
+
+    // If not exists → continue inserting new user
+    $password = password_hash($_POST["password"], PASSWORD_DEFAULT);
+    $stmt = $conn->prepare("INSERT INTO users (first_name, last_name, email, password) VALUES (?, ?, ?, ?)");
+    $stmt->bind_param("ssss", $_POST["first_name"], $_POST["last_name"], $email, $password);
+    $stmt->execute();
+
+    $_SESSION['signup_success'] = "Account created successfully! You can now log in.";
+    header("Location: login.php");
+    exit();
+}
 
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
@@ -21,12 +49,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $password = $_POST['password'] ?? '';
     $contactNumber = htmlspecialchars($_POST['contact-number'] ?? '');
     $address = htmlspecialchars($_POST['address'] ?? '');
-    $city = htmlspecialchars($_POST['city'] ?? '');
     $zipCode = htmlspecialchars($_POST['zip-code'] ?? '');
 
     // Validate input
     if (empty($firstName) || empty($lastName) || empty($email) || empty($password) || 
-        empty($contactNumber) || empty($address) || empty($city) || empty($zipCode)) {
+        empty($contactNumber) || empty($address) || empty($zipCode)) {
         $error_message = "All required fields must be filled";
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $error_message = "Invalid email format";
@@ -42,9 +69,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             // Check if email exists
             $stmt = $conn->prepare("SELECT user_id FROM users WHERE email = ?");
-            $stmt->execute([$email]);
+            $stmt->bind_param("s", $email);
+            $stmt->execute();
+            $stmt->store_result();
             
-            if ($stmt->rowCount() > 0) {
+            if ($stmt->num_rows > 0) {
                 $error_message = "Email already registered";
             } else {
                 // Insert new user
@@ -54,21 +83,27 @@ $stmt = $conn->prepare("INSERT INTO users
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
 if (false === $stmt) {
-    die("Prepare failed");
+    die("Prepare failed: " . $conn->error);
 }
 
-try {
-    if ($stmt->execute([$email, $passwordHash, $firstName, $middleName, $lastName,
-        $contactNumber, $address, $city, $zipCode])) {
-        $_SESSION['new_user_email'] = $email;
-        $show_success_modal = true;
-    }
-} catch (PDOException $e) {
-    $error_message = "Execute failed: " . $e->getMessage();
-    error_log("Database error: " . $e->getMessage());
+$bindResult = $stmt->bind_param("sssssssss", 
+    $email, $passwordHash, $firstName, $middleName, $lastName,
+    $contactNumber, $address, $zipCode);
+
+if (false === $bindResult) {
+    die("Bind failed: " . $stmt->error);
+}
+
+if ($stmt->execute()) {
+    $_SESSION['new_user_email'] = $email;
+    $show_success_modal = true;
+} else {
+    $error_message = "Execute failed: " . $stmt->error;
+    error_log("Database error: " . $stmt->error);
 }
             }
-            // No need to close PDO statements or connections explicitly
+            $stmt->close();
+            $conn->close();
         } catch (Exception $e) {
             error_log("Database error: " . $e->getMessage());
             $error_message = "A system error occurred. Please try again later.";
@@ -121,6 +156,23 @@ try {
                 <div class="curve curve-small"></div>
             </div>
             <div class="content-container">
+
+            <?php if (isset($_SESSION['signup_error'])): ?>
+                <div class="error-banner">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <?= $_SESSION['signup_error']; ?>
+                </div>
+                <?php unset($_SESSION['signup_error']); ?>
+            <?php endif; ?>
+
+            <?php if (isset($_SESSION['signup_success'])): ?>
+                <div class="success-banner">
+                    <i class="fas fa-check-circle"></i>
+                    <?= $_SESSION['signup_success']; ?>
+                </div>
+                <?php unset($_SESSION['signup_success']); ?>
+            <?php endif; ?>
+
                 <h1>Get Started Now</h1>
                 <p class="subtitle">Create your account to start donating waste sustainably.</p>
                 
@@ -129,27 +181,27 @@ try {
                         <div class="form-group full-name-container">
                             <label for="full-name" class="required">Full Name</label>
                             <input type="text" id="full-name" name="full-name" class="full-name-input" required
-                                   placeholder="Enter Full Name" readonly
-                                   onclick="toggleNameDetails()">
+                                placeholder="Enter Full Name" readonly
+                                onclick="toggleNameDetails()">
                             
                             <div class="name-details" id="name-details">
                                 <div class="form-group">
                                     <label for="first-name" class="required">First Name</label>
                                     <input type="text" id="first-name" name="first-name" required 
-                                           value="<?= htmlspecialchars($firstName ?? '') ?>" 
-                                           placeholder="Enter First Name">
+                                        value="<?= htmlspecialchars($firstName ?? '') ?>" 
+                                        placeholder="Enter First Name">
                                 </div>
                                 <div class="form-group">
                                     <label for="middle-name">Middle Name</label>
                                     <input type="text" id="middle-name" name="middle-name" 
-                                           value="<?= htmlspecialchars($middleName ?? '') ?>" 
-                                           placeholder="Enter Middle Name">
+                                        value="<?= htmlspecialchars($middleName ?? '') ?>" 
+                                        placeholder="Enter Middle Name">
                                 </div>
                                 <div class="form-group">
                                     <label for="last-name" class="required">Last Name</label>
                                     <input type="text" id="last-name" name="last-name" required 
-                                           value="<?= htmlspecialchars($lastName ?? '') ?>" 
-                                           placeholder="Enter Last Name">
+                                        value="<?= htmlspecialchars($lastName ?? '') ?>" 
+                                        placeholder="Enter Last Name">
                                 </div>
                             </div>
                         </div>
@@ -157,48 +209,41 @@ try {
                         <div class="form-group">
                             <label for="contact-number" class="required">Contact Number</label>
                             <input type="tel" id="contact-number" name="contact-number" required
-                                   value="<?= htmlspecialchars($contactNumber ?? '') ?>" 
-                                   placeholder="Enter Contact Number">
+                                value="<?= htmlspecialchars($contactNumber ?? '') ?>" 
+                                placeholder="Enter Contact Number">
                         </div>
                         
                         <div class="form-group">
                             <label for="email" class="required">Email address</label>
                             <input type="email" id="email" name="email" required
-                                   value="<?= htmlspecialchars($email ?? '') ?>" 
-                                   placeholder="email@gmail.com">
+                                value="<?= htmlspecialchars($email ?? '') ?>" 
+                                placeholder="email@gmail.com">
                         </div>
                         
                         <div class="form-group">
                             <label for="address" class="required">Full Address</label>
                             <input type="text" id="address" name="address" required
-                                   value="<?= htmlspecialchars($address ?? '') ?>" 
-                                   placeholder="Enter Full Address">
+                                value="<?= htmlspecialchars($address ?? '') ?>" 
+                                placeholder="Enter Full Address">
                         </div>
                         
                         <div class="form-group">
                             <label for="password" class="required">Password</label>
                             <input type="password" id="password" name="password" required minlength="8" 
-                                   placeholder="Enter Password">
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="city" class="required">City</label>
-                            <input type="text" id="city" name="city" required
-                                   value="<?= htmlspecialchars($city ?? '') ?>" 
-                                   placeholder="Enter City">
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="confirm-password" class="required">Confirm Password</label>
-                            <input type="password" id="confirm-password" name="confirm-password" required 
-                                   placeholder="Re-enter Password">
+                                placeholder="Enter Password">
                         </div>
                         
                         <div class="form-group">
                             <label for="zip-code" class="required">Zip Code</label>
                             <input type="text" id="zip-code" name="zip-code" required
-                                   value="<?= htmlspecialchars($zipCode ?? '') ?>" 
-                                   placeholder="Enter Zip Code">
+                                value="<?= htmlspecialchars($zipCode ?? '') ?>" 
+                                placeholder="Enter Zip Code">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="confirm-password" class="required">Confirm Password</label>
+                            <input type="password" id="confirm-password" name="confirm-password" required 
+                                placeholder="Re-enter Password">
                         </div>
                     </div>
                     
@@ -215,8 +260,8 @@ try {
                         <button type="button" class="social-btn google">
                             <i class="fab fa-google"></i> Sign up with Google
                         </button>
-                        <button type="button" class="social-btn facebook">
-                            <i class="fab fa-facebook-f"></i> Sign up with Facebook
+                        <button type="button" class="social-btn facebook" id="facebookBtnSignup">
+                            <i class="fab fa-facebook-f"></i> (Coming Soon)
                         </button>
                     </div>
                     
@@ -230,9 +275,19 @@ try {
                 <div class="green-curve green-curve-1"></div>
                 <div class="green-curve green-curve-2"></div>
                 <div class="green-curve green-curve-3"></div>
+                <div class="floating-element floating-element-1"></div>
+                <div class="floating-element floating-element-2"></div>
+                <div class="floating-element floating-element-3"></div>
             </div>
         </div>
     </div>
+
+    <!-- Popup Toast -->
+<div id="popupToast" class="popup-toast">
+    <i class="fas fa-info-circle"></i>
+    <span id="popupMessage"></span>
+    <button class="popup-close">&times;</button>
+</div>
 
     <!-- Success Modal -->
     <div class="success-modal" id="successModal" style="display: <?= $show_success_modal ? 'flex' : 'none' ?>;">
@@ -251,6 +306,7 @@ try {
             <button onclick="this.parentElement.remove()" style="margin-left: 15px; background: none; border: none; color: white;">×</button>
         </div>
     <?php endif; ?>
+
 
     <script>
         // Name field handling
@@ -293,7 +349,24 @@ try {
         document.getElementById('successModal').style.display = 'flex';
         document.getElementById('success-email').textContent = '<?= $_SESSION['new_user_email'] ?>';
     <?php endif; ?>
+    
 
+// Popup toast function
+function showPopup(message) {
+    const popup = document.getElementById('popupToast');
+    const popupMsg = document.getElementById('popupMessage');
+    popupMsg.textContent = message;
+    popup.classList.add('show');
+    setTimeout(() => popup.classList.remove('show'), 4000);
+}
+document.querySelector('.popup-close').addEventListener('click', function() {
+    document.getElementById('popupToast').classList.remove('show');
+});
+
+// Facebook button click
+document.getElementById('facebookBtnSignup').addEventListener('click', function() {
+    showPopup('Facebook authentication coming soon!');
+});
     </script>
 </body>
 </html>

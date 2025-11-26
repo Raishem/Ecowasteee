@@ -3,7 +3,10 @@
     padding: 0;
     box-sizing: border-box;
     font-family: 'Open Sans', sans-serif;
+    scrollbar-width: inherit;             
+    scrollbar-color: #82AA52 #f6ffeb;
 }
+
 
 /* Prevent extremely long words/strings from breaking layouts */
 html, body {
@@ -30,36 +33,6 @@ body, .container, .main-content, .projects-container, .project-card, .project-de
     white-space: normal !important;
     overflow-wrap: anywhere !important;
     word-break: break-word !important;
-}
-
-/* Back Button Styles */
-.back-button {
-    display: inline-flex;
-    align-items: center;
-    padding: 10px 20px;
-    background-color: #4CAF50;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 1rem;
-    transition: background-color 0.3s;
-    margin-bottom: 20px;
-    text-decoration: none;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.back-button:hover {
-    background-color: #45a049;
-}
-
-.back-button i {
-    margin-right: 8px;
-}
-
-.back-button-container {
-    margin: 20px 0;
-    padding: 0 20px;
 }
 
 /* Project Steps Styles */
@@ -126,8 +99,31 @@ body, .container, .main-content, .projects-container, .project-card, .project-de
     position: absolute;
     bottom: 16px;
     right: 16px;
+    background: #4CAF50;
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: background-color 0.2s, transform 0.15s;
+    white-space: nowrap;
+    writing-mode: horizontal-tb !important;
+    text-orientation: mixed;
+    transform: none !important;
+    width: auto !important;
+    height: auto !important;
     min-width: 110px;
     z-index: 3;
+}
+
+.project-card .view-details:hover,
+.project-card .action-btn.view-details:hover {
+    background: #45a049;
+    transform: translateY(-1px);
 }
 
 .project-card .project-materials ul {
@@ -147,7 +143,6 @@ body, .container, .main-content, .projects-container, .project-card, .project-de
     font-style: italic;
 }
 
-/* ...existing code... */
 
 /* Responsive: on small screens, place the View Details button below the card content */
 @media (max-width: 768px) {
@@ -163,9 +158,13 @@ body, .container, .main-content, .projects-container, .project-card, .project-de
     .project-card .view-details,
     .project-card .action-btn.view-details {
         position: static !important;
+        display: block !important;
         width: 100% !important;
         margin-top: 12px !important;
+        padding: 10px 12px !important;
         text-align: center !important;
+        transform: none !important;
+        writing-mode: horizontal-tb !important;
     }
 
     .project-actions {
@@ -233,7 +232,24 @@ body, .container, .main-content, .projects-container, .project-card, .project-de
     margin-top: 8px;
 }
 
-/* Action button styles moved to common-buttons.css */
+.action-btn.view-details {
+    background-color: #4CAF50;
+    color: white;
+    padding: 10px 18px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    transition: background-color 0.2s ease, transform 0.12s;
+    white-space: nowrap;
+    min-width: 150px;
+    text-decoration: none !important;
+}
+
+.action-btn.view-details:hover {
+    background-color: #45a049;
+    transform: translateY(-1px);
+}
 
 /* Normalize inputs and buttons with higher specificity to ensure styles apply */
 input.edit-input, textarea.edit-input, .form-row input, .form-row textarea, #newMaterialName, #newMaterialQuantity, #newMaterialUnit {
@@ -259,13 +275,15 @@ input.edit-input, textarea.edit-input, .form-row input, .form-row textarea, #new
 .cancel-btn { border: 1px solid #ddd !important; background: #f8f9fa !important; color: #333 !important; }
 .save-btn { background: #82AA52 !important; color: #fff !important; }
 
-/* Hide any accidental horizontal scrollbar on body */
-html, body { overflow-x: hidden; }
 
-body {
+html, body {
     background-color: #f5f5f5;
     color: #333;
     line-height: 1.6;
+    height: 100%;
+    margin: 0;
+    overflow-y: auto;   /* allow one unified scrollbar */
+    overflow-x: hidden; /* prevent horizontal scroll */
 }
 
 h1, h2, h3, h4 {
@@ -274,34 +292,55 @@ h1, h2, h3, h4 {
 
 .container {
     display: grid;
-    grid-template-columns: 250px 1fr;
+    grid-template-columns: 250px 1fr 300px;
     max-width: 1200px;
     margin: 0 auto;
     gap: 20px;
+    align-items: flex-start; /* sidebars align to top */
 }
 
+/* Fix Header Structure with Larger Logo */
 header {
     grid-column: 1 / -1;
     background-color: #82AA52;
     color: white;
-    padding: 15px 20px;
+    padding: 0 20px; /* Remove vertical padding, we'll use min-height */
     display: flex;
     align-items: center;
     justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    min-height: 80px; /* Increased to accommodate larger logo */
+    height: 90px; /* Fixed height for consistency */
 }
 
 .logo-container {
     display: flex;
     align-items: center;
     gap: 15px;
+    height: 100%; /* Take full header height */
 }
 
+.logo {
+    display: flex;
+    align-items: center;
+    height: 100%; /* Match header height */
+    padding: 10px 0; /* Add padding inside logo container */
+}
 
 .logo img {
-    width: 50px;
-    height: 50px;
+    width: 70px; /* Slightly smaller than 80px for better fit */
+    height: 70px;
+    object-fit: contain;
+    transition: transform 0.3s ease;
 }
 
+.logo img:hover {
+    transform: scale(1.05);
+}
+
+/* Adjust user profile to align properly with larger logo */
 .user-profile {
     display: flex;
     align-items: center;
@@ -310,26 +349,38 @@ header {
 }
 
 .profile-pic {
-    width: 40px;
-    height: 40px;
+    width: 45px; /* Slightly larger to balance with logo */
+    height: 45px;
     border-radius: 50%;
-    background-color: #fff;
     display: flex;
     align-items: center;
     justify-content: center;
     margin-right: 10px;
     overflow: hidden;
-}
-
-.profile-pic img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
+    background-color: #3d6a06ff;
+    color: white;
+    font-weight: bold;
+    font-size: 18px;
 }
 
 .profile-name {
     font-weight: 600;
     margin-right: 5px;
+    font-size: 16px; /* Slightly larger text */
+}
+
+/* Ensure dropdown positions correctly */
+.profile-dropdown {
+    position: absolute;
+    top: 100%; /* Position below the user profile area */
+    right: 0;
+    background-color: white;
+    border-radius: 5px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    width: 200px;
+    z-index: 100;
+    display: none;
+    overflow: hidden;
 }
 
 .dropdown-arrow {
@@ -340,18 +391,6 @@ header {
     transform: rotate(180deg);
 }
 
-.profile-dropdown {
-    position: absolute;
-    top: 100%;
-    right: 0;
-    background-color: white;
-    border-radius: 5px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    width: 200px;
-    z-index: 100;
-    display: none;
-    overflow: hidden;
-}
 
 .user-profile.active .profile-dropdown {
     display: block;
@@ -382,11 +421,36 @@ header {
     margin: 5px 0;
 }
 
+/* Enhanced Sidebar Styles */
+:root {
+    --primary-green: #82AA52;
+    --dark-green: #6d8f45;
+    --light-green: #F6FFEB;
+    --accent-green: #2e8b57;
+}
+
+/* Adjust sidebar top position to account for taller header */
 .sidebar {
-    background-color: #F6FFEB;
+    background: linear-gradient(180deg, var(--light-green) 0%, #e8f5e8 100%);
     padding: 30px 20px;
-    box-shadow: 3px 0 10px rgba(0,0,0,0.1);
-    height: fit-content;
+    box-shadow: 5px 0 25px rgba(0,0,0,0.08);
+    position: sticky;
+    width: 250px;
+    top: 90px; /* Changed from 80px to match new header height */
+    align-self: start;
+    height: calc(100vh - 90px); /* Adjust for new header height */
+    overflow: hidden;
+    left: 0;
+    border: 1px solid rgba(130, 170, 82, 0.2);
+}
+
+/* Adjust main content and right sidebar top spacing */
+.main-content {
+    min-height: calc(100vh - 90px); /* Adjust for new header height */
+    overflow: visible;
+    padding: 20px;
+    background-color: #fff;
+    grid-column: 2 / 3;
 }
 
 .sidebar nav ul {
@@ -394,25 +458,29 @@ header {
 }
 
 .sidebar nav li {
-    margin-bottom: 15px;
+    margin-bottom: 12px;
 }
 
 .sidebar nav a {
     text-decoration: none;
     color: #333;
-    font-weight: 500;
+    font-weight: 600;
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 8px 12px;
-    border-radius: 5px;
+    gap: 20px;
+    padding: 12px 15px;
+    border-radius: 12px;
     transition: all 0.3s ease;
+    background: #f4fce8;
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .sidebar nav a.active,
 .sidebar nav a:hover {
-    background-color: #e0f0d8;
-    color: #2e8b57;
+    background: linear-gradient(135deg, var(--primary-green) 0%, var(--accent-green) 100%);
+    color:#F6FFEB;
+    transform: translateX(5px);
+    box-shadow: 0 5px 15px rgba(130, 170, 82, 0.3);
 }
 
 .sidebar nav a i {
@@ -421,11 +489,104 @@ header {
     font-size: 18px;
 }
 
+/* Active States */
+.sidebar nav a.active,
+.sidebar nav a[href="projects.php"] {
+    color: #faffe8;
+}
+
+/* Enhanced Sidebar Scrollbar */
+.sidebar::-webkit-scrollbar {
+    width: 8px;
+}
+
+.sidebar::-webkit-scrollbar-track {
+    background: rgba(130, 170, 82, 0.1);
+    border-radius: 10px;
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, var(--primary-green) 0%, var(--dark-green) 100%);
+    border-radius: 10px;
+}
+
+.sidebar::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(135deg, var(--dark-green) 0%, #5a7537 100%);
+}
+
+/* For Firefox */
+.sidebar {
+    scrollbar-width: thin;
+    scrollbar-color: var(--primary-green) rgba(130, 170, 82, 0.1);
+}
+
 .main-content {
     padding: 30px;
     background-color: #fff;
     border-radius: 8px;
     box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    header {
+        min-height: 70px;
+        height: 70px;
+        padding: 0 15px;
+    }
+    
+    .logo img {
+        width: 55px;
+        height: 55px;
+    }
+    
+    .profile-pic {
+        width: 40px;
+        height: 40px;
+    }
+    
+    .sidebar,
+    .right-sidebar {
+        top: 70px;
+        height: calc(100vh - 70px);
+    }
+    
+    .main-content {
+        height: calc(100vh - 70px);
+    }
+}
+
+@media (max-width: 480px) {
+    header {
+        min-height: 60px;
+        height: 60px;
+        padding: 0 10px;
+    }
+    
+    .logo img {
+        width: 45px;
+        height: 45px;
+    }
+    
+    .profile-pic {
+        width: 35px;
+        height: 35px;
+        font-size: 16px;
+    }
+    
+    .profile-name {
+        font-size: 14px;
+    }
+    
+    .sidebar,
+    .right-sidebar {
+        top: 60px;
+        height: calc(100vh - 60px);
+    }
+    
+    .main-content {
+        height: calc(100vh - 60px);
+    }
 }
 
 .page-header {
@@ -722,7 +883,7 @@ header {
 /* Active States */
 .sidebar nav a.active,
 .sidebar nav a[href="projects.php"] {
-    color: #2e8b57;
+    color: #faffe8;
 }
 
 /* Project List Styles */
@@ -1112,38 +1273,6 @@ header {
     .project-actions { justify-content: center; }
 }
 
-/* Dark mode styles */
-:root {
-    --bg: #111214;
-    --surface: #181a1b;
-    --muted: #bfc6c2;
-    --accent: #6fbf73;
-    --card: #121314;
-    --text: #e6efe6;
-}
-
-body.dark-mode {
-    background-color: var(--bg);
-    color: var(--text);
-}
-
-body.dark-mode .main-content,
-body.dark-mode .project-card,
-body.dark-mode .project-details-content {
-    background-color: var(--surface);
-    color: var(--text);
-    box-shadow: none;
-}
-
-body.dark-mode .sidebar { background-color: #0f2010; }
-body.dark-mode .page-title, body.dark-mode h2, body.dark-mode h3 { color: var(--text); }
-body.dark-mode .project-materials { background: #0f1810; }
-body.dark-mode .project-materials h4, body.dark-mode .material-name { color: var(--text); }
-body.dark-mode .action-btn.view-details { background-color: var(--accent); }
-body.dark-mode .action-btn { background: #2a4b2b; color: var(--text); }
-body.dark-mode .project-card .more-materials { color: var(--muted); }
-
-
 /* Share Modal Styles */
 .modal {
     position: fixed;
@@ -1471,53 +1600,31 @@ textarea:focus {
     background: #999999;
 }
 
-.profile-pic {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-right: 10px;
-    overflow: hidden;
-    background-color: #3d6a06;
-    color: white;
-    font-weight: bold;
-    font-size: 18px;
-}
 
 .projects-container {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 20px;
-    padding: 20px 0;
-    /* smooth layout transitions when resizing */
-    transition: grid-template-columns 240ms ease, gap 240ms ease;
-    align-items: start;
-}
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            padding: 20px 0;
+        }
 
 .project-card {
     background: white;
     border-radius: 12px;
     padding: 20px;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-    transition: transform 220ms ease, box-shadow 220ms ease, height 220ms ease;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
     cursor: pointer;
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
     max-width: 100%;
     word-wrap: break-word;
     overflow-wrap: break-word;
     min-width: 0;
-    align-self: stretch; /* ensure equal-height rows in grid */
-    position: relative;
-    z-index: 1; /* keep cards above page background */
-}
-.project-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
-}
+}        .project-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
+        }
 
         .project-header {
             margin-bottom: 15px;
@@ -1611,8 +1718,6 @@ textarea:focus {
             align-items: center;
             gap: 8px;
             transition: background-color 0.2s ease, transform 0.12s;
-            z-index: 2; /* buttons should be above card content to receive clicks */
-            pointer-events: auto;
         }
 
         .action-btn:hover {
@@ -1879,3 +1984,205 @@ textarea:focus {
         }
     
     
+        /* Settings Modal Styles */
+.settings-modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
+.settings-modal-content {
+    background-color: white;
+    margin: 5% auto;
+    padding: 0;
+    border-radius: 10px;
+    width: 90%;
+    max-width: 600px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    animation: modalSlideIn 0.3s ease;
+}
+
+@keyframes modalSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-50px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.settings-modal-header {
+    padding: 20px;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.me-2 {
+    margin-right: 0.5rem;
+}
+
+.settings-modal-title {
+    margin: 0;
+    font-size: 1.5rem;
+    color: #2c5530;
+}
+
+.settings-close-btn {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #666;
+}
+
+.settings-close-btn:hover {
+    color: #333;
+}
+
+.settings-modal-body {
+    padding: 20px;
+}
+
+/* Tabs */
+.settings-tabs {
+    display: flex;
+    border-bottom: 1px solid #ddd;
+    margin-bottom: 20px;
+}
+
+.settings-tab {
+    padding: 12px 20px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    color: #666;
+    font-weight: 500;
+}
+
+.settings-tab.active {
+    color: #2c5530;
+    border-bottom-color: #2c5530;
+}
+
+.settings-tab-content {
+    display: none;
+}
+
+.settings-tab-content.active {
+    display: block;
+}
+
+/* Form Styles */
+.settings-form-group {
+    margin-bottom: 15px;
+}
+
+.settings-form-label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 500;
+    color: #333;
+}
+
+.settings-form-input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font-size: 14px;
+}
+
+.settings-form-input:focus {
+    outline: none;
+    border-color: #2c5530;
+}
+
+.password-strength {
+    height: 4px;
+    margin-top: 5px;
+    border-radius: 2px;
+    transition: all 0.3s ease;
+}
+
+.strength-weak { background: #dc3545; width: 25%; }
+.strength-medium { background: #ffc107; width: 50%; }
+.strength-strong { background: #28a745; width: 100%; }
+
+.invalid-feedback {
+    color: #dc3545;
+    font-size: 12px;
+    margin-top: 5px;
+    display: none;
+}
+
+.settings-form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.settings-btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.settings-btn-secondary {
+    background-color: #6c757d;
+    color: white;
+}
+
+.settings-btn-primary {
+    background-color: #2c5530;
+    color: white;
+}
+
+.settings-btn:hover {
+    opacity: 0.9;
+}
+
+/* Password Input with Toggle */
+.password-input-container {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.password-input-container .settings-form-input {
+    padding-right: 45px;
+    width: 100%;
+}
+
+.password-toggle {
+    position: absolute;
+    right: 10px;
+    background: none;
+    border: none;
+    color: #666;
+    cursor: pointer;
+    padding: 5px;
+    border-radius: 3px;
+    transition: color 0.3s ease;
+}
+
+.password-toggle:hover {
+    color: #2c5530;
+    background-color: #f5f5f5;
+}
+
+.password-toggle.active {
+    color: #2c5530;
+}

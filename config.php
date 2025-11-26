@@ -3,33 +3,21 @@
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
+date_default_timezone_set('Asia/Manila'); // ✅ global fix
 
-// Database credentials as constants for both MySQLi and PDO
-define('DB_HOST', 'localhost');
-define('DB_NAME', 'ecowaste');
-define('DB_USER', 'root');
-define('DB_PASS', '');
+// Configuration and helper functions only
 
-// Database connection (PDO)
+// Database connection
 function getDBConnection() {
-    $host = DB_HOST;
-    $db   = DB_NAME;
-    $user = DB_USER;
-    $pass = DB_PASS;
-    $charset = "utf8mb4";
+    $conn = new mysqli('localhost', 'root', '', 'ecowaste');
+    if ($conn->connect_error) 
+        die('Database connection failed: ' . $conn->connect_error);
+    
+    // ✅ Force timezone for this connection
+    $conn->query("SET time_zone = '+08:00'");
+    date_default_timezone_set('Asia/Manila');
 
-    $dsn = "mysql:host=$host;dbname=$db;charset=$charset";
-    $options = [
-        PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-        PDO::ATTR_EMULATE_PREPARES   => false,
-    ];
-
-    try {
-        return new PDO($dsn, $user, $pass, $options);
-    } catch (PDOException $e) {
-        die("Database connection failed: " . $e->getMessage());
-    }
+    return $conn;
 }
 
 // CSRF helpers
@@ -46,5 +34,8 @@ function generateCSRFToken() {
 }
 
 // Constants
-define('REMEMBER_ME_EXPIRY', 60 * 60 * 24 * 30); // 30 days
+define('REMEMBER_ME_EXPIRY', 86400 * 30); // 30 days
+
+
+
 ?>

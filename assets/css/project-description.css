@@ -1,0 +1,60 @@
+/* Project Description Styles */
+.project-description {
+    color: var(--text-primary);
+    line-height: 1.8;
+    font-size: 1.05rem;
+    position: relative;
+    transition: max-height 0.18s ease-out, opacity 0.18s ease-out;
+    overflow: hidden;
+    display: block;
+}
+
+/* Collapsed state: clamp to 5 lines and hide overflow. We'll detect overflow in JS and show the See more button only when needed. */
+.project-description.collapsed {
+    display: -webkit-box;
+    -webkit-line-clamp: 5; /* show up to 5 lines */
+    line-clamp: 5;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.project-description.expanded {
+    display: block !important;
+    -webkit-line-clamp: unset !important;
+    line-clamp: unset !important;
+    -webkit-box-orient: unset !important;
+    overflow: visible !important;
+    max-height: none !important;
+}
+
+/* Add a subtle ellipsis pseudo-element when content is truncated; JS will add .has-overflow when appropriate */
+/* Removed the floating ellipsis pseudo-element because it produced awkward visual artifacts
+    in some layouts. The native -webkit-line-clamp truncation is sufficient when supported. */
+
+.see-more-btn {
+    background: none;
+    border: none;
+    color: var(--primary-color);
+    font-weight: 600;
+    cursor: pointer;
+    padding: 8px 0;
+    margin-top: 8px;
+    display: inline-block;
+    transition: color 0.2s ease;
+}
+
+.see-more-btn:hover {
+    color: #3cb371;
+}
+
+.see-more-btn:focus {
+    outline: none;
+    text-decoration: underline;
+}
+
+.project-description-section {
+    background: var(--primary-light);
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+}

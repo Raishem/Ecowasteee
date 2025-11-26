@@ -1,0 +1,595 @@
+/* Project Header Styles */
+.project-header-centered {
+    text-align: center;
+    padding: 2rem;
+    margin: 1rem auto;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    max-width: 1200px;
+}
+
+.project-header-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+.edit-btn {
+    background: #82AA52;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.edit-btn:hover {
+    background: #6f9344;
+}
+
+/* Materials Section Improvements */
+.materials-section {
+    background: #fff;
+    border-radius: 8px;
+    padding: 2rem;
+    margin: 2rem auto;
+    max-width: 1200px;
+}
+
+.materials-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid #eee;
+}
+
+.materials-title-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.materials-title-wrapper i {
+    font-size: 1.5rem;
+    color: #82AA52;
+}
+
+.materials-title-wrapper h2 {
+    margin: 0;
+    color: #2c3e50;
+    font-size: 1.75rem;
+}
+
+.materials-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 1.5rem;
+    padding: 1rem;
+}
+
+.material-card {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    padding: 1.25rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.material-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Header Improvements */
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+.notifications-wrapper {
+    position: relative;
+}
+
+.notification-button {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 1.25rem;
+    cursor: pointer;
+    padding: 0.5rem;
+    position: relative;
+}
+
+.notification-count {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background: #e74c3c;
+    color: white;
+    font-size: 0.75rem;
+    padding: 2px 6px;
+    border-radius: 10px;
+    min-width: 18px;
+    text-align: center;
+}
+
+.notifications-dropdown {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    min-width: 300px;
+    max-width: 400px;
+    z-index: 1000;
+    display: none;
+}
+
+.notifications-dropdown.show {
+    display: block;
+}
+
+.notifications-header {
+    padding: 1rem;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.mark-all-read {
+    background: none;
+    border: none;
+    color: #82AA52;
+    cursor: pointer;
+    font-size: 0.875rem;
+}
+
+.mark-all-read:hover {
+    text-decoration: underline;
+}
+
+.project-title {
+    font-size: 2.5rem;
+    color: #2c3e50;
+    margin-bottom: 0.5rem;
+    font-weight: 700;
+}
+
+.project-date {
+    display: block;
+    color: #666;
+    font-size: 0.9rem;
+    margin-bottom: 1.5rem;
+}
+
+.project-description-centered {
+    max-width: 800px;
+    margin: 0 auto 2rem;
+    line-height: 1.6;
+    color: #444;
+    font-size: 1.1rem;
+    white-space: pre-line;
+}
+
+.project-actions {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+}
+
+/* Materials Section Styles */
+.materials-section {
+    background: #fff;
+    border-radius: 8px;
+    padding: 2rem;
+    margin: 2rem auto;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    max-width: 1200px;
+}
+
+.materials-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid #f0f0f0;
+}
+
+.materials-title {
+    font-size: 1.75rem;
+    color: #2c3e50;
+    margin: 0;
+}
+
+/* Project Workflow Styles */
+.project-workflow {
+    margin: 2rem 0;
+    padding: 2rem;
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+}
+
+.workflow-progress {
+    position: relative;
+}
+
+.progress-bar-container {
+    background: #f8f9fa;
+    height: 8px;
+    border-radius: 4px;
+    margin: 2rem 0;
+    position: relative;
+    overflow: hidden;
+}
+
+.progress-bar {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    background: linear-gradient(to right, #28a745, #20c997);
+    transition: width 0.3s ease;
+    border-radius: 4px;
+}
+
+.progress-text {
+    position: absolute;
+    right: 0;
+    top: -25px;
+    font-size: 0.9rem;
+    color: #6c757d;
+    font-weight: 500;
+}
+
+.workflow-stages {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2rem;
+    margin-top: 3rem;
+}
+
+.workflow-stage {
+    background: #fff;
+    border-radius: 12px;
+    padding: 1.5rem;
+    position: relative;
+    transition: all 0.3s ease;
+    border: 1px solid #e9ecef;
+}
+
+.workflow-stage:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+}
+
+.workflow-stage.completed {
+    border-color: #28a745;
+}
+
+.workflow-stage.current {
+    border-color: #007bff;
+    box-shadow: 0 4px 12px rgba(0, 123, 255, 0.15);
+}
+
+.stage-icon {
+    width: 48px;
+    height: 48px;
+    background: #f8f9fa;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1rem;
+}
+
+.workflow-stage.completed .stage-icon {
+    background: #28a745;
+    color: white;
+}
+
+.workflow-stage.current .stage-icon {
+    background: #007bff;
+    color: white;
+}
+
+.stage-icon i {
+    font-size: 1.5rem;
+}
+
+.stage-details h3 {
+    margin: 0 0 1rem 0;
+    color: #212529;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.stage-tasks {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.stage-tasks li {
+    position: relative;
+    padding-left: 1.5rem;
+    margin-bottom: 0.5rem;
+    color: #495057;
+    font-size: 0.9rem;
+}
+
+.stage-tasks li:before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 8px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #adb5bd;
+}
+
+.workflow-stage.completed .stage-tasks li:before {
+    background: #28a745;
+}
+
+.workflow-stage.current .stage-tasks li:before {
+    background: #007bff;
+}
+
+.stage-status {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    background: #007bff;
+    color: white;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    margin-top: 1rem;
+}
+
+/* Material List Styles */
+.materials-section {
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 2rem;
+    margin-top: 2rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+}
+
+.materials-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.add-material-btn {
+    padding: 0.5rem 1rem;
+    background: #28a745;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: background-color 0.2s;
+}
+
+.add-material-btn:hover {
+    background: #218838;
+}
+
+.material-item {
+    display: flex;
+    align-items: center;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    transition: transform 0.2s;
+}
+
+.material-item:hover {
+    transform: translateX(5px);
+}
+
+.material-info {
+    flex: 1;
+}
+
+.material-name {
+    font-weight: 500;
+    color: #212529;
+    margin-bottom: 0.25rem;
+    display: block;
+}
+
+.material-quantity {
+    font-size: 0.9rem;
+    color: #6c757d;
+}
+
+.material-status {
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    margin: 0 1rem;
+}
+
+.material-status.needed {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.material-status.completed {
+    background: #d4edda;
+    color: #155724;
+}
+
+/* Section Title Styles */
+.section-title {
+    color: #212529;
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 1.5rem;
+    position: relative;
+}
+
+.section-title:after {
+    content: '';
+    display: block;
+    width: 50px;
+    height: 3px;
+    background: #28a745;
+    margin-top: 0.5rem;
+    border-radius: 2px;
+}
+
+/* Documentation Steps Styles */
+.documentation-steps {
+    display: none; /* Hidden by default */
+    margin: 2rem 0;
+    padding: 2rem;
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+}
+
+.documentation-steps.active {
+    display: block;
+}
+
+.steps-scroll-container {
+    overflow-x: auto;
+    padding-bottom: 1rem;
+    margin: 0 -1rem;
+}
+
+.steps-horizontal {
+    display: flex;
+    gap: 2rem;
+    padding: 0.5rem 1rem;
+    min-width: min-content;
+}
+
+.documentation-step {
+    flex: 0 0 350px;
+    background: #fff;
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+    padding: 1.5rem;
+    position: relative;
+    transition: all 0.3s ease;
+}
+
+.documentation-step:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+}
+
+.step-number {
+    position: absolute;
+    top: -12px;
+    left: -12px;
+    width: 36px;
+    height: 36px;
+    background: #007bff;
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 1.1rem;
+    border: 3px solid #fff;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.step-content {
+    margin-top: 0.5rem;
+}
+
+.step-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #212529;
+    margin-bottom: 1rem;
+}
+
+.step-description {
+    color: #6c757d;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    margin-bottom: 1rem;
+}
+
+.step-image-preview {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 1rem;
+    overflow-x: auto;
+    padding-bottom: 0.5rem;
+}
+
+.step-image-preview img {
+    width: 80px;
+    height: 80px;
+    object-fit: cover;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.step-image-preview img:hover {
+    transform: scale(1.05);
+}
+
+/* Documentation Controls */
+.documentation-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.scroll-btn {
+    padding: 0.5rem 1rem;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.2s;
+}
+
+.scroll-btn:hover {
+    background: #e9ecef;
+}
+
+.scroll-btn i {
+    font-size: 1.1rem;
+}
+
+/* Share Mode Styles */
+.share-mode .documentation-steps {
+    display: block;
+}
+
+.share-mode .project-workflow {
+    display: none;
+}

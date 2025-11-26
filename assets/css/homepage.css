@@ -3,13 +3,19 @@
     padding: 0;
     box-sizing: border-box;
     font-family: 'Open Sans', sans-serif;
+    scrollbar-width: inherit;             
+    scrollbar-color: #82AA52 #f6ffeb;
 }
 
-body {
+
+html, body {
     background-color: #f5f5f5;
     color: #333;
     line-height: 1.6;
-    
+    height: 100%;
+    margin: 0;
+    overflow-y: auto;   /* allow one unified scrollbar */
+    overflow-x: hidden; /* prevent horizontal scroll */
 }
 
 h1, h2, h3, h4 {
@@ -18,36 +24,55 @@ h1, h2, h3, h4 {
 
 .container {
     display: grid;
-    grid-template-columns: 250px 1fr;
-    max-width: 100%;
-    width: 100%;
+    grid-template-columns: 250px 1fr 300px;
+    max-width: 1200px;
     margin: 0 auto;
     gap: 20px;
-    padding: 0 20px;
+    align-items: flex-start; /* sidebars align to top */
 }
 
+/* Fix Header Structure with Larger Logo */
 header {
     grid-column: 1 / -1;
     background-color: #82AA52;
     color: white;
-    padding: 15px 20px;
+    padding: 0 20px; /* Remove vertical padding, we'll use min-height */
     display: flex;
     align-items: center;
     justify-content: space-between;
     position: sticky;
+    top: 0;
+    z-index: 1000;
+    min-height: 80px; /* Increased to accommodate larger logo */
+    height: 90px; /* Fixed height for consistency */
 }
 
 .logo-container {
     display: flex;
     align-items: center;
     gap: 15px;
+    height: 100%; /* Take full header height */
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    height: 100%; /* Match header height */
+    padding: 10px 0; /* Add padding inside logo container */
 }
 
 .logo img {
-    width: 50px;
-    height: 50px;
+    width: 70px; /* Slightly smaller than 80px for better fit */
+    height: 70px;
+    object-fit: contain;
+    transition: transform 0.3s ease;
 }
 
+.logo img:hover {
+    transform: scale(1.05);
+}
+
+/* Adjust user profile to align properly with larger logo */
 .user-profile {
     display: flex;
     align-items: center;
@@ -56,8 +81,8 @@ header {
 }
 
 .profile-pic {
-    width: 40px;
-    height: 40px;
+    width: 45px; /* Slightly larger to balance with logo */
+    height: 45px;
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -70,15 +95,24 @@ header {
     font-size: 18px;
 }
 
-.profile-pic img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
 .profile-name {
     font-weight: 600;
     margin-right: 5px;
+    font-size: 16px; /* Slightly larger text */
+}
+
+/* Ensure dropdown positions correctly */
+.profile-dropdown {
+    position: absolute;
+    top: 100%; /* Position below the user profile area */
+    right: 0;
+    background-color: white;
+    border-radius: 5px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    width: 200px;
+    z-index: 100;
+    display: none;
+    overflow: hidden;
 }
 
 .dropdown-arrow {
@@ -89,18 +123,6 @@ header {
     transform: rotate(180deg);
 }
 
-.profile-dropdown {
-    position: absolute;
-    top: 100%;
-    right: 0;
-    background-color: white;
-    border-radius: 5px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    width: 200px;
-    z-index: 100;
-    display: none;
-    overflow: hidden;
-}
 
 .user-profile.active .profile-dropdown {
     display: block;
@@ -131,16 +153,36 @@ header {
     margin: 5px 0;
 }
 
-.sidebar {
-    background-color: #F6FFEB;
-    padding: 30px 20px;
-    box-shadow: 3px 0 10px rgba(0,0,0,0.1);
-            box-shadow: 3px 0 10px rgba(0,0,0,0.1);
-            height: fit-content;
-            border-radius: 10px;
-            position: sticky;
-            top: 20px;
+/* Enhanced Sidebar Styles */
+:root {
+    --primary-green: #82AA52;
+    --dark-green: #6d8f45;
+    --light-green: #F6FFEB;
+    --accent-green: #2e8b57;
+}
 
+/* Adjust sidebar top position to account for taller header */
+.sidebar {
+    background: linear-gradient(180deg, var(--light-green) 0%, #e8f5e8 100%);
+    padding: 30px 20px;
+    box-shadow: 5px 0 25px rgba(0,0,0,0.08);
+    position: sticky;
+    width: 250px;
+    top: 90px; /* Changed from 80px to match new header height */
+    align-self: start;
+    height: calc(100vh - 90px); /* Adjust for new header height */
+    overflow: hidden;
+    left: 0;
+    border: 1px solid rgba(130, 170, 82, 0.2);
+}
+
+/* Adjust main content and right sidebar top spacing */
+.main-content {
+    min-height: calc(100vh - 90px); /* Adjust for new header height */
+    overflow: visible;
+    padding: 20px;
+    background-color: #fff;
+    grid-column: 2 / 3;
 }
 
 .sidebar nav ul {
@@ -148,26 +190,29 @@ header {
 }
 
 .sidebar nav li {
-    margin-bottom: 15px;
+    margin-bottom: 12px;
 }
 
 .sidebar nav a {
     text-decoration: none;
     color: #333;
-    font-weight: 500;
+    font-weight: 600;
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 8px 12px;
-    border-radius: 5px;
+    gap: 20px;
+    padding: 12px 15px;
+    border-radius: 12px;
     transition: all 0.3s ease;
-    position: sticky;
+    background: #f4fce8;
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .sidebar nav a.active,
 .sidebar nav a:hover {
-    background-color: #e0f0d8;
-    color: #2e8b57;
+    background: linear-gradient(135deg, var(--primary-green) 0%, var(--accent-green) 100%);
+    color:#F6FFEB;
+    transform: translateX(5px);
+    box-shadow: 0 5px 15px rgba(130, 170, 82, 0.3);
 }
 
 .sidebar nav a i {
@@ -176,16 +221,133 @@ header {
     font-size: 18px;
 }
 
-.main-content {
-    padding: 30px;
-    background-color: #fff;
-    width: 100%;
-    overflow-x: hidden;
+/* Active States */
+.sidebar nav a.active,
+.sidebar nav a[href="homepage.php"] {
+    color: #faffe8;
 }
 
+/* Enhanced Sidebar Scrollbar */
+.sidebar::-webkit-scrollbar {
+    width: 8px;
+}
+
+.sidebar::-webkit-scrollbar-track {
+    background: rgba(130, 170, 82, 0.1);
+    border-radius: 10px;
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, var(--primary-green) 0%, var(--dark-green) 100%);
+    border-radius: 10px;
+}
+
+.sidebar::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(135deg, var(--dark-green) 0%, #5a7537 100%);
+}
+
+/* For Firefox */
+.sidebar {
+    scrollbar-width: thin;
+    scrollbar-color: var(--primary-green) rgba(130, 170, 82, 0.1);
+}
+
+/* Make right sidebar scrollable */
+.right-sidebar {
+    position: sticky;
+    top: 90px; /* Changed to match new header height */
+    align-self: start;
+    right: 0;
+    width: 300px;
+    height: calc(100vh - 90px); /* Adjust for new header height */
+    overflow-y: auto;
+    background: #F6FFEB;
+    padding: 20px;
+    box-shadow: inset 0 0 4px rgba(0,0,0,0.1);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    header {
+        min-height: 70px;
+        height: 70px;
+        padding: 0 15px;
+    }
+    
+    .logo img {
+        width: 55px;
+        height: 55px;
+    }
+    
+    .profile-pic {
+        width: 40px;
+        height: 40px;
+    }
+    
+    .sidebar,
+    .right-sidebar {
+        top: 70px;
+        height: calc(100vh - 70px);
+    }
+    
+    .main-content {
+        height: calc(100vh - 70px);
+    }
+}
+
+@media (max-width: 480px) {
+    header {
+        min-height: 60px;
+        height: 60px;
+        padding: 0 10px;
+    }
+    
+    .logo img {
+        width: 45px;
+        height: 45px;
+    }
+    
+    .profile-pic {
+        width: 35px;
+        height: 35px;
+        font-size: 16px;
+    }
+    
+    .profile-name {
+        font-size: 14px;
+    }
+    
+    .sidebar,
+    .right-sidebar {
+        top: 60px;
+        height: calc(100vh - 60px);
+    }
+    
+    .main-content {
+        height: calc(100vh - 60px);
+    }
+}
+
+/* Optional: match scroll bar styling with left sidebar */
+.right-sidebar::-webkit-scrollbar {
+    width: 8px;
+}
+.right-sidebar::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+.right-sidebar::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+.right-sidebar::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+
 .welcome-card {
+    padding: 20px;
     background-color: #F6FFEB;
-    padding: 25px;
     border-radius: 10px;
     margin-bottom: 30px;
     text-align: center;
@@ -233,14 +395,14 @@ header {
 }
 
 .tab-btn {
-    padding: 10px 20px;
+    padding: 10px 15px;
     background: none;
     border: none;
     border-bottom: 3px solid transparent;
     font-weight: bold;
     color: #666;
     cursor: pointer;
-    font-size: 16px;
+    font-size: 14px;
 }
 
 .tab-btn.active {
@@ -250,15 +412,13 @@ header {
 
 .tab-content {
     display: none;
-    width: 100%;
-    box-sizing: border-box;
 }
 
 /* Section Cards */
 .section-card {
     background-color: white;
     border-radius: 8px;
-    padding: 20px;
+    padding: 15px;
     margin-bottom: 20px;
     box-shadow: 0 2px 5px rgba(0,0,0,0.05);
 }
@@ -272,13 +432,11 @@ header {
 /* New donation item layout */
 /* Donation Post Styling */
 .donation-post {
-    padding: 20px;
+    padding: 15px;
     border: 1px solid #eee;
     border-radius: 8px;
     margin-bottom: 20px;
     background-color: #fff;
-    width: 100%;
-    box-sizing: border-box;
 }
 
 .donation-header {
@@ -297,7 +455,6 @@ header {
     color: #666;
     font-size: 14px;
 }
-
 
 
 .donation-actions {
@@ -348,9 +505,11 @@ header {
 
 /* Comments Section */
 .comments-section {
+    background: #f9fafb;
+    border-radius: 10px;
+    padding: 15px;
     margin-top: 15px;
-    padding-top: 15px;
-    border-top: 1px solid #eee;
+    border: 1px solid #e3e6e8;
 }
 
 .comments-list {
@@ -360,10 +519,13 @@ header {
 }
 
 .comment {
-    padding: 10px;
-    margin-bottom: 10px;
-    background-color: #f9f9f9;
-    border-radius: 4px;
+    background: #fff;
+    border-radius: 10px;
+    padding: 12px 15px;
+    margin-bottom: 12px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+    border-left: 4px solid #4CAF50;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 .comment-author {
@@ -372,9 +534,154 @@ header {
     margin-bottom: 5px;
 }
 
+
+.comment:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.07);
+}
+
+.comment-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+
+
+.comment-time {
+    font-size: 12px;
+    color: #888;
+}
+
 .comment-text {
     color: #333;
-    margin: 0;
+    font-size: 14px;
+    line-height: 1.6;
+    margin-bottom: 8px;
+}
+
+.comment-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.comment-actions button {
+    border: none;
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-weight: 600;
+}
+
+.comment-actions .reply-btn {
+    background-color: #e8f5e9;
+    color: #2e7d32;
+}
+
+.comment-actions .reply-btn:hover {
+    background-color: #c8e6c9;
+}
+
+.comment-actions .edit-btn {
+    background-color: #e3f2fd;
+    color: #1565c0;
+}
+
+.comment-actions .edit-btn:hover {
+    background-color: #bbdefb;
+}
+
+.comment-actions .delete-btn {
+    background-color: #ffebee;
+    color: #c62828;
+}
+
+.comment-actions .delete-btn:hover {
+    background-color: #ffcdd2;
+}
+
+.comment-actions i {
+    font-size: 12px;
+}
+
+/* Reply button style */
+.edit-btn {
+    background: transparent;
+    border: none;
+    color: #4CAF50;
+    font-size: 13px;
+    cursor: pointer;
+    font-weight: 600;
+    padding: 0;
+    transition: color 0.2s;
+}
+
+.edit-btn:hover {
+    color: #2e7d32;
+}
+
+/* Reply button style */
+.reply-btn {
+    background: transparent;
+    border: none;
+    color: #4CAF50;
+    font-size: 13px;
+    cursor: pointer;
+    font-weight: 600;
+    padding: 0;
+    transition: color 0.2s;
+}
+
+.reply-btn:hover {
+    color: #2e7d32;
+}
+
+/* Reply indentation */
+.comment.reply {
+    margin-left: 30px;
+    border-left: 3px solid #c8e6c9;
+    background: #fcfdfc;
+}
+
+/* Comment textarea style */
+.comment-textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1.5px solid #cdd8cf;
+    border-radius: 8px;
+    resize: vertical;
+    font-family: 'Open Sans', sans-serif;
+    font-size: 14px;
+    margin-bottom: 10px;
+    background-color: #fff;
+}
+
+.comment-textarea:focus {
+    outline: none;
+    border-color: #4CAF50;
+    box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.15);
+}
+
+/* Post comment button */
+.post-comment-btn {
+    background: #2e7d32;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+.post-comment-btn:hover {
+    background: #43a047;
 }
 
 .no-comments {
@@ -512,7 +819,7 @@ header {
 .idea-card {
     background-color: white;
     border-radius: 8px;
-    padding: 20px;
+    padding: 15px;
     margin-bottom: 20px;
     box-shadow: 0 2px 5px rgba(0,0,0,0.05);
 }
@@ -637,52 +944,233 @@ header {
     color: #2e8b57;
 }
 
-/* Popup Styles */
-.popup-container {
-    display: none; /* Changed from block to none */
-    position: fixed;
+.popup-header {
+    position: sticky;
     top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.5);
-    z-index: 1000;
+    background: #f9f9f9;
+    padding: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #eee;
+    z-index: 10;
+}
+
+.popup-header h2 {
+    margin: 0;
+    font-size: 1.5rem;
+    color: #2e8b57;
+}
+
+.popup-header .close-btn {
+    font-size: 22px;
+    background: none;
+    border: none;
+    color: #666;
+    cursor: pointer;
+    transition: color 0.2s ease;
+}
+.popup-header .close-btn:hover {
+    color: #000;
+}
+
+
+.popup-container {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.45);
+    display: none;
     justify-content: center;
     align-items: center;
+    z-index: 9999;
 }
 
 .popup-content {
-    background-color: white;
-    padding: 30px;
-    border-radius: 10px;
-    width: 90%;
-    max-width: 500px;
-    position: relative;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    background: #fff;
+    padding: 25px 30px;
+    border-radius: 12px;
+    width: 420px;
+    max-width: 90%;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    animation: fadeIn 0.3s ease;
 }
-
-.popup-content {
-        max-height: 90vh;
-        overflow-y: auto;
-    }
 
 .popup-content h2 {
-    margin-top: 0;
-    color: #333;
-    font-size: 1.8rem;
-    margin-bottom: 20px;
+    font-family: 'Montserrat', sans-serif;
     text-align: center;
 }
 
+@keyframes fadeIn {
+    from {opacity: 0; transform: scale(0.95);}
+    to {opacity: 1; transform: scale(1);}
+}
+
+/* === Popup button group === */
+.popup-btn-group {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 20px;
+}
+
+/* Submit Button (Green) */
+.popup-btn-group .request-btn {
+    background-color: #2e7d32;
+    color: #fff;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: 0.2s ease;
+}
+
+.popup-btn-group .request-btn:hover {
+    background-color: #256428;
+    transform: scale(1.03);
+}
+
+/* Cancel Button (Red) */
+.popup-btn-group .cancel-btn {
+    background-color: #e53935;
+    color: #fff;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: 0.2s ease;
+}
+
+.popup-btn-group .cancel-btn:hover {
+    background-color: #d32f2f;
+    transform: scale(1.03);
+}
+
+.reply-list {
+    margin-left: 40px;
+    margin-top: 10px;
+    list-style: none;
+    padding-left: 0;
+}
+
+.reply-item {
+    display: flex;
+    margin-bottom: 8px;
+}
+
+.comment-avatar.small {
+    width: 28px;
+    height: 28px;
+    font-size: 13px;
+}
+
+.comment-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background-color: #81c784; /* soft green */
+    color: white;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+}
+
+.reply-form {
+    margin-left: 40px;
+    margin-top: 8px;
+}
+
+.reply-input {
+    width: 100%;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    padding: 6px;
+    resize: none;
+}
+
+.reply-submit-btn {
+    margin-top: 6px;
+    background: #2e7d32;
+    color: white;
+    border: none;
+    padding: 5px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+
+/* Buttons */
+.request-btn {
+    background-color: #2e7d32;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 10px 20px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.request-btn:hover {
+    background-color: #256828;
+}
+
+.close-btn {
+    background-color: #f1f1f1;
+    color: #333;
+    border: none;
+    border-radius: 6px;
+    padding: 10px 20px;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.close-btn:hover {
+    background-color: #ddd;
+}
+
+/* Form Styling */
 .form-group {
-    margin-bottom: 20px;
+    margin-bottom: 15px;
 }
 
 .form-group label {
     display: block;
-    margin-bottom: 8px;
-    font-weight: bold;
+    font-weight: 600;
+    margin-bottom: 5px;
     color: #333;
+}
+
+.form-group select {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1.5px solid #cfcfcf;
+    border-radius: 8px;
+    background-color: #fff;
+    font-family: 'Open Sans', sans-serif;
+    font-size: 15px;
+    color: #333;
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='8' viewBox='0 0 10 8'><path fill='%23666' d='M1 1l4 4 4-4'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 10px 8px;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.form-group select:hover {
+    border-color: #2e7d32;
+}
+
+.form-group select:focus {
+    border-color: #2e7d32;
+    box-shadow: 0 0 0 3px rgba(46, 125, 50, 0.15);
+    outline: none;
 }
 
 .form-group select,
@@ -698,7 +1186,6 @@ header {
 
 /* Style for number input field */
 .form-group input[type="number"] {
-    -moz-appearance: textfield; /* Firefox */
     width: 100%;
     padding: 12px;
     border: 1px solid #ddd;
@@ -760,70 +1247,125 @@ input[type="file"] {
     margin-top: 5px;
 }
 
+/* Submit button */
 .submit-btn {
     width: 100%;
     padding: 12px;
-    background-color: rgb(4, 144, 4);
-    color: white;
+    border-radius: 6px;
+    font-size: 15px;
+    font-weight: 600;
+    background-color: #2e8b57;
+    color: #fff;
     border: none;
-    border-radius: 5px;
     cursor: pointer;
-    font-size: 1rem;
-    font-weight: bold;
-    margin-top: 10px;
+    transition: background 0.3s ease;
 }
-
 .submit-btn:hover {
-    background-color: rgb(3, 120, 3);
+    background-color: #3cb371;
 }
 
+/* Entrance animation */
+@keyframes fadeInScale {
+    from { opacity: 0; transform: scale(0.9); }
+    to   { opacity: 1; transform: scale(1); }
+}
+
+/* Fade in + scale */
+@keyframes fadeInScale {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* Fade out + scale */
+@keyframes fadeOutScale {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(0.9); }
+}
+
+
+/* Close button */
 .close-btn {
     position: absolute;
-    top: 10px;
+    top: 12px;
     right: 15px;
-    font-size: 1.5rem;
+    font-size: 22px;
     background: none;
     border: none;
-    cursor: pointer;
     color: #666;
+    cursor: pointer;
+    transition: color 0.2s ease;
 }
-
 .close-btn:hover {
-    color: #333;
+    color: #000;
 }
 
-/* Success Popup Styles */
+
 .success-popup {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+
+    /* Center box */
+    position: relative;
+    width: 450px;   /* square look */
+    height: 310px;  
+    margin: auto;
+
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
     text-align: center;
-    padding: 30px;
+    padding: 20px;
+}
+
+/* Icon */
+.success-icon {
+  font-size: 64px;
+  color: #2e8b57;
+  margin-bottom: 1px;
+  animation: bounceIn 0.8s ease;
 }
 
 .success-popup h2 {
-    color: rgb(4, 144, 4);
-    margin-bottom: 20px;
+    color: #28a745;
+    margin-bottom: 10px;
+    font-size: 1.5em;
 }
 
 .success-popup p {
-    margin: 15px 0;
-    line-height: 1.5;
+    font-size: 1em;
     color: #333;
+    margin-bottom: 20px;
+    line-height: 1.4em;
 }
 
-.continue-btn {
-    width: 100%;
-    padding: 10px;
-    background-color: rgb(4, 144, 4);
-    color: white;
+.success-popup .continue-btn {
+    background: #28a745;
+    color: #fff;
     border: none;
-    border-radius: 4px;
+    padding: 10px 20px;
+    font-size: 1em;
+    border-radius: 6px;
     cursor: pointer;
-    font-size: 1rem;
-    margin-top: 20px;
+    transition: background 0.3s ease;
 }
 
-.continue-btn:hover {
-    background-color: rgb(3, 120, 3);
+.success-popup .continue-btn:hover {
+    background: #218838;
 }
+
+.success-popup .close-btn {
+    position: absolute;
+    top: 10px;
+    right: 15px;
+    background: transparent;
+    border: none;
+    font-size: 1.5em;
+    color: #888;
+    cursor: pointer;
+}
+
 
 /* Feedback System */
 .feedback-btn {
@@ -1078,7 +1620,7 @@ input[type="file"] {
     width: 100%;
     height: 100%;
     background-color: rgba(0, 0, 0, 0.8);
-    z-index: 1000;
+    z-index: 5000;
 }
 
 .zoomed-photo {
@@ -1193,7 +1735,97 @@ input[type="file"] {
         background: #555;
     }
 
-            /* Additional styles to fix text overflow issues */
+/* Make each project clickable */
+.project-item-link {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.project-item-link:hover .project-item {
+    background-color: #f0f8f5;
+    transform: scale(1.02);
+    box-shadow: 0 2px 8px rgba(46, 139, 87, 0.2);
+}
+
+.project-item {
+    background-color: #fff;
+    border: 1px solid #e8e8e8;
+    border-radius: 10px;
+    padding: 10px;
+    margin-bottom: 10px;
+    transition: background-color 0.3s, box-shadow 0.3s;
+}
+
+.project-item strong {
+  color: #2e8b57;
+  display: block;
+  margin-bottom: 5px;
+  font-size: 15px;
+}
+
+.project-item div {
+  font-size: 13px;
+  color: #555;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis; /* truncates long text with "..." */
+  max-width: 200px; /* adjust to fit your sidebar width */
+}
+
+.project-date {
+  font-size: 12px;
+  color: #888;
+  margin-top: 3px;
+}
+
+
+    .latest-project {
+        background: #e8f6ee; /* light green background */
+        border-left: 4px solid #2e8b57; /* accent */
+        padding: 8px;
+        border-radius: 6px;
+    }
+
+
+/* Scrollable project list (Fix scrollbar) */
+.projects-scroll {
+    max-height: 220px;       /* You can change this height if needed */
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 6px;
+    margin-right: -6px;
+}
+
+/* Always show scrollbar (for Chrome, Edge) */
+.projects-scroll::-webkit-scrollbar {
+    width: 8px;
+}
+
+.projects-scroll::-webkit-scrollbar-thumb {
+    background-color: #2e8b57;
+    border-radius: 10px;
+}
+
+.projects-scroll::-webkit-scrollbar-thumb:hover {
+    background-color: #3cb371;
+}
+
+/* Make scrollbar visible in Firefox */
+.projects-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: #2e8b57 #f0f0f0;
+}
+
+/* Ensure card container doesn’t hide it */
+.card {
+    overflow: visible !important;
+}
+
+
+
+        /* Additional styles to fix text overflow issues */
         .donation-post, .idea-card, .card, .project-item, .leaderboard-item {
             overflow-wrap: break-word;
             word-wrap: break-word;
@@ -1226,11 +1858,7 @@ input[type="file"] {
             margin: 0;
         }
         
-        /* Fix for comment section */
-        .comments-section {
-            max-height: 300px;
-            overflow-y: auto;
-        }
+
         
         .comment-text {
             max-height: 100px;
@@ -1337,12 +1965,8 @@ input[type="file"] {
             align-items: center;
             justify-content: center;
         }
-        
-        .popup-content {
-            max-height: 90vh;
-            overflow-y: auto;
-        }
-        
+
+
         /* Custom scrollbar for the preview container */
         .photo-preview-container::-webkit-scrollbar {
             width: 8px;
@@ -1416,21 +2040,6 @@ input[type="file"] {
     font-weight: 500;
 }
 
-/* Donation Post Styling to match the design */
-.donation-post {
-    padding: 20px;
-    border: 1px solid #e8e8e8;
-    border-radius: 12px;
-    margin-bottom: 20px;
-    background-color: #fff;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-}
-
-.donation-user-header {
-    display: flex;
-    align-items: center;
-    margin-bottom: 15px;
-}
 
 .user-avatar {
     width: 40px;
@@ -1455,14 +2064,6 @@ input[type="file"] {
     font-size: 16px;
     color: #333;
     margin-bottom: 4px;
-}
-
-.donation-meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    font-size: 13px;
-    color: #666;
 }
 
 .category {
@@ -1506,43 +2107,410 @@ input[type="file"] {
     line-height: 1.5;
 }
 
-.donation-images {
+.popup-content button {
+    padding:8px 12px;
+    border:none;
+    border-radius:5px;
+    cursor:pointer;
+}
+
+@media (min-width: 768px) {
+    .popup-content {
+        max-width: 600px;
+    }
+}
+@media (min-width: 1024px) {
+    .popup-content {
+        max-width: 700px;
+    }
+}
+
+#subcategory-group {
+    margin-top: 10px;
+}
+
+#donatePopup {
+  z-index: 1001;
+}
+
+#requestPopup {
+  z-index: 1002;
+}
+
+.leaderboard-scroll {
+    max-height: 300px;
+    overflow-y: auto;
+    padding-right: 4px;
+    scrollbar-width: thin;
+}
+
+.leaderboard-item-link {
+    text-decoration: none;
+    color: inherit;
+}
+
+.leaderboard-item {
     display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.leaderboard-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 3px 8px rgba(0,0,0,0.05);
+}
+
+.leaderboard-rank {
+    font-weight: 700;
+    color: #2e8b57;
+    margin-right: 10px;
+    flex-shrink: 0;
+}
+
+.leaderboard-info {
+    flex: 1;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.leader-name {
+    font-weight: 600;
+    color: #333;
+}
+
+.leader-points {
+    font-size: 14px;
+    color: #777;
+}
+
+
+/* === POPUP OVERLAY === */
+#donationPopup {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.6);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+/* === POPUP BOX === */
+#donationPopup .popup-content {
+  background: #fff;
+  width: 90%;
+  max-width: 600px;
+  max-height: 80vh; /* constrain popup size */
+  border-radius: 10px;
+  padding: 20px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+  overflow: hidden; /* prevents overflow outside popup */
+}
+
+/* === SCROLLABLE AREA === */
+#donationPopup .popup-scroll-area {
+  overflow-y: auto;
+  padding-right: 10px;
+  margin-top: 10px;
+  flex: 1;
+}
+
+/* === CLOSE BUTTON === */
+#donationPopup .close-btn {
+  position: absolute;
+  top: 10px;
+  right: 15px;
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: #555;
+  cursor: pointer;
+}
+#donationPopup .close-btn:hover {
+  color: #000;
+}
+
+/* === Prevent background scrolling when popup is open === */
+body.popup-open {
+  overflow: hidden;
+}
+
+#donationPopup .popup-content {
+  animation: fadeIn 0.25s ease;
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* Reply box container */
+.reply-box {
+  margin-top: 10px;
+}
+
+/* Textarea */
+.reply-box .comment-input {
+  width: 100%;
+  min-height: 60px;
+  padding: 8px 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 14px;
+  resize: vertical;
+  transition: border-color 0.2s ease;
+}
+.reply-box .comment-input:focus {
+  border-color: #4CAF50;
+  outline: none;
+}
+
+/* Buttons container */
+.reply-box div {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+/* Base button style */
+.reply-box button {
+  border: none;
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  transition: all 0.25s ease;
+}
+
+/* Reply button */
+.reply-box .comment-submit {
+  background-color: #28a745;  /* green */
+  color: #fff;
+}
+.reply-box .comment-submit:hover {
+  background-color: #218838;
+  transform: translateY(-1px);
+}
+
+/* Cancel button */
+.reply-box .reply-cancel {
+  background-color: #f0f0f0;
+  color: #333;
+}
+.reply-box .reply-cancel:hover {
+  background-color: #e0e0e0;
+  transform: translateY(-1px);
+}
+
+/* Settings Modal Styles */
+.settings-modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
+.settings-modal-content {
+    background-color: white;
+    margin: 5% auto;
+    padding: 0;
+    border-radius: 10px;
+    width: 90%;
+    max-width: 600px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    animation: modalSlideIn 0.3s ease;
+}
+
+@keyframes modalSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-50px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.settings-modal-header {
+    padding: 20px;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.me-2 {
+    margin-right: 0.5rem;
+}
+
+.settings-modal-title {
+    margin: 0;
+    font-size: 1.5rem;
+    color: #2c5530;
+}
+
+.settings-close-btn {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #666;
+}
+
+.settings-close-btn:hover {
+    color: #333;
+}
+
+.settings-modal-body {
+    padding: 20px;
+}
+
+/* Tabs */
+.settings-tabs {
+    display: flex;
+    border-bottom: 1px solid #ddd;
+    margin-bottom: 20px;
+}
+
+.settings-tab {
+    padding: 12px 20px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    color: #666;
+    font-weight: 500;
+}
+
+.settings-tab.active {
+    color: #2c5530;
+    border-bottom-color: #2c5530;
+}
+
+.settings-tab-content {
+    display: none;
+}
+
+.settings-tab-content.active {
+    display: block;
+}
+
+/* Form Styles */
+.settings-form-group {
     margin-bottom: 15px;
 }
 
-.donation-image {
-    width: 80px;
-    height: 80px;
-    object-fit: cover;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: transform 0.2s;
+.settings-form-label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 500;
+    color: #333;
 }
 
-.donation-image:hover {
-    transform: scale(1.05);
+.settings-form-input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font-size: 14px;
 }
 
-.donation-actions {
+.settings-form-input:focus {
+    outline: none;
+    border-color: #2c5530;
+}
+
+.password-strength {
+    height: 4px;
+    margin-top: 5px;
+    border-radius: 2px;
+    transition: all 0.3s ease;
+}
+
+.strength-weak { background: #dc3545; width: 25%; }
+.strength-medium { background: #ffc107; width: 50%; }
+.strength-strong { background: #28a745; width: 100%; }
+
+.invalid-feedback {
+    color: #dc3545;
+    font-size: 12px;
+    margin-top: 5px;
+    display: none;
+}
+
+.settings-form-actions {
     display: flex;
     justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
 }
 
-.request-btn {
+.settings-btn {
     padding: 10px 20px;
-    background-color: #2e8b57;
-    color: white;
     border: none;
-    border-radius: 6px;
-    font-weight: 600;
+    border-radius: 5px;
     cursor: pointer;
-    transition: background-color 0.3s;
+    font-weight: 500;
 }
 
-.request-btn:hover {
-    background-color: #3cb371;
+.settings-btn-secondary {
+    background-color: #6c757d;
+    color: white;
 }
 
+.settings-btn-primary {
+    background-color: #2c5530;
+    color: white;
+}
+
+.settings-btn:hover {
+    opacity: 0.9;
+}
+
+/* Password Input with Toggle */
+.password-input-container {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.password-input-container .settings-form-input {
+    padding-right: 45px;
+    width: 100%;
+}
+
+.password-toggle {
+    position: absolute;
+    right: 10px;
+    background: none;
+    border: none;
+    color: #666;
+    cursor: pointer;
+    padding: 5px;
+    border-radius: 3px;
+    transition: color 0.3s ease;
+}
+
+.password-toggle:hover {
+    color: #2c5530;
+    background-color: #f5f5f5;
+}
+
+.password-toggle.active {
+    color: #2c5530;
+}

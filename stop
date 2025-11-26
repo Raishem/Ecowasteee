@@ -1,0 +1,23 @@
+[33mcommit e2adabe923475b2e9a79be0c3d0ed3f50abb8ace[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mhomepage[m[33m, [m[1;31morigin/homepage[m[33m)[m
+Author: HIMEKENSHI\Acer <princesskenshi73@gmail.com>
+Date:   Thu Sep 25 01:32:50 2025 +0800
+
+    updated homepage ui
+
+[33mcommit ddb1b3e0991ca2825bc0eacec73ec3c0aa100850[m
+Author: HIMEKENSHI\Acer <princesskenshi73@gmail.com>
+Date:   Thu Sep 25 01:32:17 2025 +0800
+
+    updated homepage ui
+
+[33mcommit d7940100ed5c6a3c66b5c11d6834055d2014731f[m[33m ([m[1;31morigin/browse.php[m[33m)[m
+Author: HIMEKENSHI\Acer <princesskenshi73@gmail.com>
+Date:   Thu Sep 25 01:21:29 2025 +0800
+
+    ui updated only
+
+[33mcommit 3ff29304a31990598d96e86a413fe6ce1448cf08[m[33m ([m[1;31morigin/donations[m[33m, [m[1;32mdonations[m[33m)[m
+Author: HIMEKENSHI\Acer <princesskenshi73@gmail.com>
+Date:   Thu Sep 25 01:06:22 2025 +0800
+
+    ui updated. No functions to buttons yet xd

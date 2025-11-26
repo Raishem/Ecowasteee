@@ -15,15 +15,13 @@ if (!$conn) {
     die("Database connection failed.");
 }
 
-try {
-    $user_query = $conn->prepare("SELECT * FROM users WHERE user_id = ?");
-    $user_query->execute([$user_id]);
-    $user_data = $user_query->fetch(PDO::FETCH_ASSOC);
-    if (!$user_data) {
-        $user_data = [];
-    }
-} catch (PDOException $e) {
-    die("Database error: " . $e->getMessage());
+$user_query = $conn->prepare("SELECT * FROM users WHERE user_id = ?");
+$user_query->bind_param("i", $user_id);
+$user_query->execute();
+$result = $user_query->get_result();
+$user_data = $result->fetch_assoc();
+if (!$user_data) {
+    $user_data = [];
 }
 
 // Handle form submission
@@ -44,30 +42,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_project'])) {
     } elseif (empty($materials) || empty($materials[0])) {
         $error_message = "At least one material is required.";
     } else {
+        // Start transaction
+        $conn->begin_transaction();
+        
         try {
-            // Start transaction
-            $conn->beginTransaction();
-            
             // Insert project
             $project_stmt = $conn->prepare("INSERT INTO projects (user_id, project_name, description) VALUES (?, ?, ?)");
-            if (!$project_stmt->execute([$user_id, $project_name, $project_description])) {
-                throw new PDOException("Failed to create project");
+            $project_stmt->bind_param("iss", $user_id, $project_name, $project_description);
+            if (!$project_stmt->execute()) {
+                throw new Exception("Failed to create project");
             }
             
-            $project_id = $conn->lastInsertId();
+            $project_id = $conn->insert_id;
             
             // Insert materials
             $material_stmt = $conn->prepare("INSERT INTO project_materials (project_id, material_name, quantity) VALUES (?, ?, ?)");
             if (!$material_stmt) {
-                throw new PDOException("Failed to prepare material statement");
+                throw new Exception("Failed to prepare material statement");
             }
+            
+            $material_stmt->bind_param("isi", $project_id, $material, $quantity);
             
             foreach ($materials as $index => $material) {
                 if (!empty($material) && isset($quantities[$index])) {
                     $quantity = (int)$quantities[$index];
                     if ($quantity > 0) {
-                        if (!$material_stmt->execute([$project_id, $material, $quantity])) {
-                            throw new PDOException("Failed to insert material");
+                        if (!$material_stmt->execute()) {
+                            throw new Exception("Failed to insert material");
                         }
                     }
                 }
@@ -80,10 +81,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_project'])) {
             // Clear form
             $_POST = array();
             
-        } catch (PDOException $e) {
+        } catch (Exception $e) {
             // Rollback transaction on error
             if ($conn) {
-                $conn->rollBack();
+                $conn->rollback();
             }
             $error_message = "Error creating project: " . $e->getMessage();
         }
@@ -96,24 +97,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_project'])) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Start Project | EcoWaste</title>
-    <link rel="stylesheet" href="assets/css/homepage.css">
+    <link rel="stylesheet" href="assets/css/start_project.css">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&family=Open+Sans&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        .profile-pic {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-right: 10px;
-            overflow: hidden;
-            background-color: #3d6a06ff;
-            color: white;
-            font-weight: bold;
-            font-size: 18px;
-        }
         
         /* Project Form Styles */
         .back-button-container {
@@ -127,16 +114,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_project'])) {
             color: #2e8b57;
             font-weight: 600;
             padding: 8px 16px;
-            border-radius: 4px;
-            transition: background-color 0.3s;
+            border-radius: 6px;
+            transition: all 0.3s ease;
+            background-color: #f0f7e8;
+            border: 1px solid #2e8b57;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            font-size: 14px;
         }
         
         .back-button:hover {
-            background-color: #f0f7e8;
+            background-color: #2e8b57;
+            color: white;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
         }
         
         .back-button i {
-            margin-right: 8px;
+            margin-right: 6px;
+            transition: transform 0.3s ease;
+        }
+        
+        .back-button:hover i {
+            transform: translateX(-3px);
         }
         
         .page-header {
@@ -303,7 +302,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_project'])) {
             <i class="fas fa-chevron-down dropdown-arrow"></i>
             <div class="profile-dropdown">
                 <a href="profile.php" class="dropdown-item"><i class="fas fa-user"></i> My Profile</a>
-                <a href="#" class="dropdown-item"><i class="fas fa-cog"></i> Settings</a>
+                <a href="#" class="dropdown-item" id="settingsLink">
+                    <i class="fas fa-cog"></i> Settings
+                </a>
                 <div class="dropdown-divider"></div>
                 <a href="logout.php" class="dropdown-item"><i class="fas fa-sign-out-alt"></i> Logout</a>
             </div>
@@ -318,13 +319,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_project'])) {
                     <li><a href="browse.php"><i class="fas fa-search"></i>Browse</a></li>
                     <li><a href="achievements.php"><i class="fas fa-star"></i>Achievements</a></li>
                     <li><a href="leaderboard.php"><i class="fas fa-trophy"></i>Leaderboard</a></li>
-                    <li><a href="projects.php" style="color: rgb(4, 144, 4);"><i class="fas fa-recycle"></i>Projects</a></li>
-                    <li><a href="donations.php"><i class="fas fa-box"></i>Donations</a></li>
+                    <li><a href="projects.php" class="active"><i class="fas fa-recycle"></i>Projects</a></li>
+                    <li><a href="donations.php"><i class="fas fa-hand-holding-heart"></i>Donations</a></li>
                 </ul>
             </nav>
         </aside>
         
         <main class="main-content">
+
+        <!-- Success/Error Messages -->
+        <?php if (isset($_SESSION['password_success'])): ?>
+            <div class="alert alert-success" style="margin: 20px; padding: 15px; background: #d4edda; color: #155724; border: 1px solid #c3e6cb; border-radius: 5px;">
+                <?php echo htmlspecialchars($_SESSION['password_success']); ?>
+                <?php unset($_SESSION['password_success']); ?>
+            </div>
+        <?php endif; ?>
+        
+        <?php if (isset($_SESSION['password_error'])): ?>
+            <div class="alert alert-danger" style="margin: 20px; padding: 15px; background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; border-radius: 5px;">
+                <?php echo htmlspecialchars($_SESSION['password_error']); ?>
+                <?php unset($_SESSION['password_error']); ?>
+            </div>
+        <?php endif; ?>
+
+        <!-- Include Settings Modal -->
+    <?php include 'includes/settings_modal.php'; ?>
+
             <div class="back-button-container">
                 <a href="projects.php" class="back-button">
                     <i class="fas fa-arrow-left"></i> Back to Projects

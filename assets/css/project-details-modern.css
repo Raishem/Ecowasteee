@@ -1,0 +1,446 @@
+/* Modern Project Details Styling */
+:root {
+    --primary-color: #2e7d32;
+    --primary-light: #e8f5e9;
+    --primary-dark: #1b5e20;
+    --secondary-color: #4a90e2;
+    --text-primary: #2c3e50;
+    --text-secondary: #666;
+    --background-light: #f8faf8;
+    --border-color: #e8f0e8;
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+    --radius-sm: 6px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+}
+
+/* Main Layout */
+.main-content.project-details {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.back-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-weight: 500;
+    margin-bottom: 1.5rem;
+    padding: 0.5rem 1rem;
+    border-radius: var(--radius-sm);
+    transition: all 0.2s ease;
+}
+
+.back-button:hover {
+    background: var(--background-light);
+    color: var(--primary-color);
+    transform: translateX(-2px);
+}
+
+/* Project Header */
+.project-header.card {
+    background: white;
+    border-radius: var(--radius-lg);
+    padding: 2rem;
+    box-shadow: var(--shadow-lg);
+    margin-bottom: 2rem;
+    position: relative;
+    overflow: hidden;
+}
+
+.project-header.card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: var(--primary-color);
+}
+
+.project-title-section,
+.project-description-section {
+    position: relative;
+    padding-top: 2rem;
+    margin-bottom: 2rem;
+}
+
+.project-section-label {
+    position: absolute;
+    top: 0;
+    left: 0;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--primary-color);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    background: var(--primary-light);
+    padding: 0.25rem 0.75rem;
+    border-radius: var(--radius-sm);
+}
+
+.project-title {
+    font-size: 2.4rem;
+    color: var(--text-primary);
+    margin: 1rem 0 0.5rem;
+    line-height: 1.2;
+    font-weight: 800;
+}
+
+.project-subtitle {
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+    margin: 0.75rem 0;
+    line-height: 1.5;
+}
+
+.project-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    margin-top: 1rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--background-light);
+    border-radius: var(--radius-sm);
+    display: inline-flex;
+}
+
+.project-meta i {
+    color: var(--primary-color);
+}
+
+.project-description {
+    color: var(--text-secondary);
+    line-height: 1.8;
+    font-size: 1.05rem;
+    background: var(--background-light);
+    padding: 1.5rem;
+    border-radius: var(--radius-md);
+}
+
+/* Materials Section */
+.materials-section {
+    background: white;
+    border-radius: var(--radius-md);
+    padding: 2rem;
+    margin: 2rem 0;
+    box-shadow: var(--shadow-md);
+    position: relative;
+}
+
+.materials-section::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: var(--secondary-color);
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+.section-title {
+    font-size: 1.5rem;
+    color: var(--text-primary);
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.materials-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1rem;
+}
+
+.material-item {
+    background: var(--background-light);
+    padding: 1.25rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-color);
+    transition: all 0.2s ease;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.material-item:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-sm);
+}
+
+.material-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.material-name {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.material-quantity {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+/* Project Actions */
+.project-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 2rem;
+}
+
+.edit-btn,
+.share-btn {
+    padding: 0.75rem 1.5rem;
+    border-radius: var(--radius-sm);
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.3s ease;
+    border: none;
+    cursor: pointer;
+}
+
+.edit-btn {
+    background: var(--primary-color);
+    color: white;
+}
+
+.edit-btn:hover {
+    background: var(--primary-dark);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.share-btn {
+    background: var(--primary-light);
+    color: var(--primary-color);
+}
+
+.share-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-sm);
+}
+
+/* Status Tags */
+.status-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.75rem;
+    border-radius: 1rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.status-needed {
+    background: #fff3e0;
+    color: #f57c00;
+}
+
+.status-completed {
+    background: var(--primary-light);
+    color: var(--primary-color);
+}
+
+/* Add Material Button */
+.add-material-btn {
+    width: 100%;
+    padding: 1rem;
+    background: white;
+    border: 2px dashed var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--primary-color);
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.add-material-btn:hover {
+    border-color: var(--primary-color);
+    background: var(--primary-light);
+}
+
+/* Workflow Section */
+.workflow-section {
+    background: white;
+    border-radius: var(--radius-md);
+    padding: 2rem;
+    margin-top: 2rem;
+    box-shadow: var(--shadow-md);
+}
+
+.workflow-progress {
+    margin: 2rem 0;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 8px;
+    background: var(--background-light);
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 1rem 0;
+}
+
+.progress-fill {
+    height: 100%;
+    background: var(--primary-color);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+.workflow-stages {
+    display: grid;
+    gap: 1rem;
+}
+
+.workflow-stage {
+    background: var(--background-light);
+    border-radius: var(--radius-sm);
+    padding: 1.5rem;
+}
+
+.stage-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.stage-title {
+    font-weight: 600;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.stage-tasks {
+    list-style: none;
+    margin: 0;
+    padding-left: 1.5rem;
+}
+
+.stage-task {
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+    position: relative;
+}
+
+.stage-task::before {
+    content: "•";
+    color: var(--primary-color);
+    position: absolute;
+    left: -1rem;
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.project-header.card,
+.materials-section,
+.workflow-section {
+    animation: fadeIn 0.3s ease-out;
+}
+
+/* Toast Messages */
+.toast {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    padding: 1rem 1.5rem;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    box-shadow: var(--shadow-lg);
+    z-index: 1000;
+    animation: slideIn 0.3s ease-out;
+}
+
+.toast-success {
+    background: var(--primary-light);
+    color: var(--primary-color);
+    border-left: 4px solid var(--primary-color);
+}
+
+.toast-error {
+    background: #ffebee;
+    color: #c62828;
+    border-left: 4px solid #c62828;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .main-content.project-details {
+        padding: 1rem;
+    }
+
+    .project-header.card {
+        padding: 1.5rem;
+    }
+
+    .project-title {
+        font-size: 1.8rem;
+    }
+
+    .materials-list {
+        grid-template-columns: 1fr;
+    }
+
+    .project-actions {
+        flex-direction: column;
+    }
+
+    .edit-btn,
+    .share-btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .workflow-stages {
+        grid-template-columns: 1fr;
+    }
+}
