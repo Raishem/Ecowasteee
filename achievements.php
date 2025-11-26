@@ -579,7 +579,9 @@ while ($row = $result->fetch_assoc()) $tasks[] = $row;
     <i class="fas fa-chevron-down dropdown-arrow"></i>
     <div class="profile-dropdown">
         <a href="profile.php" class="dropdown-item"><i class="fas fa-user"></i> My Profile</a>
-        <a href="#" class="dropdown-item"><i class="fas fa-cog"></i> Settings</a>
+        <a href="#" class="dropdown-item" id="settingsLink">
+            <i class="fas fa-cog"></i> Settings
+        </a>
         <div class="dropdown-divider"></div>
         <a href="logout.php" class="dropdown-item"><i class="fas fa-sign-out-alt"></i> Logout</a>
     </div>
@@ -601,6 +603,26 @@ while ($row = $result->fetch_assoc()) $tasks[] = $row;
         </aside>
 
  <main class="main-content">
+    <!-- Success/Error Messages -->
+        <?php if (isset($_SESSION['password_success'])): ?>
+            <div class="alert alert-success" style="margin: 20px; padding: 15px; background: #d4edda; color: #155724; border: 1px solid #c3e6cb; border-radius: 5px;">
+                <?php echo htmlspecialchars($_SESSION['password_success']); ?>
+                <?php unset($_SESSION['password_success']); ?>
+            </div>
+        <?php endif; ?>
+        
+        <?php if (isset($_SESSION['password_error'])): ?>
+            <div class="alert alert-danger" style="margin: 20px; padding: 15px; background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; border-radius: 5px;">
+                <?php echo htmlspecialchars($_SESSION['password_error']); ?>
+                <?php unset($_SESSION['password_error']); ?>
+            </div>
+        <?php endif; ?>
+
+        
+    <!-- Include Settings Modal -->
+    <?php include 'includes/settings_modal.php'; ?>
+
+
     <div class="achievements-header">
         <h2>My Achievements</h2>
         <p class="subtitle">Track your eco-friendly progress and accomplishments</p>
@@ -734,7 +756,7 @@ while ($row = $result->fetch_assoc()) $tasks[] = $row;
     </div>
 </div>
 
-
+    <!-- Feedback Modal -->
     <div class="feedback-btn" id="feedbackBtn">💬</div>
     <div class="feedback-modal" id="feedbackModal">
         <div class="feedback-content">

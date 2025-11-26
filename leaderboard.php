@@ -42,26 +42,29 @@ if ($result && $result->num_rows > 0) {
 
     
 <body>
-        <header>
+    <header>
         <div class="logo-container">
-            <div class="logo">
-                <img src="assets/img/ecowaste_logo.png" alt="EcoWaste Logo">
+                    <div class="logo">
+                        <img src="assets/img/ecowaste_logo.png" alt="EcoWaste Logo">
+                    </div>
+                    <h1>EcoWaste</h1>
+                </div>
+                <div class="user-profile" id="userProfile">
+                <div class="profile-pic">
+                <?= strtoupper(substr(htmlspecialchars($_SESSION['first_name'] ?? 'User'), 0, 1)) ?>
             </div>
-            <h1>EcoWaste</h1>
+            <span class="profile-name"><?= htmlspecialchars($_SESSION['first_name'] ?? 'User') ?></span>
+            <i class="fas fa-chevron-down dropdown-arrow"></i>
+            <div class="profile-dropdown">
+                <a href="profile.php" class="dropdown-item"><i class="fas fa-user"></i> My Profile</a>
+                <a href="#" class="dropdown-item" id="settingsLink">
+                    <i class="fas fa-cog"></i> Settings
+                </a>
+                <div class="dropdown-divider"></div>
+                <a href="logout.php" class="dropdown-item"><i class="fas fa-sign-out-alt"></i> Logout</a>
+            </div>
         </div>
-        <div class="user-profile" id="userProfile">
-        <div class="profile-pic">
-        <?= strtoupper(substr(htmlspecialchars($_SESSION['first_name'] ?? 'User'), 0, 1)) ?>
-    </div>
-    <span class="profile-name"><?= htmlspecialchars($_SESSION['first_name'] ?? 'User') ?></span>
-    <i class="fas fa-chevron-down dropdown-arrow"></i>
-    <div class="profile-dropdown">
-        <a href="profile.php" class="dropdown-item"><i class="fas fa-user"></i> My Profile</a>
-        <a href="#" class="dropdown-item"><i class="fas fa-cog"></i> Settings</a>
-        <div class="dropdown-divider"></div>
-        <a href="logout.php" class="dropdown-item"><i class="fas fa-sign-out-alt"></i> Logout</a>
-    </div>
-</div>
+
     </header>
 
 <div class="container">
@@ -78,6 +81,26 @@ if ($result && $result->num_rows > 0) {
         </nav>
     </aside>
     <main class="main-content">
+        <!-- Success/Error Messages -->
+        <?php if (isset($_SESSION['password_success'])): ?>
+            <div class="alert alert-success" style="margin: 20px; padding: 15px; background: #d4edda; color: #155724; border: 1px solid #c3e6cb; border-radius: 5px;">
+                <?php echo htmlspecialchars($_SESSION['password_success']); ?>
+                <?php unset($_SESSION['password_success']); ?>
+            </div>
+        <?php endif; ?>
+        
+        <?php if (isset($_SESSION['password_error'])): ?>
+            <div class="alert alert-danger" style="margin: 20px; padding: 15px; background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; border-radius: 5px;">
+                <?php echo htmlspecialchars($_SESSION['password_error']); ?>
+                <?php unset($_SESSION['password_error']); ?>
+            </div>
+        <?php endif; ?>
+
+        <!-- Include Settings Modal -->
+    <?php include 'includes/settings_modal.php'; ?>
+
+
+
         <div class="leaderboard-container">
             <h2 class="leaderboard-title">Community Leaderboard</h2>
             <p class="leaderboard-subtitle">Top contributors making a difference for our planet</p>
@@ -152,6 +175,7 @@ if ($result && $result->num_rows > 0) {
         </div>
     </main>
 </div>
+
 
 <!-- Feedback Button -->
     <div class="feedback-btn" id="feedbackBtn">💬</div>
@@ -288,6 +312,7 @@ if ($result && $result->num_rows > 0) {
         });
     });
 });
+
 </script>
 </body>
 </html>
