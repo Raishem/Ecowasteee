@@ -129,8 +129,8 @@ if (isset($_SESSION['login_error'])) {
                         <a href="google_login.php" class="social-btn google" >
                             <i class="fab fa-google"></i> Continue with Google
                     </a>
-                        <button type="button" class="social-btn facebook">
-                            <i class="fab fa-facebook-f"></i> Continue with Facebook
+                        <button type="button" class="social-btn facebook" id="facebookBtn"> 
+                            <i class="fab fa-facebook-f"></i> (Coming Soon)
                         </button>
                     </div>
                     
@@ -151,8 +151,15 @@ if (isset($_SESSION['login_error'])) {
         </div>
     </div>
 
-<script>
+<!-- Popup Toast -->
+<div id="popupToast" class="popup-toast">
+    <i class="fas fa-info-circle"></i>
+    <span id="popupMessage"></span>
+    <button class="popup-close">&times;</button>
+</div>
 
+<script>
+    // password visibility toggle
     document.addEventListener("DOMContentLoaded", function() {
     const togglePassword = document.getElementById('togglePassword');
     const passwordInput = document.getElementById('password');
@@ -165,6 +172,7 @@ if (isset($_SESSION['login_error'])) {
     });
 });
 
+// Auto dismiss banner after 5 seconds
     document.addEventListener("DOMContentLoaded", function() {
         const banners = document.querySelectorAll('.success-banner, .error-banner');
         if (banners.length > 0) {
@@ -172,7 +180,7 @@ if (isset($_SESSION['login_error'])) {
                 banners.forEach(banner => {
                     banner.classList.add('banner-hidden');
                 });
-            }, 5000); // wait 5 seconds before fade out
+            }, 5000); 
         }
     });
 
@@ -205,6 +213,27 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     });
 });
+
+// Facebook toast
+    const fbBtn = document.getElementById('facebookBtn');
+    fbBtn.addEventListener('click', function() {
+        showPopup('Facebook authentication coming soon!');
+    });
+
+        // Popup function
+    function showPopup(message) {
+        const popup = document.getElementById('popupToast');
+        const popupMsg = document.getElementById('popupMessage');
+        popupMsg.textContent = message;
+        popup.classList.add('show');
+        setTimeout(() => popup.classList.remove('show'), 4000);
+    }
+
+    // Close button
+    document.querySelector('.popup-close').addEventListener('click', function() {
+        document.getElementById('popupToast').classList.remove('show');
+    });
+
 </script>
 
 

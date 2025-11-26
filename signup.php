@@ -260,8 +260,8 @@ if ($stmt->execute()) {
                         <button type="button" class="social-btn google">
                             <i class="fab fa-google"></i> Sign up with Google
                         </button>
-                        <button type="button" class="social-btn facebook">
-                            <i class="fab fa-facebook-f"></i> Sign up with Facebook
+                        <button type="button" class="social-btn facebook" id="facebookBtnSignup">
+                            <i class="fab fa-facebook-f"></i> (Coming Soon)
                         </button>
                     </div>
                     
@@ -282,6 +282,13 @@ if ($stmt->execute()) {
         </div>
     </div>
 
+    <!-- Popup Toast -->
+<div id="popupToast" class="popup-toast">
+    <i class="fas fa-info-circle"></i>
+    <span id="popupMessage"></span>
+    <button class="popup-close">&times;</button>
+</div>
+
     <!-- Success Modal -->
     <div class="success-modal" id="successModal" style="display: <?= $show_success_modal ? 'flex' : 'none' ?>;">
         <div class="modal-content">
@@ -299,6 +306,7 @@ if ($stmt->execute()) {
             <button onclick="this.parentElement.remove()" style="margin-left: 15px; background: none; border: none; color: white;">×</button>
         </div>
     <?php endif; ?>
+
 
     <script>
         // Name field handling
@@ -341,7 +349,24 @@ if ($stmt->execute()) {
         document.getElementById('successModal').style.display = 'flex';
         document.getElementById('success-email').textContent = '<?= $_SESSION['new_user_email'] ?>';
     <?php endif; ?>
+    
 
+// Popup toast function
+function showPopup(message) {
+    const popup = document.getElementById('popupToast');
+    const popupMsg = document.getElementById('popupMessage');
+    popupMsg.textContent = message;
+    popup.classList.add('show');
+    setTimeout(() => popup.classList.remove('show'), 4000);
+}
+document.querySelector('.popup-close').addEventListener('click', function() {
+    document.getElementById('popupToast').classList.remove('show');
+});
+
+// Facebook button click
+document.getElementById('facebookBtnSignup').addEventListener('click', function() {
+    showPopup('Facebook authentication coming soon!');
+});
     </script>
 </body>
 </html>

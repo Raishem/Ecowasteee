@@ -643,3 +643,35 @@
 .banner-hidden {
     animation: fadeOut 0.5s ease forwards;
 }
+
+.popup-toast {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background-color: #edf4ff;
+    color: #1a73e8;
+    border: 1px solid #1a73e8;
+    padding: 12px 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    opacity: 0;
+    transform: translateY(-20px);
+    transition: all 0.4s ease;
+    z-index: 1000;
+}
+.popup-toast.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+.popup-toast i { font-size: 18px; }
+.popup-toast .popup-close {
+    background: none;
+    border: none;
+    color: #1a73e8;
+    font-size: 16px;
+    cursor: pointer;
+    margin-left: auto;
+}
