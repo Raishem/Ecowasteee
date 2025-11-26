@@ -59,6 +59,7 @@
 
 .project-description.expanded {
     max-height: none;
+    margin-top: auto;
 }
 
 .see-more-btn {

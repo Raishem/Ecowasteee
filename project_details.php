@@ -282,7 +282,7 @@ try {
 // Get user data for header
 try {
     if ($conn) {
-        $user_stmt = $conn->prepare("SELECT username, avatar FROM users WHERE user_id = ?");
+        $user_stmt = $conn->prepare("SELECT first_name, last_name, avatar FROM users WHERE user_id = ?");
         $user_stmt->bind_param("i", $_SESSION['user_id']);
         $user_stmt->execute();
         $user_data = $user_stmt->get_result()->fetch_assoc();
@@ -301,8 +301,7 @@ try {
     <title>Project Details | EcoWaste</title>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Open+Sans:wght@400;500;600&display=swap">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="assets/css/header.css">
-    <link rel="stylesheet" href="assets/css/projects.css">
+    <link rel="stylesheet" href="assets/css/project-details.css">
     <link rel="stylesheet" href="assets/css/project-details-modern-v2.css">
     <link rel="stylesheet" href="assets/css/project-description.css">
     <link rel="stylesheet" href="assets/css/project-materials.css?v=4">
@@ -448,24 +447,24 @@ try {
             </div>
             <h1>EcoWaste</h1>
         </div>
-        <div class="header-right">
+        <!-- <div class="header-right">
             <div class="notifications-icon" id="headerNotifications" title="Notifications">
                 <i class="fas fa-bell"></i>
                 <span class="notification-badge" id="headerUnreadCount"></span>
                 <div class="header-notifications-panel" id="headerNotificationsPanel" aria-hidden="true">
-                    <!-- notifications loaded dynamically -->
+                     notifications loaded dynamically 
                 </div>
-            </div>
+            </div> -->
 
             <div class="user-profile" id="userProfile">
                 <div class="profile-pic">
-                    <?= !empty($user_data['avatar']) ? '<img src="'.htmlspecialchars($user_data['avatar']).'" alt="Profile">' : strtoupper(substr(htmlspecialchars($user_data['username'] ?? 'U'), 0, 1)) ?>
+                    <?= strtoupper(substr(htmlspecialchars($user_data['first_name'] ?? 'U'), 0, 1)) ?>
                 </div>
-                <span class="profile-name"><?= htmlspecialchars($user_data['username'] ?? ($_SESSION['first_name'] ?? 'User')) ?></span>
+                <span class="profile-name"><?= htmlspecialchars($user_data['first_name'] ?? 'User') ?></span>
                 <i class="fas fa-chevron-down dropdown-arrow"></i>
                 <div class="profile-dropdown">
                     <a href="profile.php" class="dropdown-item"><i class="fas fa-user"></i> My Profile</a>
-                    <a href="settings.php" class="dropdown-item"><i class="fas fa-cog"></i> Settings</a>
+                    <a href="#" class="dropdown-item"><i class="fas fa-cog"></i> Settings</a>
                     <div class="dropdown-divider"></div>
                     <a href="logout.php" class="dropdown-item"><i class="fas fa-sign-out-alt"></i> Logout</a>
                 </div>
@@ -476,25 +475,15 @@ try {
     <div class="container">
         <!-- Left Sidebar -->
         <aside class="sidebar">
-            <nav class="side-navigation">
-                <a href="homepage.php" class="nav-item">
-                    <i class="fas fa-home"></i> Home
-                </a>
-                <a href="browse.php" class="nav-item">
-                    <i class="fas fa-search"></i> Browse
-                </a>
-                <a href="projects.php" class="nav-item active">
-                    <i class="fas fa-recycle"></i> My Projects
-                </a>
-                <a href="donations.php" class="nav-item">
-                    <i class="fas fa-hand-holding-heart"></i> Donations
-                </a>
-                <a href="achievements.php" class="nav-item">
-                    <i class="fas fa-trophy"></i> Achievements
-                </a>
-                <a href="leaderboard.php" class="nav-item">
-                    <i class="fas fa-crown"></i> Leaderboard
-                </a>
+            <nav>
+                <ul>
+                    <li><a href="homepage.php"><i class="fas fa-home"></i> Home</a></li>
+                    <li><a href="browse.php"><i class="fas fa-search"></i> Browse</a></li>
+                    <li><a href="achievements.php"><i class="fas fa-star"></i> Achievements</a></li>
+                    <li><a href="leaderboard.php"><i class="fas fa-trophy"></i> Leaderboard</a></li>
+                    <li><a href="projects.php" class="active"><i class="fas fa-recycle"></i> Projects</a></li>
+                    <li><a href="donations.php"><i class="fas fa-hand-holding-heart"></i> Donations</a></li>
+                </ul>
             </nav>
         </aside>
 
@@ -529,6 +518,61 @@ try {
     <div class="project-meta">
         <i class="far fa-calendar-alt"></i> Created: <?= date('M d, Y', strtotime($project['created_at'])) ?>
     </div>
+
+    <!-- Feedback Button -->
+    <div class="feedback-btn" id="feedbackBtn">💬</div>
+
+    <!-- Feedback Modal -->
+    <div class="feedback-modal" id="feedbackModal">
+        <div class="feedback-content">
+            <span class="feedback-close-btn" id="feedbackCloseBtn">&times;</span>
+            <div class="feedback-form" id="feedbackForm">
+                <h3>Share Your Feedback</h3>
+                
+                <div class="emoji-rating" id="emojiRating">
+                    <div class="emoji-option" data-rating="1">
+                        <span class="emoji">😞</span>
+                        <span class="emoji-label">Very Sad</span>
+                    </div>
+                    <div class="emoji-option" data-rating="2">
+                        <span class="emoji">😕</span>
+                        <span class="emoji-label">Sad</span>
+                    </div>
+                    <div class="emoji-option" data-rating="3">
+                        <span class="emoji">😐</span>
+                        <span class="emoji-label">Neutral</span>
+                    </div>
+                    <div class="emoji-option" data-rating="4">
+                        <span class="emoji">🙂</span>
+                        <span class="emoji-label">Happy</span>
+                    </div>
+                    <div class="emoji-option" data-rating="5">
+                        <span class="emoji">😍</span>
+                        <span class="emoji-label">Very Happy</span>
+                    </div>
+                </div>
+                <div class="error-message" id="ratingError">Please select a rating</div>
+                
+                <p class="feedback-detail">Please share in detail what we can improve more?</p>
+                
+                <textarea id="feedbackText" placeholder="Your feedback helps us make EcoWaste better..."></textarea>
+                <div class="error-message" id="textError">Please provide your feedback</div>
+                
+                <button type="submit" class="feedback-submit-btn" id="feedbackSubmitBtn">
+                    Submit Feedback
+                    <div class="spinner" id="spinner"></div>
+                </button>
+            </div>
+            
+            <div class="thank-you-message" id="thankYouMessage">
+                <span class="thank-you-emoji">🎉</span>
+                <h3>Thank You!</h3>
+                <p>We appreciate your feedback and will use it to improve EcoWaste.</p>
+                <p>Your opinion matters to us!</p>
+            </div>
+        </div>
+    </div>
+
 </section>
 
 <script>
@@ -3467,6 +3511,8 @@ document.addEventListener('DOMContentLoaded', function(){
             }
         })();
     })();
+
+    
     </script>
     
 <script>
@@ -3487,7 +3533,100 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+
+    
 });
+
+</script>
+<script>
+    // -------------------------
+    // Feedback Modal
+    // -------------------------
+    const feedbackBtn = document.getElementById('feedbackBtn');
+    const feedbackModal = document.getElementById('feedbackModal');
+    const feedbackCloseBtn = document.getElementById('feedbackCloseBtn');
+    const emojiOptions = document.querySelectorAll('.emoji-option');
+    const feedbackForm = document.getElementById('feedbackForm');
+    const thankYouMessage = document.getElementById('thankYouMessage');
+    const feedbackSubmitBtn = document.getElementById('feedbackSubmitBtn');
+    const spinner = document.getElementById('spinner');
+    const ratingError = document.getElementById('ratingError');
+    const textError = document.getElementById('textError');
+    const feedbackText = document.getElementById('feedbackText');
+    let selectedRating = 0;
+
+    if(feedbackBtn && feedbackModal && feedbackCloseBtn && feedbackForm){
+        // Emoji selection
+        emojiOptions.forEach(option => {
+            option.addEventListener('click', () => {
+                emojiOptions.forEach(opt => opt.classList.remove('selected'));
+                option.classList.add('selected');
+                selectedRating = option.getAttribute('data-rating');
+                ratingError.style.display = 'none';
+            });
+        });
+
+        // Submit feedback
+        feedbackForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            let isValid = true;
+
+            if (selectedRating === 0) {
+                ratingError.style.display = 'block';
+                isValid = false;
+            } else {
+                ratingError.style.display = 'none';
+            }
+
+            if (feedbackText.value.trim() === '') {
+                textError.style.display = 'block';
+                isValid = false;
+            } else {
+                textError.style.display = 'none';
+            }
+
+            if (!isValid) return;
+
+            feedbackSubmitBtn.disabled = true;
+            spinner.style.display = 'block';
+
+            setTimeout(() => {
+                spinner.style.display = 'none';
+                feedbackForm.style.display = 'none';
+                thankYouMessage.style.display = 'block';
+
+                setTimeout(() => {
+                    closeFeedbackModal();
+                }, 3000);
+
+            }, 1500);
+        });
+
+        // Open/Close feedback modal
+        feedbackBtn.addEventListener('click', () => {
+            feedbackModal.style.display = 'flex';
+        });
+        feedbackCloseBtn.addEventListener('click', closeFeedbackModal);
+        window.addEventListener('click', (event) => {
+            if (event.target === feedbackModal) {
+                closeFeedbackModal();
+            }
+        });
+    }
+
+    function closeFeedbackModal() {
+        feedbackModal.style.display = 'none';
+        feedbackForm.style.display = 'block';
+        thankYouMessage.style.display = 'none';
+        feedbackText.value = '';
+        emojiOptions.forEach(opt => opt.classList.remove('selected'));
+        selectedRating = 0;
+        ratingError.style.display = 'none';
+        textError.style.display = 'none';
+        feedbackSubmitBtn.disabled = false;
+        spinner.style.display = 'none';
+    }
+
 </script>
 <script>
 // JS to toggle project step completion and update the UI

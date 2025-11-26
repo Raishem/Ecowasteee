@@ -29,61 +29,8 @@ if (!$user) {
     <title>Projects | EcoWaste</title>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&family=Open+Sans&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="assets/css/header.css">
     <link rel="stylesheet" href="assets/css/projects.css">
-    <style>
-        .profile-dropdown {
-            display: none;
-            position: absolute;
-            top: 100%;
-            right: 0;
-            background-color: white;
-            border-radius: 8px;
-                    
-            background-color: #eee;
-            margin: 8px 0;
-        }
 
-        .user-profile {
-            position: relative;
-            cursor: pointer;
-        }
-
-        .user-profile.active .dropdown-arrow {
-            transform: rotate(180deg);
-        }
-
-        .filter-tab {
-            cursor: pointer;
-            padding: 8px 16px;
-            border-radius: 6px;
-            transition: all 0.3s ease;
-        }
-
-        .filter-tab.active {
-            background-color: #2e8b57;
-            color: white;
-        }
-
-        .filter-tab:hover:not(.active) {
-            background-color: #f0f7e8;
-        }
-
-        .view-details {
-            background-color: #2e8b57;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .view-details:hover {
-            background-color: #3cb371;
-            transform: translateY(-1px);
-        }
-    </style>
 </head>
 <body>
     <header>
@@ -117,7 +64,7 @@ if (!$user) {
                     <li><a href="achievements.php"><i class="fas fa-star"></i>Achievements</a></li>
                     <li><a href="leaderboard.php"><i class="fas fa-trophy"></i>Leaderboard</a></li>
                     <li><a href="projects.php" class="active"><i class="fas fa-recycle"></i>Projects</a></li>
-                    <li><a href="donations.php"><i class="fas fa-box"></i>Donations</a></li>
+                    <li><a href="donations.php"><i class="fas fa-hand-holding-heart"></i>Donations</a></li>
                 </ul>
             </nav>
         </aside>
@@ -1056,6 +1003,96 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+
+
+// -------------------------
+    // Feedback Modal
+    // -------------------------
+    const feedbackBtn = document.getElementById('feedbackBtn');
+    const feedbackModal = document.getElementById('feedbackModal');
+    const feedbackCloseBtn = document.getElementById('feedbackCloseBtn');
+    const emojiOptions = document.querySelectorAll('.emoji-option');
+    const feedbackForm = document.getElementById('feedbackForm');
+    const thankYouMessage = document.getElementById('thankYouMessage');
+    const feedbackSubmitBtn = document.getElementById('feedbackSubmitBtn');
+    const spinner = document.getElementById('spinner');
+    const ratingError = document.getElementById('ratingError');
+    const textError = document.getElementById('textError');
+    const feedbackText = document.getElementById('feedbackText');
+    let selectedRating = 0;
+
+    if(feedbackBtn && feedbackModal && feedbackCloseBtn && feedbackForm){
+        // Emoji selection
+        emojiOptions.forEach(option => {
+            option.addEventListener('click', () => {
+                emojiOptions.forEach(opt => opt.classList.remove('selected'));
+                option.classList.add('selected');
+                selectedRating = option.getAttribute('data-rating');
+                ratingError.style.display = 'none';
+            });
+        });
+
+        // Submit feedback
+        feedbackForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            let isValid = true;
+
+            if (selectedRating === 0) {
+                ratingError.style.display = 'block';
+                isValid = false;
+            } else {
+                ratingError.style.display = 'none';
+            }
+
+            if (feedbackText.value.trim() === '') {
+                textError.style.display = 'block';
+                isValid = false;
+            } else {
+                textError.style.display = 'none';
+            }
+
+            if (!isValid) return;
+
+            feedbackSubmitBtn.disabled = true;
+            spinner.style.display = 'block';
+
+            setTimeout(() => {
+                spinner.style.display = 'none';
+                feedbackForm.style.display = 'none';
+                thankYouMessage.style.display = 'block';
+
+                setTimeout(() => {
+                    closeFeedbackModal();
+                }, 3000);
+
+            }, 1500);
+        });
+
+        // Open/Close feedback modal
+        feedbackBtn.addEventListener('click', () => {
+            feedbackModal.style.display = 'flex';
+        });
+        feedbackCloseBtn.addEventListener('click', closeFeedbackModal);
+        window.addEventListener('click', (event) => {
+            if (event.target === feedbackModal) {
+                closeFeedbackModal();
+            }
+        });
+    }
+
+    function closeFeedbackModal() {
+        feedbackModal.style.display = 'none';
+        feedbackForm.style.display = 'block';
+        thankYouMessage.style.display = 'none';
+        feedbackText.value = '';
+        emojiOptions.forEach(opt => opt.classList.remove('selected'));
+        selectedRating = 0;
+        ratingError.style.display = 'none';
+        textError.style.display = 'none';
+        feedbackSubmitBtn.disabled = false;
+        spinner.style.display = 'none';
+    }
+
 });
 </script>
 </body>

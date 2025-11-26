@@ -3,36 +3,337 @@
     padding: 0;
     box-sizing: border-box;
     font-family: 'Open Sans', sans-serif;
+    scrollbar-width: inherit;             
+    scrollbar-color: #82AA52 #f6ffeb;
 }
+
 
 html, body {
-    max-width: 100%;
-    overflow-x: hidden; /* prevent horizontal scrolling caused by long words */
-}
-
-/* sensible defaults to avoid overflow from long strings */
-body, p, h1, h2, h3, h4, a, span, .project-title, .material-name {
-    word-wrap: break-word;
-    word-break: break-word;
-    overflow-wrap: anywhere;
-}
-
-body {
     background-color: #f5f5f5;
     color: #333;
     line-height: 1.6;
-    min-height: 100vh;
+    height: 100%;
+    margin: 0;
+    overflow-y: auto;   /* allow one unified scrollbar */
+    overflow-x: hidden; /* prevent horizontal scroll */
 }
 
 h1, h2, h3, h4 {
     font-family: 'Montserrat', sans-serif;
 }
 
-/* Header and sidebar moved to shared stylesheet: assets/css/header.css
-   Project-specific file should not duplicate header/sidebar rules to avoid
-   conflicting styles. Keep page-specific layout rules below. */
+.container {
+    display: grid;
+    grid-template-columns: 250px 1fr 300px;
+    max-width: 1200px;
+    margin: 0 auto;
+    gap: 20px;
+    align-items: flex-start; /* sidebars align to top */
+}
 
-/* ...existing rules for project header, project-info, materials, etc. ... */
+/* Fix Header Structure with Larger Logo */
+header {
+    grid-column: 1 / -1;
+    background-color: #82AA52;
+    color: white;
+    padding: 0 20px; /* Remove vertical padding, we'll use min-height */
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    min-height: 80px; /* Increased to accommodate larger logo */
+    height: 90px; /* Fixed height for consistency */
+}
+
+.logo-container {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    height: 100%; /* Take full header height */
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    height: 100%; /* Match header height */
+    padding: 10px 0; /* Add padding inside logo container */
+}
+
+.logo img {
+    width: 70px; /* Slightly smaller than 80px for better fit */
+    height: 70px;
+    object-fit: contain;
+    transition: transform 0.3s ease;
+}
+
+.logo img:hover {
+    transform: scale(1.05);
+}
+
+/* Adjust user profile to align properly with larger logo */
+.user-profile {
+    display: flex;
+    align-items: center;
+    position: relative;
+    cursor: pointer;
+}
+
+.profile-pic {
+    width: 45px; /* Slightly larger to balance with logo */
+    height: 45px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 10px;
+    overflow: hidden;
+    background-color: #3d6a06ff;
+    color: white;
+    font-weight: bold;
+    font-size: 18px;
+}
+
+.profile-name {
+    font-weight: 600;
+    margin-right: 5px;
+    font-size: 16px; /* Slightly larger text */
+}
+
+/* Ensure dropdown positions correctly */
+.profile-dropdown {
+    position: absolute;
+    top: 100%; /* Position below the user profile area */
+    right: 0;
+    background-color: white;
+    border-radius: 5px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    width: 200px;
+    z-index: 100;
+    display: none;
+    overflow: hidden;
+}
+
+.dropdown-arrow {
+    transition: transform 0.3s;
+}
+
+.user-profile.active .dropdown-arrow {
+    transform: rotate(180deg);
+}
+
+
+.user-profile.active .profile-dropdown {
+    display: block;
+}
+
+.dropdown-item {
+    padding: 10px 15px;
+    color: #333;
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+    transition: background-color 0.2s;
+}
+
+.dropdown-item i {
+    margin-right: 10px;
+    width: 20px;
+    text-align: center;
+}
+
+.dropdown-item:hover {
+    background-color: #f5f5f5;
+}
+
+.dropdown-divider {
+    height: 1px;
+    background-color: #eee;
+    margin: 5px 0;
+}
+
+/* Enhanced Sidebar Styles */
+:root {
+    --primary-green: #82AA52;
+    --dark-green: #6d8f45;
+    --light-green: #F6FFEB;
+    --accent-green: #2e8b57;
+}
+
+/* Adjust sidebar top position to account for taller header */
+.sidebar {
+    background: linear-gradient(180deg, var(--light-green) 0%, #e8f5e8 100%);
+    padding: 30px 20px;
+    box-shadow: 5px 0 25px rgba(0,0,0,0.08);
+    position: sticky;
+    width: 250px;
+    top: 90px; /* Changed from 80px to match new header height */
+    align-self: start;
+    height: calc(100vh - 90px); /* Adjust for new header height */
+    overflow: hidden;
+    left: 0;
+    border: 1px solid rgba(130, 170, 82, 0.2);
+}
+
+/* Adjust main content and right sidebar top spacing */
+.main-content {
+    min-height: calc(100vh - 90px);
+    overflow: visible;
+    padding: 20px;
+    background-color: #fff;
+    grid-column: 2 / 4;
+    max-width: 100%; /* Prevent overflow */
+}
+
+/* Add better text wrapping for long content */
+.project-description {
+    max-width: 100%;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+/* Ensure project header doesn't get too wide */
+.project-header.card {
+    max-width: 100%;
+}
+
+/* Add better text handling for all main content */
+.main-content p,
+.main-content .project-title,
+.main-content .project-subtitle,
+.main-content .project-description {
+    max-width: 100%;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+.sidebar nav ul {
+    list-style: none;
+}
+
+.sidebar nav li {
+    margin-bottom: 12px;
+}
+
+.sidebar nav a {
+    text-decoration: none;
+    color: #333;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 12px 15px;
+    border-radius: 12px;
+    transition: all 0.3s ease;
+    background: #f4fce8;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.sidebar nav a.active,
+.sidebar nav a:hover {
+    background: linear-gradient(135deg, var(--primary-green) 0%, var(--accent-green) 100%);
+    color:#F6FFEB;
+    transform: translateX(5px);
+    box-shadow: 0 5px 15px rgba(130, 170, 82, 0.3);
+}
+
+.sidebar nav a i {
+    width: 20px;
+    text-align: center;
+    font-size: 18px;
+}
+
+/* Active States */
+.sidebar nav a.active,
+.sidebar nav a[href="projects.php"] {
+    color: #faffe8;
+}
+
+/* Enhanced Sidebar Scrollbar */
+.sidebar::-webkit-scrollbar {
+    width: 8px;
+}
+
+.sidebar::-webkit-scrollbar-track {
+    background: rgba(130, 170, 82, 0.1);
+    border-radius: 10px;
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, var(--primary-green) 0%, var(--dark-green) 100%);
+    border-radius: 10px;
+}
+
+.sidebar::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(135deg, var(--dark-green) 0%, #5a7537 100%);
+}
+
+/* For Firefox */
+.sidebar {
+    scrollbar-width: thin;
+    scrollbar-color: var(--primary-green) rgba(130, 170, 82, 0.1);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    header {
+        min-height: 70px;
+        height: 70px;
+        padding: 0 15px;
+    }
+    
+    .logo img {
+        width: 55px;
+        height: 55px;
+    }
+    
+    .profile-pic {
+        width: 40px;
+        height: 40px;
+    }
+    
+    .sidebar {
+        top: 70px;
+        height: calc(100vh - 70px);
+    }
+    
+    .main-content {
+        height: calc(100vh - 70px);
+    }
+}
+
+@media (max-width: 480px) {
+    header {
+        min-height: 60px;
+        height: 60px;
+        padding: 0 10px;
+    }
+    
+    .logo img {
+        width: 45px;
+        height: 45px;
+    }
+    
+    .profile-pic {
+        width: 35px;
+        height: 35px;
+        font-size: 16px;
+    }
+    
+    .profile-name {
+        font-size: 14px;
+    }
+    
+    .sidebar {
+        top: 60px;
+        height: calc(100vh - 60px);
+    }
+    
+    .main-content {
+        height: calc(100vh - 60px);
+    }
+}
+
 
 .project-header.card {
     position: relative;
@@ -104,6 +405,7 @@ h1, h2, h3, h4 {
     padding: 8px 0;
     margin-top: 8px;
 }
+
 
 .back-link {
     display: inline-flex;
@@ -298,7 +600,7 @@ h1, h2, h3, h4 {
     margin-top: 12px;
 }
 
-/* Header actions and notification icon (if DOM includes them) */
+/* Header actions and notification icon (if DOM includes them) 
 .header-actions {
     display: flex;
     align-items: center;
@@ -358,16 +660,16 @@ h1, h2, h3, h4 {
 .header-notif .hn-msg { color: #555; font-size: 0.95rem; margin-bottom: 6px; }
 .header-notif .hn-time { color: #888; font-size: 0.8rem; }
 
-/* Pulse animation for badge */
+/* Pulse animation for badge 
 .notification-badge.pulse {
     animation: pulse 1.2s ease-out;
-}
+} 
 
 @keyframes pulse {
     0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.6); }
     70% { transform: scale(1.15); box-shadow: 0 0 0 10px rgba(231, 76, 60, 0); }
     100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(231, 76, 60, 0); }
-}
+} */
 
 /* Responsive: on small screens fall back to stacked flow and move meta inline */
 @media (max-width: 880px) {
@@ -715,11 +1017,12 @@ h1, h2, h3, h4 {
 .modal-content::before {
     content: '';
     position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
+    top: 0px;
+    left: 4px;
+    width: 633px;
     height: 4px;
     background: linear-gradient(to right, #2e8b57, #3cb371);
+    border-radius: 12px 12px 0 0;
 }
 
 .modal-header {
@@ -926,12 +1229,16 @@ h1, h2, h3, h4 {
     line-height: 1.8;
     font-size: 1.05em;
     padding: 8px 0;
-    margin-top: 8px;
+    margin-top: -25px;
 
     overflow: hidden;
     transition: max-height 0.35s ease-in-out;
 }
 
+.project-description.collapsed {
+    max-height: 100px; /* preview */
+    margin-top: auto;
+}
 
 .project-description.expanded {
     max-height: none; /* full */
@@ -944,7 +1251,6 @@ h1, h2, h3, h4 {
     font-size: 0.95rem;
     color: #2e8b57;
     cursor: pointer;
-    -webkit-user-select: none;
     user-select: none;
     transition: color 0.2s ease;
     background: none;
@@ -971,4 +1277,178 @@ h1, h2, h3, h4 {
 
 .project-description {
     transition: max-height 0.3s ease;
+}
+
+/* feedback system */
+.feedback-btn {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    width: 60px;
+    height: 60px;
+    background-color: #82AA52;
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+    z-index: 100;
+    transition: all 0.3s ease;
+}
+
+.feedback-btn:hover {
+    transform: scale(1.1);
+    background-color: #6d8f45;
+}
+
+.feedback-modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+    z-index: 2000;
+    justify-content: center;
+    align-items: center;
+}
+
+.feedback-content {
+    background-color: white;
+    padding: 30px;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 500px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    position: relative;
+}
+
+.feedback-close-btn {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    font-size: 24px;
+    cursor: pointer;
+    color: #777;
+}
+
+.feedback-close-btn:hover {
+    color: #333;
+}
+
+.feedback-form h3 {
+    color: #82AA52;
+    margin-bottom: 20px;
+    font-family: 'Montserrat', sans-serif;
+}
+
+.emoji-rating {
+    display: flex;
+    justify-content: space-between;
+    margin: 20px 0;
+}
+
+.emoji-option {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    cursor: pointer;
+    transition: transform 0.2s;
+    padding: 5px;
+    border-radius: 50%;
+}
+
+.emoji-option:hover {
+    transform: scale(1.2);
+    background-color: #f0f7e8;
+}
+
+.emoji-option.selected {
+    transform: scale(1.3);
+    background-color: #e0f0d8;
+}
+
+.emoji {
+    font-size: 30px;
+    margin-bottom: 5px;
+}
+
+.emoji-label {
+    font-size: 12px;
+    color: #666;
+}
+
+.feedback-detail {
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 10px;
+}
+
+.feedback-form textarea {
+    width: 100%;
+    padding: 15px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    resize: vertical;
+    min-height: 150px;
+    margin-bottom: 20px;
+    font-family: 'Open Sans', sans-serif;
+}
+
+.feedback-submit-btn {
+    background-color: #82AA52;
+    color: white;
+    border: none;
+    padding: 12px 25px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background-color 0.3s;
+    width: 100%;
+}
+
+.feedback-submit-btn:hover {
+    background-color: #6d8f45;
+}
+
+.thank-you-message {
+    display: none;
+    text-align: center;
+    padding: 20px;
+}
+
+.thank-you-message h3 {
+    color: #82AA52;
+    margin-bottom: 15px;
+}
+
+.thank-you-emoji {
+    font-size: 50px;
+    margin-bottom: 20px;
+}
+
+.error-message {
+    color: #e74c3c;
+    font-size: 13px;
+    margin-top: 5px;
+    display: none;
+}
+
+.spinner {
+    display: none;
+    width: 20px;
+    height: 20px;
+    border: 3px solid rgba(255,255,255,0.3);
+    border-radius: 50%;
+    border-top-color: white;
+    animation: spin 1s ease-in-out infinite;
+    margin-left: 10px;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
 }
