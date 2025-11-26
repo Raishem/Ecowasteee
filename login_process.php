@@ -52,12 +52,12 @@ try {
         exit();
     }
 
-    // Check if email is verified
-    //if (!$user['verified']) {
-    ///    $_SESSION['login_error'] = 'Please verify your email first';
-    ///    header('Location: login.php');
-    ///    exit();
-    ///}
+    // ✅ Check if email is verified
+    if ($user['is_verified'] == 0) {
+        $_SESSION['login_error'] = 'Please verify your email before logging in';
+        header('Location: login.php');
+        exit();
+    }
 
     // Set session variables
     $_SESSION['logged_in'] = true;
