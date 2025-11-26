@@ -80,6 +80,8 @@ if ($result && $result->num_rows > 0) {
     <main class="main-content">
         <div class="leaderboard-container">
             <h2 class="leaderboard-title">Community Leaderboard</h2>
+            <p class="leaderboard-subtitle">Top contributors making a difference for our planet</p>
+            
             <table class="leaderboard-table">
                 <thead>
                     <tr>
@@ -89,32 +91,64 @@ if ($result && $result->num_rows > 0) {
                     </tr>
                 </thead>
                 <tbody>
-                    <?php foreach ($users as $i => $user): ?>
-                    <tr>
-                        <td class="rank"><?= $i + 1 ?></td>
-                        <td class="user-info">
-                            <?php
-                                $userId = isset($user['user_id']) ? (int)$user['user_id'] : 0;
-                                $userName = !empty($user['first_name']) ? htmlspecialchars($user['first_name']) : 'Unknown User';
-                                $profilePic = !empty($user['profile_pic']) ? htmlspecialchars($user['profile_pic']) : null;
-                            ?>
-                            <a href="profile.php?id=<?= $userId ?>" class="user-link">
-                                <div class="user-profile-pic">
-                                    <?php if ($profilePic): ?>
-                                        <img src="uploads/<?= $profilePic ?>" alt="<?= $userName ?>">
-                                    <?php else: ?>
-                                        <div class="default-icon"><i class="fas fa-user"></i></div>
-                                    <?php endif; ?>
-                                </div>
-                                <span class="user-name"><?= $userName ?></span>
-                            </a>
+                    <?php foreach ($users as $i => $user): 
+                        $rank = $i + 1;
+                        $userId = isset($user['user_id']) ? (int)$user['user_id'] : 0;
+                        $userName = !empty($user['first_name']) ? htmlspecialchars($user['first_name']) : 'Unknown User';
+                        $profilePic = !empty($user['profile_pic']) ? htmlspecialchars($user['profile_pic']) : null;
+                        $points = htmlspecialchars($user['points']);
+                        
+                        // Determine special styling for top ranks
+                        $rankClass = '';
+                        if ($rank === 1) {
+                            $rankClass = 'rank-first';
+                        } elseif ($rank === 2) {
+                            $rankClass = 'rank-second';
+                        } elseif ($rank === 3) {
+                            $rankClass = 'rank-third';
+                        }
+                    ?>
+                    <tr class="<?= $rankClass ?>">
+                        <td class="rank">
+                            <div class="rank-container">
+                                <?php if ($rank <= 3): ?>
+                                    <div class="rank-badge rank-<?= $rank ?>">
+                                        <i class="fas fa-trophy"></i>
+                                        <span><?= $rank ?></span>
+                                    </div>
+                                <?php else: ?>
+                                    <span class="rank-number"><?= $rank ?></span>
+                                <?php endif; ?>
+                            </div>
                         </td>
-
-                        <td class="points"><?= htmlspecialchars($user['points']) ?></td>
+                        <td class="user-info">
+                            <div class="user-link-wrapper">
+                                <a href="profile.php?id=<?= $userId ?>" class="user-link">
+                                    <div class="profile-pic">
+                                        <?= strtoupper(substr($userName, 0, 1)) ?>
+                                    </div>
+                                    <span class="user-name"><?= $userName ?></span>
+                                </a>
+                            </div>
+                        </td>
+                        <td class="points">
+                            <div class="points-container">
+                                <span class="points-value"><?= $points ?></span>
+                                <span class="points-label">pts</span>
+                            </div>
+                        </td>
                     </tr>
                     <?php endforeach; ?>
                 </tbody>
             </table>
+            
+            <?php if (empty($users)): ?>
+                <div class="empty-leaderboard">
+                    <i class="fas fa-trophy"></i>
+                    <h3>No Users Yet</h3>
+                    <p>Be the first to earn points and appear on the leaderboard!</p>
+                </div>
+            <?php endif; ?>
         </div>
     </main>
 </div>

@@ -3,6 +3,8 @@
     padding: 0;
     box-sizing: border-box;
     font-family: 'Open Sans', sans-serif;
+    scrollbar-width: inherit;
+    scrollbar-color: #82AA52 #f0f0f0;
 }
 
 html, body {
@@ -12,6 +14,8 @@ html, body {
     height: 100%;
     overflow: hidden;
     line-height: 1.6;
+    overflow-y: auto;   /* allow one unified scrollbar */
+    overflow-x: hidden; /* prevent horizontal scroll */
 }
 
 h1, h2, h3, h4 {
@@ -162,41 +166,22 @@ header {
     padding: 30px 20px;
     box-shadow: 5px 0 25px rgba(0,0,0,0.08);
     position: sticky;
-    top: 80px; /* Changed from 80px to match new header height */
+    width: 250px;
+    top: 90px; /* Changed from 80px to match new header height */
     align-self: start;
-    height: calc(100vh - 80px); /* Adjust for new header height */
-    overflow-y: auto;
+    height: calc(100vh - 90px); /* Adjust for new header height */
+    overflow: hidden;
+    left: 0;
     border: 1px solid rgba(130, 170, 82, 0.2);
 }
 
 /* Adjust main content and right sidebar top spacing */
 .main-content {
-    height: calc(100vh - 80px); /* Fits between header and bottom of screen */
-    overflow-y: auto; /* ✅ Only main content scrolls */
-    overflow-x: hidden;
-    padding: 20px;
+    padding: 30px;
     background-color: #fff;
-    grid-column: 2 / 3;
-    scrollbar-width: inherit;
-    scrollbar-color: #82AA52 #f0f0f0;
-}
-
-/* ✅ Custom scrollbar for the main content only */
-.main-content::-webkit-scrollbar {
-    width: 10px;
-}
-
-.main-content::-webkit-scrollbar-track {
-    background: #f0f0f0;
-}
-
-.main-content::-webkit-scrollbar-thumb {
-    background: linear-gradient(135deg, #82AA52 0%, #6d8f45 100%);
     border-radius: 10px;
-}
-
-.main-content::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(135deg, #6d8f45 0%, #5a7537 100%);
+    grid-column: 2 / 3;
+    width: 900px;
 }
 
 
@@ -579,18 +564,36 @@ header {
     gap: 12px;
 }
 
+/* Make entire user area clickable */
+.user-link-wrapper {
+    width: 100%;
+}
+
 .user-link {
     display: flex;
     align-items: center;
     text-decoration: none;
     color: #333;
-    transition: color 0.2s ease-in-out;
+    transition: all 0.2s ease-in-out;
+    padding: 8px 12px;
+    border-radius: 8px;
+    width: 100%;
+}
+
+.user-link:hover {
+    background-color: rgba(130, 170, 82, 0.1);
+    transform: translateX(5px);
 }
 
 .user-link:hover .user-name {
     color: #2e8b57;
-    text-decoration: underline;
 }
+
+.user-link:hover .profile-pic {
+    transform: scale(1.1);
+    box-shadow: 0 0 8px rgba(130, 170, 82, 0.4);
+}
+
 
 .user-profile-pic {
     width: 38px;
@@ -627,4 +630,268 @@ header {
     transform: scale(1.05);
     box-shadow: 0 0 6px rgba(130, 170, 82, 0.3);
     transition: all 0.2s ease;
+}
+
+/* ===== ENHANCED LEADERBOARD STYLES ===== */
+
+.leaderboard-subtitle {
+    color: #666;
+    margin-bottom: 25px;
+    font-size: 16px;
+}
+
+/* Enhanced table styling */
+.leaderboard-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+}
+
+/* Top rank special styling */
+.rank-first {
+    background: linear-gradient(135deg, #fff9e6 0%, #fff0c2 100%);
+    border-left: 4px solid #FFD700;
+}
+
+.rank-second {
+    background: linear-gradient(135deg, #f0f0f0 0%, #e8e8e8 100%);
+    border-left: 4px solid #C0C0C0;
+}
+
+.rank-third {
+    background: linear-gradient(135deg, #f7e8d1 0%, #f0d9b5 100%);
+    border-left: 4px solid #CD7F32;
+}
+
+/* Rank badges for top 3 */
+.rank-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.rank-badge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    position: relative;
+    font-weight: bold;
+    color: white;
+}
+
+.rank-badge.rank-1 {
+    background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+    box-shadow: 0 2px 5px rgba(255, 215, 0, 0.3);
+}
+
+.rank-badge.rank-2 {
+    background: linear-gradient(135deg, #C0C0C0 0%, #A0A0A0 100%);
+    box-shadow: 0 2px 5px rgba(192, 192, 192, 0.3);
+}
+
+.rank-badge.rank-3 {
+    background: linear-gradient(135deg, #CD7F32 0%, #A66A28 100%);
+    box-shadow: 0 2px 5px rgba(205, 127, 50, 0.3);
+}
+
+.rank-badge i {
+    font-size: 14px;
+    margin-right: 2px;
+}
+
+.rank-badge span {
+    font-size: 14px;
+}
+
+.rank-number {
+    font-weight: bold;
+    font-size: 18px;
+    color: #555;
+}
+
+/* Enhanced points display */
+.points-container {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.points-value {
+    font-weight: 700;
+    font-size: 18px;
+    color: #2e8b57;
+}
+
+.points-label {
+    font-size: 12px;
+    color: #777;
+    font-weight: normal;
+}
+
+/* Empty leaderboard state */
+.empty-leaderboard {
+    text-align: center;
+    padding: 60px 20px;
+    color: #777;
+}
+
+.empty-leaderboard i {
+    font-size: 60px;
+    color: #ddd;
+    margin-bottom: 20px;
+    display: block;
+}
+
+.empty-leaderboard h3 {
+    color: #999;
+    margin-bottom: 10px;
+}
+
+/* Enhanced hover effects */
+.leaderboard-table tr {
+    transition: all 0.3s ease;
+}
+
+.leaderboard-table tr:not(.rank-first):not(.rank-second):not(.rank-third):hover {
+    background-color: #f0f7e8;
+    transform: translateY(-2px);
+    box-shadow: 0 3px 8px rgba(0,0,0,0.08);
+}
+
+/* Improved user info section */
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.user-link {
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+    color: #333;
+    transition: all 0.2s ease-in-out;
+    padding: 5px;
+    border-radius: 8px;
+}
+
+.user-link:hover {
+    background-color: rgba(130, 170, 82, 0.1);
+    transform: translateX(5px);
+}
+
+.user-link:hover .user-name {
+    color: #2e8b57;
+}
+
+.user-profile-pic {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    overflow: hidden;
+    background-color: #f2f8f0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    border: 2px solid #d6e8d0;
+    transition: all 0.2s ease;
+}
+
+.user-link:hover .user-profile-pic {
+    transform: scale(1.1);
+    box-shadow: 0 0 8px rgba(130, 170, 82, 0.4);
+}
+
+.user-profile-pic img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.user-profile-pic .default-icon {
+    color: #82AA52;
+    font-size: 18px;
+}
+
+.user-name {
+    font-weight: 600;
+    font-size: 16px;
+    white-space: nowrap;
+}
+
+/* Responsive improvements */
+@media (max-width: 768px) {
+    .leaderboard-table {
+        font-size: 14px;
+    }
+    
+    .user-profile-pic {
+        width: 36px;
+        height: 36px;
+    }
+    
+    .user-name {
+        font-size: 14px;
+    }
+    
+    .points-value {
+        font-size: 16px;
+    }
+    
+    .rank-badge {
+        width: 32px;
+        height: 32px;
+    }
+    
+    .rank-badge i {
+        font-size: 12px;
+    }
+    
+    .rank-badge span {
+        font-size: 12px;
+    }
+}
+
+@media (max-width: 480px) {
+    .leaderboard-container {
+        padding: 20px 15px;
+    }
+    
+    .leaderboard-table th,
+    .leaderboard-table td {
+        padding: 10px 8px;
+    }
+    
+    .user-info {
+        gap: 8px;
+    }
+    
+    .user-profile-pic {
+        width: 32px;
+        height: 32px;
+    }
+    
+    .user-name {
+        font-size: 13px;
+    }
+    
+    .points-container {
+        flex-direction: column;
+        gap: 2px;
+    }
+    
+    .points-value {
+        font-size: 14px;
+    }
+    
+    .points-label {
+        font-size: 10px;
+    }
 }
