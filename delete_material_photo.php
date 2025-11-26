@@ -20,6 +20,14 @@ if ($photo_id <= 0) {
     echo json_encode(['success' => false, 'message' => 'Invalid photo id']);
     exit();
 }
+// Temporary server-side debug log to confirm this endpoint was reached during troubleshooting.
+try {
+    $logDir = __DIR__ . '/logs';
+    if (!is_dir($logDir)) @mkdir($logDir, 0755, true);
+    $logFile = $logDir . '/delete_material_photo_debug.log';
+    $entry = date('[Y-m-d H:i:s] ') . 'user:' . (isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : 'anon') . ' photo_id:' . $photo_id . ' ip:' . ($_SERVER['REMOTE_ADDR'] ?? 'n/a') . PHP_EOL;
+    @file_put_contents($logFile, $entry, FILE_APPEND | LOCK_EX);
+} catch(Exception $e) { /* ignore logging errors */ }
 try {
     $conn = getDBConnection();
     $pstmt = $conn->prepare("SELECT photo_path, material_id FROM material_photos WHERE id = ? LIMIT 1");

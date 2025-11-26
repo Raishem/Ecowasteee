@@ -59,6 +59,8 @@ try {
 
         // Helper: fetch stage name from template so we can apply stage-specific requirements
         $stage_name = '';
+        // list of template numbers that correspond to Material Collection (populated below)
+        $materialTemplateNumbers = [];
         try {
             $name_stmt = $conn->prepare("SELECT stage_name FROM stage_templates WHERE stage_number = ? LIMIT 1");
             $name_stmt->bind_param("i", $stage_number);
@@ -103,7 +105,6 @@ try {
                     $scan = $conn->prepare("SELECT stage_number, stage_name FROM stage_templates WHERE LOWER(stage_name) LIKE '%material%'");
                     $scan->execute();
                     $sres = $scan->get_result();
-                    $materialTemplateNumbers = [];
                     while ($sr = $sres->fetch_assoc()) {
                         $materialTemplateNumbers[] = (int)$sr['stage_number'];
                     }
@@ -149,7 +150,11 @@ try {
             }
 
             // Additional rule: if this is the Preparation stage (name contains 'prepar'), require an 'after' photo for each material
-            $isPreparation = strpos($stage_name, 'prepar') !== false;
+            // Treat as Preparation only when name contains 'prepar' AND this template is not one
+            // of the known Material Collection template numbers. This keeps renamed
+            // Material Collection stages (renamed to "Preparation" in the UI) using the
+            // looser material rules rather than the stricter 'after photo' requirement.
+            $isPreparation = (strpos($stage_name, 'prepar') !== false) && !(in_array($stage_number, $materialTemplateNumbers, true));
             if ($isPreparation) {
                 try {
                     $totStmt = $conn->prepare("SELECT COUNT(*) AS tot FROM project_materials WHERE project_id = ?");

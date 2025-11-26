@@ -499,8 +499,6 @@ if (!$user) {
                 }
             }
 
-        }
-
         // Functions for managing materials
         function showAddMaterialForm() {
             document.getElementById('addMaterialForm').style.display = 'block';
@@ -887,11 +885,11 @@ if (!$user) {
         }
 
         // Project filters functionality
-        const filterTabs = document.querySelectorAll('.filter-tab');
-        filterTabs.forEach(tab => {
+        const filterTabsInit = document.querySelectorAll('.filter-tab');
+        filterTabsInit.forEach(tab => {
             tab.addEventListener('click', () => {
                 // Update active tab
-                filterTabs.forEach(t => t.classList.remove('active'));
+                filterTabsInit.forEach(t => t.classList.remove('active'));
                 tab.classList.add('active');
 
                 const filter = tab.getAttribute('data-filter');

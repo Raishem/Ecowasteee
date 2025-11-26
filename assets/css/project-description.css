@@ -13,6 +13,7 @@
 .project-description.collapsed {
     display: -webkit-box;
     -webkit-line-clamp: 5; /* show up to 5 lines */
+    line-clamp: 5;
     -webkit-box-orient: vertical;
     overflow: hidden;
 }
@@ -20,6 +21,7 @@
 .project-description.expanded {
     display: block !important;
     -webkit-line-clamp: unset !important;
+    line-clamp: unset !important;
     -webkit-box-orient: unset !important;
     overflow: visible !important;
     max-height: none !important;
