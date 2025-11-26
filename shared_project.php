@@ -11,20 +11,23 @@ if (!$shared_id) {
 $conn = getDBConnection();
 
 $stmt = $conn->prepare("SELECT sp.*, u.username FROM shared_projects sp LEFT JOIN users u ON u.user_id = sp.user_id WHERE sp.shared_id = ?");
-$stmt->execute([$shared_id]);
-$proj = $stmt->fetch(PDO::FETCH_ASSOC);
+$stmt->bind_param('i', $shared_id);
+$stmt->execute();
+$proj = $stmt->get_result()->fetch_assoc();
 if (!$proj) {
     echo "<p>Shared project not found</p>";
     exit;
 }
 
 $mstmt = $conn->prepare("SELECT * FROM shared_materials WHERE shared_id = ?");
-$mstmt->execute([$shared_id]);
-$materials = $mstmt->fetchAll(PDO::FETCH_ASSOC);
+$mstmt->bind_param('i', $shared_id);
+$mstmt->execute();
+$materials = $mstmt->get_result()->fetch_all(MYSQLI_ASSOC);
 
 $sstmt = $conn->prepare("SELECT * FROM shared_steps WHERE shared_id = ? ORDER BY step_number");
-$sstmt->execute([$shared_id]);
-$steps = $sstmt->fetchAll(PDO::FETCH_ASSOC);
+$sstmt->bind_param('i', $shared_id);
+$sstmt->execute();
+$steps = $sstmt->get_result()->fetch_all(MYSQLI_ASSOC);
 
 ?><!doctype html>
 <html>
@@ -175,8 +178,9 @@ try {
         SELECT * FROM project_materials 
         WHERE project_id = ?
     ");
-    $materials_stmt->execute([$project['project_id']]);
-    $materials = $materials_stmt->fetchAll(PDO::FETCH_ASSOC);
+    $materials_stmt->bind_param('i', $project['project_id']);
+    $materials_stmt->execute();
+    $materials = $materials_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 
     // Get project steps with photos
     $steps_stmt = $conn->prepare("
@@ -187,8 +191,9 @@ try {
         GROUP BY s.step_id
         ORDER BY s.step_number
     ");
-    $steps_stmt->execute([$project['project_id']]);
-    $steps = $steps_stmt->fetchAll(PDO::FETCH_ASSOC);
+    $steps_stmt->bind_param('i', $project['project_id']);
+    $steps_stmt->execute();
+    $steps = $steps_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 
 } catch (PDOException $e) {
     // Log error and redirect

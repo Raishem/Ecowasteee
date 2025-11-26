@@ -178,11 +178,13 @@ header {
 
 /* Adjust main content and right sidebar top spacing */
 .main-content {
-    min-height: calc(100vh - 90px); /* Adjust for new header height */
+    min-height: calc(100vh - 90px);
     overflow: visible;
-    padding: 20px;
+    padding: 30px;
     background-color: #fff;
-    grid-column: 2 / 3;
+    grid-column: 2 / 4; /* ← Span both middle AND right columns */
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .sidebar nav ul {
