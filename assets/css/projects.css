@@ -3,7 +3,10 @@
     padding: 0;
     box-sizing: border-box;
     font-family: 'Open Sans', sans-serif;
+    scrollbar-width: inherit;             
+    scrollbar-color: #82AA52 #f6ffeb;
 }
+
 
 /* Prevent extremely long words/strings from breaking layouts */
 html, body {
@@ -140,7 +143,6 @@ body, .container, .main-content, .projects-container, .project-card, .project-de
     font-style: italic;
 }
 
-/* ...existing code... */
 
 /* Responsive: on small screens, place the View Details button below the card content */
 @media (max-width: 768px) {
@@ -241,6 +243,7 @@ body, .container, .main-content, .projects-container, .project-card, .project-de
     transition: background-color 0.2s ease, transform 0.12s;
     white-space: nowrap;
     min-width: 150px;
+    text-decoration: none !important;
 }
 
 .action-btn.view-details:hover {
@@ -272,13 +275,15 @@ input.edit-input, textarea.edit-input, .form-row input, .form-row textarea, #new
 .cancel-btn { border: 1px solid #ddd !important; background: #f8f9fa !important; color: #333 !important; }
 .save-btn { background: #82AA52 !important; color: #fff !important; }
 
-/* Hide any accidental horizontal scrollbar on body */
-html, body { overflow-x: hidden; }
 
-body {
+html, body {
     background-color: #f5f5f5;
     color: #333;
     line-height: 1.6;
+    height: 100%;
+    margin: 0;
+    overflow-y: auto;   /* allow one unified scrollbar */
+    overflow-x: hidden; /* prevent horizontal scroll */
 }
 
 h1, h2, h3, h4 {
@@ -287,10 +292,11 @@ h1, h2, h3, h4 {
 
 .container {
     display: grid;
-    grid-template-columns: 250px 1fr;
+    grid-template-columns: 250px 1fr 300px;
     max-width: 1200px;
     margin: 0 auto;
     gap: 20px;
+    align-items: flex-start; /* sidebars align to top */
 }
 
 /* Fix Header Structure with Larger Logo */
@@ -385,18 +391,6 @@ header {
     transform: rotate(180deg);
 }
 
-.profile-dropdown {
-    position: absolute;
-    top: 100%;
-    right: 0;
-    background-color: white;
-    border-radius: 5px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    width: 200px;
-    z-index: 100;
-    display: none;
-    overflow: hidden;
-}
 
 .user-profile.active .profile-dropdown {
     display: block;
@@ -441,11 +435,22 @@ header {
     padding: 30px 20px;
     box-shadow: 5px 0 25px rgba(0,0,0,0.08);
     position: sticky;
-    top: 80px; /* Changed from 80px to match new header height */
+    width: 250px;
+    top: 90px; /* Changed from 80px to match new header height */
     align-self: start;
-    height: calc(100vh - 80px); /* Adjust for new header height */
-    overflow-y: auto;
+    height: calc(100vh - 90px); /* Adjust for new header height */
+    overflow: hidden;
+    left: 0;
     border: 1px solid rgba(130, 170, 82, 0.2);
+}
+
+/* Adjust main content and right sidebar top spacing */
+.main-content {
+    min-height: calc(100vh - 90px); /* Adjust for new header height */
+    overflow: visible;
+    padding: 20px;
+    background-color: #fff;
+    grid-column: 2 / 3;
 }
 
 .sidebar nav ul {
@@ -482,6 +487,12 @@ header {
     width: 20px;
     text-align: center;
     font-size: 18px;
+}
+
+/* Active States */
+.sidebar nav a.active,
+.sidebar nav a[href="projects.php"] {
+    color: #faffe8;
 }
 
 /* Enhanced Sidebar Scrollbar */
@@ -1589,20 +1600,6 @@ textarea:focus {
     background: #999999;
 }
 
-.profile-pic {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-right: 10px;
-    overflow: hidden;
-    background-color: #3d6a06;
-    color: white;
-    font-weight: bold;
-    font-size: 18px;
-}
 
 .projects-container {
             display: grid;

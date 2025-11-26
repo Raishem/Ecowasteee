@@ -282,7 +282,7 @@ try {
 // Get user data for header
 try {
     if ($conn) {
-        $user_stmt = $conn->prepare("SELECT first_name, last_name, avatar FROM users WHERE user_id = ?");
+        $user_stmt = $conn->prepare("SELECT username, avatar FROM users WHERE user_id = ?");
         $user_stmt->bind_param("i", $_SESSION['user_id']);
         $user_stmt->execute();
         $user_data = $user_stmt->get_result()->fetch_assoc();
@@ -301,7 +301,8 @@ try {
     <title>Project Details | EcoWaste</title>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Open+Sans:wght@400;500;600&display=swap">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="assets/css/project-details.css">
+    <link rel="stylesheet" href="assets/css/header.css">
+    <link rel="stylesheet" href="assets/css/projects.css">
     <link rel="stylesheet" href="assets/css/project-details-modern-v2.css">
     <link rel="stylesheet" href="assets/css/project-description.css">
     <link rel="stylesheet" href="assets/css/project-materials.css?v=4">
@@ -447,24 +448,24 @@ try {
             </div>
             <h1>EcoWaste</h1>
         </div>
-        <!-- <div class="header-right">
+        <div class="header-right">
             <div class="notifications-icon" id="headerNotifications" title="Notifications">
                 <i class="fas fa-bell"></i>
                 <span class="notification-badge" id="headerUnreadCount"></span>
                 <div class="header-notifications-panel" id="headerNotificationsPanel" aria-hidden="true">
-                     notifications loaded dynamically 
+                    <!-- notifications loaded dynamically -->
                 </div>
-            </div> -->
+            </div>
 
             <div class="user-profile" id="userProfile">
                 <div class="profile-pic">
-                    <?= strtoupper(substr(htmlspecialchars($user_data['first_name'] ?? 'U'), 0, 1)) ?>
+                    <?= !empty($user_data['avatar']) ? '<img src="'.htmlspecialchars($user_data['avatar']).'" alt="Profile">' : strtoupper(substr(htmlspecialchars($user_data['username'] ?? 'U'), 0, 1)) ?>
                 </div>
-                <span class="profile-name"><?= htmlspecialchars($user_data['first_name'] ?? 'User') ?></span>
+                <span class="profile-name"><?= htmlspecialchars($user_data['username'] ?? ($_SESSION['first_name'] ?? 'User')) ?></span>
                 <i class="fas fa-chevron-down dropdown-arrow"></i>
                 <div class="profile-dropdown">
                     <a href="profile.php" class="dropdown-item"><i class="fas fa-user"></i> My Profile</a>
-                    <a href="#" class="dropdown-item"><i class="fas fa-cog"></i> Settings</a>
+                    <a href="settings.php" class="dropdown-item"><i class="fas fa-cog"></i> Settings</a>
                     <div class="dropdown-divider"></div>
                     <a href="logout.php" class="dropdown-item"><i class="fas fa-sign-out-alt"></i> Logout</a>
                 </div>
@@ -475,15 +476,25 @@ try {
     <div class="container">
         <!-- Left Sidebar -->
         <aside class="sidebar">
-            <nav>
-                <ul>
-                    <li><a href="homepage.php"><i class="fas fa-home"></i> Home</a></li>
-                    <li><a href="browse.php"><i class="fas fa-search"></i> Browse</a></li>
-                    <li><a href="achievements.php"><i class="fas fa-star"></i> Achievements</a></li>
-                    <li><a href="leaderboard.php"><i class="fas fa-trophy"></i> Leaderboard</a></li>
-                    <li><a href="projects.php" class="active"><i class="fas fa-recycle"></i> Projects</a></li>
-                    <li><a href="donations.php"><i class="fas fa-hand-holding-heart"></i> Donations</a></li>
-                </ul>
+            <nav class="side-navigation">
+                <a href="homepage.php" class="nav-item">
+                    <i class="fas fa-home"></i> Home
+                </a>
+                <a href="browse.php" class="nav-item">
+                    <i class="fas fa-search"></i> Browse
+                </a>
+                <a href="projects.php" class="nav-item active">
+                    <i class="fas fa-recycle"></i> My Projects
+                </a>
+                <a href="donations.php" class="nav-item">
+                    <i class="fas fa-hand-holding-heart"></i> Donations
+                </a>
+                <a href="achievements.php" class="nav-item">
+                    <i class="fas fa-trophy"></i> Achievements
+                </a>
+                <a href="leaderboard.php" class="nav-item">
+                    <i class="fas fa-crown"></i> Leaderboard
+                </a>
             </nav>
         </aside>
 
@@ -518,61 +529,6 @@ try {
     <div class="project-meta">
         <i class="far fa-calendar-alt"></i> Created: <?= date('M d, Y', strtotime($project['created_at'])) ?>
     </div>
-
-    <!-- Feedback Button -->
-    <div class="feedback-btn" id="feedbackBtn">💬</div>
-
-    <!-- Feedback Modal -->
-    <div class="feedback-modal" id="feedbackModal">
-        <div class="feedback-content">
-            <span class="feedback-close-btn" id="feedbackCloseBtn">&times;</span>
-            <div class="feedback-form" id="feedbackForm">
-                <h3>Share Your Feedback</h3>
-                
-                <div class="emoji-rating" id="emojiRating">
-                    <div class="emoji-option" data-rating="1">
-                        <span class="emoji">😞</span>
-                        <span class="emoji-label">Very Sad</span>
-                    </div>
-                    <div class="emoji-option" data-rating="2">
-                        <span class="emoji">😕</span>
-                        <span class="emoji-label">Sad</span>
-                    </div>
-                    <div class="emoji-option" data-rating="3">
-                        <span class="emoji">😐</span>
-                        <span class="emoji-label">Neutral</span>
-                    </div>
-                    <div class="emoji-option" data-rating="4">
-                        <span class="emoji">🙂</span>
-                        <span class="emoji-label">Happy</span>
-                    </div>
-                    <div class="emoji-option" data-rating="5">
-                        <span class="emoji">😍</span>
-                        <span class="emoji-label">Very Happy</span>
-                    </div>
-                </div>
-                <div class="error-message" id="ratingError">Please select a rating</div>
-                
-                <p class="feedback-detail">Please share in detail what we can improve more?</p>
-                
-                <textarea id="feedbackText" placeholder="Your feedback helps us make EcoWaste better..."></textarea>
-                <div class="error-message" id="textError">Please provide your feedback</div>
-                
-                <button type="submit" class="feedback-submit-btn" id="feedbackSubmitBtn">
-                    Submit Feedback
-                    <div class="spinner" id="spinner"></div>
-                </button>
-            </div>
-            
-            <div class="thank-you-message" id="thankYouMessage">
-                <span class="thank-you-emoji">🎉</span>
-                <h3>Thank You!</h3>
-                <p>We appreciate your feedback and will use it to improve EcoWaste.</p>
-                <p>Your opinion matters to us!</p>
-            </div>
-        </div>
-    </div>
-
 </section>
 
 <script>
@@ -1014,37 +970,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Modal to update material quantity (mark as obtained with amount user has)
-    function showMaterialHaveModal(materialId, maxQty) {
-        return new Promise((resolve) => {
-            const modal = document.createElement('div');
-            modal.style.position = 'fixed'; modal.style.top = '0'; modal.style.left = '0'; modal.style.width = '100%'; modal.style.height = '100%'; modal.style.backgroundColor = 'rgba(0,0,0,0.5)'; modal.style.display = 'flex'; modal.style.alignItems = 'center'; modal.style.justifyContent = 'center'; modal.style.zIndex = '10000';
-            const content = document.createElement('div');
-            content.style.backgroundColor = '#fff'; content.style.padding = '20px'; content.style.borderRadius = '8px'; content.style.maxWidth = '400px'; content.style.boxShadow = '0 8px 24px rgba(0,0,0,0.2)';
-            content.innerHTML = `<h3 style="margin-top:0;">How much do you have?</h3><p style="color:#666;font-size:14px;">Enter the amount of this material you already have (max: ${maxQty || 'unlimited'})</p><div style="display:flex;gap:8px;margin:12px 0;"><input type="number" id="haveQty" min="1" ${maxQty ? `max="${maxQty}"` : ''} placeholder="Amount" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:4px;"></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;"><button id="haveCancel" style="padding:8px 16px;border:1px solid #ddd;border-radius:4px;background:#f3f4f6;cursor:pointer;">Cancel</button><button id="haveAll" style="padding:8px 16px;border:none;border-radius:4px;background:#2E8B57;color:#fff;cursor:pointer;">Have all</button><button id="haveSubmit" style="padding:8px 16px;border:none;border-radius:4px;background:#007bff;color:#fff;cursor:pointer;">Mark obtained</button></div>`;
-            modal.appendChild(content);
-            document.body.appendChild(modal);
-            const input = content.querySelector('#haveQty');
-            const submitBtn = content.querySelector('#haveSubmit');
-            const haveAllBtn = content.querySelector('#haveAll');
-            const cancelBtn = content.querySelector('#haveCancel');
-            submitBtn.addEventListener('click', function() {
-                const qty = parseInt(input.value || '1', 10);
-                if (isNaN(qty) || qty < 1) { alert('Please enter a valid quantity'); return; }
-                if (maxQty && qty > maxQty) { alert('Cannot exceed required amount (' + maxQty + ')'); return; }
-                modal.remove();
-                resolve({ qty: qty });
-            });
-            haveAllBtn.addEventListener('click', function() {
-                modal.remove();
-                resolve({ qty: maxQty || 1 });
-            });
-            cancelBtn.addEventListener('click', function() { modal.remove(); resolve(null); });
-            input.addEventListener('keydown', function(e) { if (e.key === 'Enter') submitBtn.click(); });
-            input.focus();
-        });
-    }
-
     // Intercept remove and update forms inside material list
     document.addEventListener('submit', async function(e){
         const form = e.target;
@@ -1067,11 +992,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         const m = String(qtyEl.textContent).match(/\d+/);
                         if (m) maxQty = parseInt(m[0], 10);
                     }
-                    // Use the newer showMaterialHaveModal to collect quantity from user.
-                    // Pass material id (if available) and maxQty for clamping.
-                    const midForModal = materialItem.dataset.materialId || (materialItem.querySelector('input[name="material_id"]') ? materialItem.querySelector('input[name="material_id"]').value : null);
-                    const result = await showMaterialHaveModal(midForModal, maxQty);
-                    if (result && typeof result.qty !== 'undefined' && result !== null) {
+                    const result = await showObtainedModal(maxQty);
+                    if (result && result.confirmed) {
                         const fd = new FormData(form);
                         // ensure server receives which action (submitter)
                         if (submitterName && !fd.has(submitterName)) fd.append(submitterName, submitterValue || '1');
@@ -2068,11 +1990,38 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!btn) return;
         const mid = btn.dataset.materialId;
         if (!mid) return;
-        // Simplify upload flow: always open file picker directly and upload with a single default photo type.
-        // This removes the before/after chooser so uploads are faster and simpler.
+        // Determine whether we're in the Preparation stage. Only Preparation should ask Before/After.
+        let inPreparation = false;
+        try {
+            const stageEl = btn.closest('.workflow-stage, .stage-card') || document.querySelector('.workflow-stage.active') || document.querySelector('.stage-card.current');
+            if (stageEl) {
+                const sname = (stageEl.getAttribute('data-stage-name') || (stageEl.querySelector('.stage-title') && stageEl.querySelector('.stage-title').textContent) || '').toLowerCase();
+                if (/prepar/.test(sname)) inPreparation = true;
+            }
+        } catch(e) { inPreparation = false; }
+
         const cleanUp = () => { /* noop for non-modal flow */ };
-        // Default photo type used for material uploads. Keep 'after' so server defaults still apply.
-        pickAndUpload('after');
+
+        if (inPreparation) {
+            // show a small chooser to pick Before or After then open file picker
+            const chooser = document.createElement('div');
+            chooser.className = 'photo-type-chooser';
+            chooser.style.position = 'fixed'; chooser.style.zIndex = 99999; chooser.style.left = '50%'; chooser.style.top = '50%'; chooser.style.transform = 'translate(-50%,-50%)'; chooser.style.background = '#fff'; chooser.style.padding = '12px'; chooser.style.boxShadow = '0 8px 24px rgba(0,0,0,0.2)'; chooser.style.borderRadius = '8px';
+            chooser.innerHTML = `<div style="margin-bottom:8px;font-weight:600">Upload photo as</div>`;
+            const beforeBtn = document.createElement('button'); beforeBtn.className='btn'; beforeBtn.textContent = 'Before';
+            const afterBtn = document.createElement('button'); afterBtn.className='btn'; afterBtn.style.marginLeft='8px'; afterBtn.textContent = 'After';
+            const cancelBtn = document.createElement('button'); cancelBtn.className='btn'; cancelBtn.style.marginLeft='8px'; cancelBtn.textContent = 'Cancel';
+            chooser.appendChild(beforeBtn); chooser.appendChild(afterBtn); chooser.appendChild(cancelBtn);
+            document.body.appendChild(chooser);
+
+            const chooserClean = () => { try{ chooser.remove(); } catch(e){} };
+            beforeBtn.addEventListener('click', function(){ chooserClean(); pickAndUpload('before'); });
+            afterBtn.addEventListener('click', function(){ chooserClean(); pickAndUpload('after'); });
+            cancelBtn.addEventListener('click', function(){ chooserClean(); });
+        } else {
+            // For Material Collection and other stages, skip Before/After and upload as 'before'
+            pickAndUpload('before');
+        }
 
         async function pickAndUpload(photoType){
             cleanUp();
@@ -2081,7 +2030,6 @@ document.addEventListener('DOMContentLoaded', function() {
             input.onchange = async function(ev){
                 const file = ev.target.files[0];
                 if (!file) return;
-                input.value = '';
                 const fd = new FormData();
                 fd.append('material_id', mid);
                 fd.append('photo', file);
@@ -2406,7 +2354,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     // use wrapper.closest since it points at the element to remove; fallback to del.closest
                     const parentMat = mat || (wrapper && wrapper.closest ? wrapper.closest('.material-item') : null) || (del && del.closest ? del.closest('.material-item') : null);
                     wrapper.remove();
-                    dbgUI('removed server photo element');
+                    showToast('Photo removed');
+                    dbgUI('removed server photo element and showed toast');
                     // After removing photo, restore camera button beside Obtained badge if present
                     try {
                         if (parentMat) {
@@ -2811,13 +2760,23 @@ document.addEventListener('DOMContentLoaded', function(){
                 }
 
                     // Defensive deduplication: ensure unique stage names (preserve original order)
-                    // Then normalize the workflow to the simplified three-stage layout requested by the UI:
-                    // 1) Preparation (this will host the Material Collection UI), 2) Construction, 3) Finishing
                     if (!empty($workflow_stages)) {
                         $seen = [];
                         $filtered = [];
                         foreach ($workflow_stages as $st) {
-                            $name = trim(strtolower($st['name'] ?? $st['stage_name'] ?? ''));
+                            $name = trim(strtolower($st['name'] ?? ''));
+
+                    // Replace the last stage name with "Share" (was Documentation)
+                    if (!empty($workflow_stages) && is_array($workflow_stages)) {
+                        $lastIndex = count($workflow_stages) - 1;
+                        if ($lastIndex >= 0) {
+                            // normalize keys which templates might use
+                            if (isset($workflow_stages[$lastIndex]['stage_name'])) $workflow_stages[$lastIndex]['stage_name'] = 'Share';
+                            if (isset($workflow_stages[$lastIndex]['name'])) $workflow_stages[$lastIndex]['name'] = 'Share';
+                            // also ensure description (optional)
+                            if (isset($workflow_stages[$lastIndex]['description'])) $workflow_stages[$lastIndex]['description'] = 'Share your project with others.';
+                        }
+                    }
                             if ($name === '') continue;
                             if (isset($seen[$name])) continue; // skip duplicates
                             $seen[$name] = true;
@@ -2828,89 +2787,35 @@ document.addEventListener('DOMContentLoaded', function(){
                         unset($fs);
                         $workflow_stages = array_values($filtered);
 
-                        // Normalize into the three-stage set. We prefer existing templates when possible.
-                        $newStages = [];
-
-                        // 1) Preparation: prefer an existing 'material' stage (rename it to Preparation),
-                        // otherwise prefer an existing 'prepar' stage, otherwise create a generic Preparation.
-                        $foundPrep = false;
-                        foreach ($workflow_stages as $ws) {
-                            $n = strtolower(trim((string)($ws['stage_name'] ?? $ws['name'] ?? '')));
-                            if ($n !== '' && stripos($n, 'material') !== false) {
-                                $ws['name'] = 'Preparation';
-                                $newStages[] = $ws;
-                                $foundPrep = true;
-                                break;
-                            }
-                        }
-                        if (!$foundPrep) {
-                            // look for an existing preparation stage (we'll reuse it but prefer material semantics)
+                        // If there are project materials but no explicit "Material Collection" stage in templates,
+                        // inject a lightweight Material Collection stage so the materials UI is visible.
+                        // This is a non-destructive fallback (only when no stage contains the word 'material').
+                        try {
+                            $hasMaterialStage = false;
                             foreach ($workflow_stages as $ws) {
                                 $n = strtolower(trim((string)($ws['stage_name'] ?? $ws['name'] ?? '')));
-                                if ($n !== '' && stripos($n, 'prepar') !== false) {
-                                    // use it but clear tasks in UI are handled separately; keep description
-                                    $ws['name'] = 'Preparation';
-                                    $newStages[] = $ws;
-                                    $foundPrep = true;
-                                    break;
-                                }
+                                if ($n !== '' && stripos($n, 'material') !== false) { $hasMaterialStage = true; break; }
                             }
-                        }
-                        if (!$foundPrep) {
-                            $newStages[] = ['name' => 'Preparation', 'description' => 'Collect materials required for this project', 'number' => 1];
-                        }
-
-                        // 2) Construction
-                        $found = false;
-                        foreach ($workflow_stages as $ws) {
-                            $n = strtolower(trim((string)($ws['stage_name'] ?? $ws['name'] ?? '')));
-                            if ($n !== '' && stripos($n, 'construct') !== false) {
-                                $ws['name'] = 'Construction';
-                                $newStages[] = $ws;
-                                $found = true;
-                                break;
+                            if (!$hasMaterialStage && !empty($materials) && is_array($materials)) {
+                                // Insert after the first stage where possible (index 1), otherwise append
+                                $insertAt = min(1, count($workflow_stages));
+                                $matStage = [
+                                    'name' => 'Material Collection',
+                                    'description' => 'Collect materials required for this project',
+                                    // number will be renumbered below
+                                ];
+                                array_splice($workflow_stages, $insertAt, 0, [$matStage]);
+                                // renumber again to keep numbers consistent
+                                foreach ($workflow_stages as $i => &$fs2) { $fs2['number'] = $i + 1; if (!isset($fs2['template_number'])) $fs2['template_number'] = $fs2['number']; }
+                                unset($fs2);
                             }
-                        }
-                        if (!$found) {
-                            $newStages[] = ['name' => 'Construction', 'description' => 'Build your project, follow safety guidelines, document progress', 'number' => 2];
-                        }
-
-                        // 3) Share
-                        $found = false;
-                        foreach ($workflow_stages as $ws) {
-                            $n = strtolower(trim((string)($ws['stage_name'] ?? $ws['name'] ?? '')));
-                            if ($n !== '' && (stripos($n, 'finish') !== false || stripos($n, 'share') !== false)) {
-                                $ws['name'] = 'Share';
-                                $newStages[] = $ws;
-                                $found = true;
-                                break;
-                            }
-                        }
-                        if (!$found) {
-                            $newStages[] = ['name' => 'Share', 'description' => 'Share your project with the community', 'number' => 3];
-                        }
-
-                        // assign sequential numbers and ensure template_number exists
-                        foreach ($newStages as $i => &$ns) { $ns['number'] = $i + 1; if (!isset($ns['template_number'])) $ns['template_number'] = $ns['number']; }
-                        unset($ns);
-                        $workflow_stages = $newStages;
-
-                        // Safety: ensure the first (visible) stage is Preparation so materials UI appears.
-                        // If templates produced a different ordering, insert a Preparation stage at index 0.
-                        $firstName = strtolower(trim((string)($workflow_stages[0]['name'] ?? '')));
-                        if (stripos($firstName, 'prepar') === false && stripos($firstName, 'material') === false) {
-                            array_unshift($workflow_stages, ['name' => 'Preparation', 'description' => 'Collect materials required for this project', 'number' => 1]);
-                            // renumber again
-                            foreach ($workflow_stages as $i => &$fs2) { $fs2['number'] = $i + 1; if (!isset($fs2['template_number'])) $fs2['template_number'] = $fs2['number']; }
-                            unset($fs2);
-                        }
+                        } catch (Exception $e) { /* non-fatal fallback insertion failed (silenced) */ }
                     }
 
                 if (empty($workflow_stages)) {
                     $workflow_stages = [
-                        ['name' => 'Preparation', 'description' => 'Collect materials required for this project', 'number' => 1],
-                        ['name' => 'Construction', 'description' => 'Build your project, follow safety guidelines, document progress', 'number' => 2],
-                        ['name' => 'Share', 'description' => 'Share your project with the community', 'number' => 3],
+                        ['name' => 'Preparation', 'description' => 'Collect materials, clean and sort materials, prepare workspace', 'number' => 1],
+                        ['name' => 'Creation', 'description' => 'Build your project, follow safety guidelines, document progress', 'number' => 2],
                     ];
                 }
 
@@ -3038,9 +2943,9 @@ document.addEventListener('DOMContentLoaded', function(){
                         $tn = isset($st['template_number']) ? (int)$st['template_number'] : (int)($st['stage_number'] ?? $st['number'] ?? $i + 1);
                         // determine badge class
                         $is_completed = array_key_exists($i, $completed_stage_map);
-                        // If this is a Material Collection (now also 'Preparation') stage and DB shows completed, re-validate server-side
+                        // If this is a Material Collection stage and DB shows completed, re-validate server-side
                         $stage_name_lower = strtolower($st['stage_name'] ?? $st['name'] ?? '');
-                        if ($is_completed && (stripos($stage_name_lower, 'material') !== false || stripos($stage_name_lower, 'prepar') !== false)) {
+                        if ($is_completed && stripos($stage_name_lower, 'material') !== false) {
                             try {
                                 $cstmt = $conn->prepare("SELECT COUNT(*) AS not_obtained FROM project_materials WHERE project_id = ? AND (status IS NULL OR LOWER(status) <> 'obtained')");
                                 $cstmt->bind_param('i', $project_id);
@@ -3067,7 +2972,7 @@ document.addEventListener('DOMContentLoaded', function(){
                             $tres = $tp->get_result()->fetch_assoc();
                             if ($tres && !empty($tres['photo_path'])) $thumb = 'assets/uploads/' . $tres['photo_path'];
                         } catch (Exception $e) { /* ignore */ }
-                        if (empty($thumb) && (stripos($st['stage_name'] ?? $st['name'] ?? '', 'material') !== false || stripos($st['stage_name'] ?? $st['name'] ?? '', 'prepar') !== false)) {
+                        if (empty($thumb) && stripos($st['stage_name'] ?? $st['name'] ?? '', 'material') !== false) {
                             try {
                                 $mp = $conn->prepare("SELECT photo_path FROM material_photos WHERE project_id = ? AND material_id IN (SELECT material_id FROM project_materials WHERE project_id = ?) ORDER BY created_at DESC LIMIT 1");
                                 $mp->bind_param('ii', $project_id, $project_id);
@@ -3080,7 +2985,7 @@ document.addEventListener('DOMContentLoaded', function(){
                         <?php
                             $stage_name_lower = strtolower($st['stage_name'] ?? $st['name'] ?? '');
                             $iconClass = 'fas fa-circle';
-                                    if (stripos($stage_name_lower, 'material') !== false || stripos($stage_name_lower, 'prepar') !== false) $iconClass = 'fas fa-box-open';
+                            if (stripos($stage_name_lower, 'material') !== false) $iconClass = 'fas fa-box-open';
                             else if (stripos($stage_name_lower, 'prepar') !== false) $iconClass = 'fas fa-tools';
                             else if (stripos($stage_name_lower, 'construct') !== false) $iconClass = 'fas fa-hard-hat';
                             else if (stripos($stage_name_lower, 'finish') !== false) $iconClass = 'fas fa-paint-roller';
@@ -3177,7 +3082,7 @@ document.addEventListener('DOMContentLoaded', function(){
                             <?php endif; ?>
 
                             <?php // Inject materials list into Material Collection stage (read-only) ?>
-                            <?php if (in_array(strtolower(trim($stage['name'] ?? '')), ['material collection','preparation'])): ?>
+                            <?php if (strtolower(trim($stage['name'] ?? '')) === 'material collection'): ?>
     <div class="stage-materials">
         <h4>Materials Needed</h4>
         <?php if (isset($is_debug) && $is_debug): ?>
@@ -3253,11 +3158,11 @@ document.addEventListener('DOMContentLoaded', function(){
                                 <a class="btn small find-donations-btn" href="browse.php?query=<?= urlencode($m['material_name'] ?? $m['name'] ?? '') ?>&from_project=<?= $project_id ?>" title="Find donations for this material">
                                     Find Donations
                                 </a>
-                                <form method="POST" class="inline-form" data-obtain-modal="1" style="display:inline-flex !important;align-items:center;margin:0;padding:0;">
+                                <form method="POST" class="inline-form" data-obtain-modal="1" style="display:inline-flex;align-items:center;">
                                     <input type="hidden" name="material_id" value="<?= $mid ?>">
                                     <input type="hidden" name="status" value="obtained">
-                                    <button type="submit" name="update_material_status" class="btn small obtain-btn" title="Mark obtained" aria-label="Mark material obtained" style="display:inline-block !important;visibility:visible !important;">
-                                        <i class="fas fa-check" aria-hidden="true"></i> Check
+                                    <button type="submit" name="update_material_status" class="btn small obtain-btn" title="Mark obtained" aria-label="Mark material obtained">
+                                        <i class="fas fa-check" aria-hidden="true"></i>
                                     </button>
                                 </form>
                                 <!-- Remove material form (trash icon only) -->
@@ -3280,11 +3185,74 @@ document.addEventListener('DOMContentLoaded', function(){
 
                                             <?php if (!$is_locked): ?>
                                             <div class="stage-actions">
-                                                <?php if (in_array(strtolower(trim($stage['name'] ?? '')), ['material collection','preparation'])): ?>
+                                                <?php if (strtolower(trim($stage['name'] ?? '')) === 'material collection'): ?>
                                                     <button type="button" class="btn add-material-btn" onclick="showAddMaterialModal()">
                                                         <i class="fas fa-plus"></i> Add Material
                                                     </button>
-                                                <?php endif; ?>
+                                <?php endif; ?>
+
+                                <!-- Stage-level upload removed; per-material upload button remains beside Obtained badge -->
+                                <?php
+                                    // Determine whether this stage can be completed: it must not be locked (i.e., earlier stages done)
+                                    $can_attempt = !$is_locked || $is_current || $is_completed;
+                                    // For Material Collection, compute whether requirements are satisfied (all materials obtained or with photos)
+                                    $req_ok = true;
+                                    if (stripos($stage['name'], 'material') !== false) {
+                                        try {
+                                            $totStmt = $conn->prepare("SELECT COUNT(*) AS total FROM project_materials WHERE project_id = ?");
+                                            $totStmt->bind_param('i', $project_id);
+                                            $totStmt->execute();
+                                            $tot = (int)$totStmt->get_result()->fetch_assoc()['total'];
+
+                                            $haveStmt = $conn->prepare("SELECT COUNT(*) AS have FROM project_materials pm WHERE pm.project_id = ? AND (LOWER(pm.status) = 'obtained' OR EXISTS(SELECT 1 FROM material_photos mp WHERE mp.material_id = pm.material_id LIMIT 1))");
+                                            $haveStmt->bind_param('i', $project_id);
+                                            $haveStmt->execute();
+                                            $have = (int)$haveStmt->get_result()->fetch_assoc()['have'];
+
+                                            if ($tot > 0 && $have < $tot) $req_ok = false;
+
+                                            // Additionally require stage-level photos (before & after) to be present
+                                            // to match server-side complete_stage.php checks.
+                                            try {
+                                                $template_num_chk = isset($stage['template_number']) ? (int)$stage['template_number'] : (int)($stage['number'] ?? 0);
+                                                if ($template_num_chk > 0) {
+                                                    $ptypeStmt = $conn->prepare("SELECT COALESCE(photo_type,'other') AS photo_type, COUNT(*) AS c FROM stage_photos WHERE project_id = ? AND stage_number = ? GROUP BY photo_type");
+                                                    if ($ptypeStmt) {
+                                                        $ptypeStmt->bind_param('ii', $project_id, $template_num_chk);
+                                                        $ptypeStmt->execute();
+                                                        $pres = $ptypeStmt->get_result();
+                                                        $haveTypes = [];
+                                                        while ($r = $pres->fetch_assoc()) {
+                                                            $pt = strtolower(trim($r['photo_type']));
+                                                            if ($pt === '') $pt = 'other';
+                                                            $haveTypes[$pt] = (int)$r['c'];
+                                                        }
+                                                        // require both before and after
+                                                        if ((!isset($haveTypes['before']) || $haveTypes['before'] <= 0) || (!isset($haveTypes['after']) || $haveTypes['after'] <= 0)) {
+                                                            $req_ok = false;
+                                                        }
+                                                    }
+                                                }
+                                            } catch (Exception $e) { /* ignore photo check errors - be conservative */ }
+                                        } catch (Exception $e) { /* ignore and allow */ }
+                                    }
+
+                                    // The complete button is visible for all non-locked stages; if locked, show disabled with tooltip
+                                    $btn_classes = 'complete-stage-btn';
+                                    $btn_disabled = false;
+                                    $btn_title = '';
+                                    if ($is_locked && !$is_completed) {
+                                        $btn_disabled = true;
+                                        $btn_title = 'Locked: complete previous stages first';
+                                    } elseif (!$req_ok && !$is_completed) {
+                                        $btn_disabled = true;
+                                        $btn_title = 'Requirements not met for this stage';
+                                    }
+                                ?>
+                                <?php $template_num = isset($stage['template_number']) ? (int)$stage['template_number'] : (int)$stage['number']; ?>
+                                                <?php // Render a non-interactive status label instead of an actionable button ?>
+                                                <?php $template_num = isset($stage['template_number']) ? (int)$stage['template_number'] : (int)$stage['number']; ?>
+                                                <?php // Do not render a stage-level status label here; the tab badge shows the status below the step name. ?>
                             </div>
                             <?php else: ?>
                                 <div class="stage-locked-note" title="This stage is locked until previous stages are completed.">🔒 Stage locked — complete previous stage to unlock.</div>
@@ -3511,8 +3479,6 @@ document.addEventListener('DOMContentLoaded', function(){
             }
         })();
     })();
-
-    
     </script>
     
 <script>
@@ -3533,100 +3499,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
-
-    
 });
-
-</script>
-<script>
-    // -------------------------
-    // Feedback Modal
-    // -------------------------
-    const feedbackBtn = document.getElementById('feedbackBtn');
-    const feedbackModal = document.getElementById('feedbackModal');
-    const feedbackCloseBtn = document.getElementById('feedbackCloseBtn');
-    const emojiOptions = document.querySelectorAll('.emoji-option');
-    const feedbackForm = document.getElementById('feedbackForm');
-    const thankYouMessage = document.getElementById('thankYouMessage');
-    const feedbackSubmitBtn = document.getElementById('feedbackSubmitBtn');
-    const spinner = document.getElementById('spinner');
-    const ratingError = document.getElementById('ratingError');
-    const textError = document.getElementById('textError');
-    const feedbackText = document.getElementById('feedbackText');
-    let selectedRating = 0;
-
-    if(feedbackBtn && feedbackModal && feedbackCloseBtn && feedbackForm){
-        // Emoji selection
-        emojiOptions.forEach(option => {
-            option.addEventListener('click', () => {
-                emojiOptions.forEach(opt => opt.classList.remove('selected'));
-                option.classList.add('selected');
-                selectedRating = option.getAttribute('data-rating');
-                ratingError.style.display = 'none';
-            });
-        });
-
-        // Submit feedback
-        feedbackForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            let isValid = true;
-
-            if (selectedRating === 0) {
-                ratingError.style.display = 'block';
-                isValid = false;
-            } else {
-                ratingError.style.display = 'none';
-            }
-
-            if (feedbackText.value.trim() === '') {
-                textError.style.display = 'block';
-                isValid = false;
-            } else {
-                textError.style.display = 'none';
-            }
-
-            if (!isValid) return;
-
-            feedbackSubmitBtn.disabled = true;
-            spinner.style.display = 'block';
-
-            setTimeout(() => {
-                spinner.style.display = 'none';
-                feedbackForm.style.display = 'none';
-                thankYouMessage.style.display = 'block';
-
-                setTimeout(() => {
-                    closeFeedbackModal();
-                }, 3000);
-
-            }, 1500);
-        });
-
-        // Open/Close feedback modal
-        feedbackBtn.addEventListener('click', () => {
-            feedbackModal.style.display = 'flex';
-        });
-        feedbackCloseBtn.addEventListener('click', closeFeedbackModal);
-        window.addEventListener('click', (event) => {
-            if (event.target === feedbackModal) {
-                closeFeedbackModal();
-            }
-        });
-    }
-
-    function closeFeedbackModal() {
-        feedbackModal.style.display = 'none';
-        feedbackForm.style.display = 'block';
-        thankYouMessage.style.display = 'none';
-        feedbackText.value = '';
-        emojiOptions.forEach(opt => opt.classList.remove('selected'));
-        selectedRating = 0;
-        ratingError.style.display = 'none';
-        textError.style.display = 'none';
-        feedbackSubmitBtn.disabled = false;
-        spinner.style.display = 'none';
-    }
-
 </script>
 <script>
 // JS to toggle project step completion and update the UI
@@ -4101,9 +3974,3 @@ function showStagePhotoModal(stageNumber, missingTypes, projectId){
     }
     }
 // End of completeStage function
-
-<?php
-// Output materials script config and include via PHP to avoid editor parse issues
-echo '<script>window.ECW_DATA = window.ECW_DATA || {}; window.ECW_DATA.projectId = ' . json_encode($project_id) . ';</script>' . "\n";
-echo '<script src="assets/js/project-details-materials.js"></script>' . "\n";
-?>
