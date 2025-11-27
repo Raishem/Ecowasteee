@@ -183,6 +183,42 @@ try {
                 } catch (Exception $e) { /* ignore and continue */ }
             }
 
+            // Construction photo requirements: require at least 1 'before' (building) and 1 'after' (finished) photo
+            $isConstruction = (strpos($stage_name, 'construct') !== false) || in_array($stage_number, $materialTemplateNumbers, true) === false && (strpos($stage_name, 'construct') !== false);
+            // Better check templates for construct keywords
+            if (!$isConstruction) {
+                try {
+                    $scanC = $conn->prepare("SELECT stage_number FROM stage_templates WHERE LOWER(stage_name) LIKE '%construct%'");
+                    $scanC->execute();
+                    $rC = $scanC->get_result();
+                    $constructNums = [];
+                    while ($rc = $rC->fetch_assoc()) $constructNums[] = (int)$rc['stage_number'];
+                    if (in_array($stage_number, $constructNums, true)) $isConstruction = true;
+                } catch (Exception $e) { /* ignore */ }
+            }
+
+            if ($isConstruction) {
+                try {
+                    $bstmt = $conn->prepare("SELECT COUNT(*) AS bcnt FROM stage_photos WHERE project_id = ? AND stage_number = ? AND LOWER(photo_type) = 'before'");
+                    $astmt = $conn->prepare("SELECT COUNT(*) AS acnt FROM stage_photos WHERE project_id = ? AND stage_number = ? AND LOWER(photo_type) = 'after'");
+                    $bstmt->bind_param('ii', $project_id, $stage_number); $bstmt->execute(); $bcnt = (int)$bstmt->get_result()->fetch_assoc()['bcnt'];
+                    $astmt->bind_param('ii', $project_id, $stage_number); $astmt->execute(); $acnt = (int)$astmt->get_result()->fetch_assoc()['acnt'];
+                    if ($bcnt < 1 || $acnt < 1) {
+                        echo json_encode([
+                            'success' => false,
+                            'message' => 'Cannot complete Construction: requires at least 1 building and 1 finished photo',
+                            'reason' => 'missing_construction_photos',
+                            'before_count' => $bcnt,
+                            'after_count' => $acnt
+                        ]);
+                        exit;
+                    }
+                } catch (Exception $e) {
+                    echo json_encode(['success' => false, 'message' => 'Database error during construction photo check', 'reason' => 'db_error', 'detail' => $e->getMessage()]);
+                    exit;
+                }
+            }
+
             // All checks passed — mark as completed (insert or update)
             try {
                 $stmt = $conn->prepare(
