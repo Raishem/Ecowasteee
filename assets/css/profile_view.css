@@ -1697,3 +1697,889 @@ input[type="file"] {
 .password-toggle.active {
     color: #2c5530;
 }
+
+/* ===== ENHANCED PROFILE VIEW STYLES ===== */
+
+/* Enhanced Profile Header */
+.profile-header {
+    background: linear-gradient(135deg, #82AA52 0%, #6d8f45 100%);
+    border-radius: 15px;
+    padding: 0;
+    margin-bottom: 30px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 8px 25px rgba(130, 170, 82, 0.3);
+}
+
+.profile-cover {
+    height: 120px;
+    background: linear-gradient(135deg, rgba(130, 170, 82, 0.8) 0%, rgba(109, 143, 69, 0.9) 100%);
+    position: relative;
+}
+
+.profile-avatar {
+    position: absolute;
+    bottom: -40px;
+    left: 40px;
+}
+
+.avatar-circle {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #3d6a06 0%, #2e8b57 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 48px;
+    font-weight: bold;
+    border: 6px solid white;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.profile-info {
+    padding: 60px 40px 30px;
+    color: white;
+}
+
+
+.profile-username {
+    font-size: 1.2rem;
+    opacity: 0.9;
+    margin-bottom: 15px;
+}
+
+.profile-location,
+.member-since-profile {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    font-size: 0.95rem;
+}
+
+.profile-location i,
+.member-since-profile i {
+    width: 16px;
+}
+
+/* Enhanced Profile Stats Grid */
+.profile-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    margin-bottom: 40px;
+}
+
+.stat-card {
+    background: white;
+    padding: 25px;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    border-left: 4px solid #82AA52;
+}
+
+.stat-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.stat-card.highlight {
+    border-left-color: #FFD700;
+    background: linear-gradient(135deg, #fff9e6 0%, #fff0c2 100%);
+}
+
+.stat-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #82AA52 0%, #6d8f45 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 24px;
+}
+
+.stat-card.highlight .stat-icon {
+    background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+}
+
+.stat-content {
+    flex: 1;
+}
+
+.stat-value {
+    font-size: 2.2rem;
+    font-weight: 700;
+    color: #2e8b57;
+    line-height: 1;
+    margin-bottom: 5px;
+    font-family: 'Montserrat', sans-serif;
+}
+
+.stat-card.highlight .stat-value {
+    color: #FF8C00;
+}
+
+.stat-label {
+    font-size: 0.9rem;
+    color: #666;
+    font-weight: 600;
+}
+
+/* Profile Sections */
+.profile-section {
+    background: white;
+    padding: 30px;
+
+}
+
+.section-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #2e8b57;
+    margin-bottom: 25px;
+    font-family: 'Montserrat', sans-serif;
+    border-bottom: 2px solid #f0f7e8;
+    padding-bottom: 10px;
+}
+
+/* Enhanced Badges Grid */
+.badges-grid {
+    display: grid;
+    gap: 20px;
+}
+
+
+.badge-card {
+    background: linear-gradient(135deg, #f8fdf0 0%, #e8f5e8 100%); 
+    border-radius: 15px; 
+    text-align: center; 
+    width: 160px; 
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1); 
+    border: 2px solid #82AA52;
+}
+
+.badge-card:hover {
+    transform: translateX(5px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.badge-icon {
+    width: 80px; 
+    height: 80px; 
+    margin: 10px auto 15px; 
+    background: linear-gradient(135deg, #82AA52 0%, #6d8f45 100%); 
+    border-radius: 50%; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    color: white; 
+    font-size: 32px; 
+    border: 3px solid white; 
+    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+}
+
+
+.badge-info {
+    flex: 1;
+}
+
+.badge-info h3 {
+    font-size: 16px; 
+    font-weight: 700; 
+    color: #2e8b57; 
+    margin-bottom: 8px; 
+    line-height: 1.2; 
+    min-height: 38px; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center;
+}
+
+.badge-info p {
+    font-size: 12px; 
+    color: #666; 
+    margin-bottom: 10px; 
+    line-height: 1.3;
+    min-height: 32px;
+}
+
+.badge-status {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.badge-status.earned {
+    background: #e8f5e8; 
+    color: #2e8b57; 
+    padding: 4px 12px; 
+    border-radius: 12px; 
+    font-size: 11px; 
+    font-weight: 600;
+}
+
+.badge-status:not(.earned) {
+    background: #fff3cd;
+    color: #856404;
+}
+
+/* Enhanced Donation Posts */
+.donation-post {
+    background: white;
+    border-radius: 12px;
+    padding: 25px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+    border-left: 4px solid #82AA52;
+    transition: transform 0.3s ease;
+}
+
+.donation-post:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+}
+
+.donation-user-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.user-avatar {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #3d6a06 0%, #2e8b57 100%);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    margin-right: 15px;
+    font-size: 18px;
+}
+
+.user-info {
+    flex: 1;
+}
+
+.user-name {
+    font-weight: 600;
+    font-size: 16px;
+    color: #333;
+    margin-bottom: 4px;
+}
+
+.profile-link {
+    text-decoration: none;
+    color: inherit;
+}
+
+.profile-link:hover {
+    color: #2e8b57;
+}
+
+.donation-meta {
+    display: flex;
+    gap: 15px;
+    font-size: 14px;
+    color: #666;
+}
+
+.category {
+    font-weight: 500;
+}
+
+.time-ago {
+    color: #999;
+}
+
+.quantity-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    margin-bottom: 15px;
+}
+
+.quantity-label {
+    font-weight: 600;
+    color: #333;
+}
+
+.quantity-unit {
+    color: #666;
+    font-size: 14px;
+}
+
+.donation-description {
+    margin-bottom: 15px;
+    padding: 12px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+}
+
+.donation-description p {
+    margin: 0;
+    color: #444;
+    line-height: 1.5;
+}
+
+/* Enhanced No Content Styling */
+.no-content {
+    text-align: center;
+    padding: 40px;
+    color: #999;
+    font-style: italic;
+    background: #f8f9fa;
+    border-radius: 10px;
+    border: 2px dashed #ddd;
+}
+
+/* Combined Layout */
+.combined-layout {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 30px;
+}
+
+@media (min-width: 992px) {
+    .combined-layout {
+        grid-template-columns: 2fr 1fr;
+    }
+}
+
+/* Responsive Design for Profile */
+@media (max-width: 768px) {
+    .profile-stats-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .badges-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .profile-info {
+        padding: 50px 20px 20px;
+        text-align: center;
+    }
+    
+    .profile-avatar {
+        left: 50%;
+        transform: translateX(-50%);
+    }
+    
+    .avatar-circle {
+        width: 100px;
+        height: 100px;
+        font-size: 36px;
+    }
+    
+
+    .stat-card {
+        padding: 20px;
+    }
+    
+    .badge-card,
+    .donation-post {
+        padding: 15px;
+    }
+    
+    .donation-meta {
+        flex-direction: column;
+        gap: 5px;
+    }
+}
+
+@media (max-width: 480px) {
+    .profile-section {
+        padding: 20px;
+    }
+    
+    .stat-icon {
+        width: 50px;
+        height: 50px;
+        font-size: 20px;
+    }
+    
+    .stat-value {
+        font-size: 1.8rem;
+    }
+    
+    .badge-icon {
+        width: 60px;
+        height: 60px;
+        font-size: 24px;
+    }
+    
+    .user-avatar {
+        width: 40px;
+        height: 40px;
+        font-size: 16px;
+    }
+}
+
+/* Remove old profile styles that conflict */
+.profile-avatar-large,
+.profile-header-content,
+.profile-fullname,
+.profile-bio,
+.badge-item,
+.badge-icon.old-style {
+    display: none;
+}
+
+/* Badges Section Header with View All */
+.badges-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 25px;
+}
+
+.badges-section-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #2e8b57;
+    font-family: 'Montserrat', sans-serif;
+    margin: 0;
+}
+
+.view-all-btn {
+    background: linear-gradient(135deg, #82AA52 0%, #6d8f45 100%);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 25px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 4px 15px rgba(130, 170, 82, 0.3);
+}
+
+.view-all-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(130, 170, 82, 0.4);
+    background: linear-gradient(135deg, #6d8f45 0%, #5a7537 100%);
+}
+
+.view-all-btn i {
+    font-size: 0.8rem;
+    transition: transform 0.3s ease;
+}
+
+.view-all-btn:hover i {
+    transform: translateX(3px);
+}
+
+/* Badges Grid with limited display */
+.badges-grid.limited {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(138px, 1fr));
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.badges-grid:not(.limited) {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(138px, 1fr));
+    gap: 20px;
+}
+
+/* Show more/less functionality */
+.badges-container {
+    position: relative;
+}
+
+.badges-more {
+    display: none;
+}
+
+.badges-more.show {
+    display: block;
+}
+
+.view-toggle {
+    text-align: center;
+    margin-top: 20px;
+}
+
+.toggle-badges-btn {
+    background: transparent;
+    border: 2px solid #82AA52;
+    color: #82AA52;
+    padding: 8px 20px;
+    border-radius: 20px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.toggle-badges-btn:hover {
+    background: #82AA52;
+    color: white;
+    transform: translateY(-2px);
+}
+
+/* Section Header matching profile.php */
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #eee;
+}
+
+.section-header h3 {
+    color: #82AA52;
+    font-size: 22px;
+    margin: 0;
+}
+
+.view-all {
+    color: #82AA52;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 14px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.view-all:hover {
+    text-decoration: underline;
+}
+
+/* Donation Action Buttons */
+.donation-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid #eee;
+}
+
+.request-donation-btn {
+    background: linear-gradient(135deg, #82AA52 0%, #6d8f45 100%);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 14px;
+}
+
+.request-donation-btn:hover {
+    background: linear-gradient(135deg, #6d8f45 0%, #5a7537 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(130, 170, 82, 0.3);
+}
+
+.comments-btn {
+    background: transparent;
+    border: 2px solid #82AA52;
+    color: #82AA52;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 14px;
+}
+
+.comments-btn:hover {
+    background: #82AA52;
+    color: white;
+    transform: translateY(-2px);
+}
+
+/* === Donation Actions Styles (from browse.css) === */
+
+/* Action Buttons Container */
+.donation-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 18px;
+}
+
+/* Request Button */
+.request-btn {
+    flex: 1;
+    background: linear-gradient(135deg, #82AA52, #6e9346);
+    color: #fff;
+    font-weight: 600;
+    border: none;
+    padding: 12px 0;
+    border-radius: 8px;
+    font-size: 15px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+}
+
+.request-btn:hover {
+    background: linear-gradient(135deg, #6d8f45, #557532);
+    transform: translateY(-2px);
+}
+
+/* Comment Button */
+.comment-btn {
+    background-color: #f3f3f3;
+    color: #333;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 15px;
+    transition: all 0.3s ease;
+}
+
+.comment-btn i {
+    margin-right: 6px;
+}
+
+.comment-btn:hover {
+    background-color: #e4e4e4;
+    transform: translateY(-2px);
+}
+
+/* Comments Panel */
+.comments-panel {
+    background: #fafafa;
+    border-radius: 10px;
+    padding: 15px;
+    margin-top: 15px;
+    border: 1px solid #e8e8e8;
+}
+
+/* Comment List */
+.comment-list {
+    list-style: none;
+    margin-bottom: 15px;
+}
+
+.comment-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-top: 8px;
+}
+
+.comment-avatar {
+    width: 35px;
+    height: 35px;
+    border-radius: 50%;
+    background: #82AA52;
+    color: #fff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: bold;
+}
+
+.comment-content {
+    background: #fafafa;
+    border-radius: 10px;
+    padding: 10px 14px;
+    margin-top: 4px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    flex: 1;
+}
+
+.comment-author {
+    font-weight: 600;
+    font-size: 14px;
+    margin-bottom: 5px;
+    color: #333;
+}
+
+.comment-text {
+    margin-top: 4px;
+    margin-bottom: 6px;
+    line-height: 1.5;
+    color: #444;
+}
+
+.comment-time {
+    font-size: 12px;
+    color: #999;
+    margin-top: 5px;
+}
+
+.comment-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 6px;
+}
+
+.comment-actions button {
+    background: #f6f6f6;
+    border: 1px solid #dcdcdc;
+    color: #333;
+    font-size: 13px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+}
+
+.comment-actions button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+}
+
+.comment-actions .reply-btn:hover {
+    background: #e9f8f0;
+    border-color: #99e1b0;
+    color: #1b8f4b;
+}
+
+.comment-actions .edit-btn:hover {
+    background: #e7f0ff;
+    border-color: #a6c8ff;
+    color: #1f66d1;
+}
+
+.comment-actions .delete-btn:hover {
+    background: #ffe8e8;
+    border-color: #ffbaba;
+    color: #d32f2f;
+}
+
+/* Reply List */
+.reply-list {
+    margin-left: 45px;
+    border-left: 2px solid #ddd;
+    padding-left: 10px;
+}
+
+.reply-list .comment-item {
+    margin-top: 6px;
+}
+
+/* Comment Form */
+.comment-form-ajax {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.comment-input {
+    width: 100%;
+    min-height: 70px;
+    resize: vertical;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    padding: 10px;
+    font-size: 14px;
+    outline: none;
+    transition: border 0.25s, box-shadow 0.25s;
+}
+
+.comment-input:focus {
+    border-color: #4CAF50;
+    box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.15);
+}
+
+.comment-submit-ajax {
+    background: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 14px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    transition: all 0.25s ease;
+    align-self: flex-start;
+}
+
+.comment-submit-ajax:hover {
+    background: #43a047;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.comment-spinner {
+    margin-left: 6px;
+    font-size: 14px;
+    color: #777;
+}
+
+/* No Comments Message */
+.no-comments {
+    text-align: center;
+    color: #999;
+    font-style: italic;
+    padding: 20px;
+}
+
+/* Reply Box */
+.reply-box {
+    margin: 10px 0 0 45px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background: #f9fafb;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    padding: 12px;
+    animation: fadeIn 0.25s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .donation-actions {
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .request-btn,
+    .comment-btn {
+        width: 100%;
+    }
+    
+    .reply-list {
+        margin-left: 25px;
+    }
+    
+    .reply-box {
+        margin-left: 25px;
+    }
+}

@@ -80,62 +80,11 @@ function getTimeAgo($timestamp) {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
 
-        
-        .profile-avatar-large {
-            width: 100px;
-            height: 100px;
-            border-radius: 50%;
-            background-color: #3d6a06;
-            color: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            font-size: 40px;
-            margin-right: 25px;
-            flex-shrink: 0;
-        }
-        
-        .profile-header-content {
-            display: flex;
-            align-items: center;
-            margin-bottom: 25px;
-        }
-        
-        .profile-info {
-            flex: 1;
-        }
-        
-        .profile-fullname {
-            font-size: 28px;
-            font-weight: 700;
-            color: #333;
-            margin-bottom: 5px;
-        }
-        
-        .profile-username {
-            font-size: 18px;
-            color: #2e8b57;
-            font-weight: 600;
-            margin-bottom: 10px;
-        }
-        
-        .profile-address {
-            color: #666;
-            font-size: 16px;
-            margin-bottom: 15px;
-        }
-        
-        .profile-bio {
-            color: #666;
-            font-style: italic;
-            margin-top: 10px;
-        }
-        
+    
         .profile-stats-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 200px;
+            gap: 120px;
             margin-bottom: 25px;
         }
         
@@ -166,7 +115,6 @@ function getTimeAgo($timestamp) {
         
         .badges-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
             gap: 15px;
             margin-top: 15px;
         }
@@ -182,7 +130,7 @@ function getTimeAgo($timestamp) {
         .badge-icon {
             font-size: 24px;
             margin-bottom: 8px;
-            color: #2e8b57;
+            color: #fff938;
         }
         
         .badge-name {
@@ -319,42 +267,45 @@ function getTimeAgo($timestamp) {
 
         <main class="main-content">
             <!-- Success/Error Messages -->
-        <?php if (isset($_SESSION['password_success'])): ?>
-            <div class="alert alert-success" style="margin: 20px; padding: 15px; background: #d4edda; color: #155724; border: 1px solid #c3e6cb; border-radius: 5px;">
-                <?php echo htmlspecialchars($_SESSION['password_success']); ?>
-                <?php unset($_SESSION['password_success']); ?>
-            </div>
-        <?php endif; ?>
-        
-        <?php if (isset($_SESSION['password_error'])): ?>
-            <div class="alert alert-danger" style="margin: 20px; padding: 15px; background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; border-radius: 5px;">
-                <?php echo htmlspecialchars($_SESSION['password_error']); ?>
-                <?php unset($_SESSION['password_error']); ?>
-            </div>
-        <?php endif; ?>
+            <?php if (isset($_SESSION['password_success'])): ?>
+                <div class="alert alert-success" style="margin: 20px; padding: 15px; background: #d4edda; color: #155724; border: 1px solid #c3e6cb; border-radius: 5px;">
+                    <?php echo htmlspecialchars($_SESSION['password_success']); ?>
+                    <?php unset($_SESSION['password_success']); ?>
+                </div>
+            <?php endif; ?>
+            
+            <?php if (isset($_SESSION['password_error'])): ?>
+                <div class="alert alert-danger" style="margin: 20px; padding: 15px; background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; border-radius: 5px;">
+                    <?php echo htmlspecialchars($_SESSION['password_error']); ?>
+                    <?php unset($_SESSION['password_error']); ?>
+                </div>
+            <?php endif; ?>
 
-        <!-- Include Settings Modal -->
-    <?php include 'includes/settings_modal.php'; ?>
+            <!-- Include Settings Modal -->
+            <?php include 'includes/settings_modal.php'; ?>
 
             <div class="combined-layout">
                 <div class="main-content-column">
-                    <!-- User Profile Header -->
-                    <div class="user-profile-card">
-                        <div class="profile-header-content">
-                            <div class="profile-avatar-large">
-                                <?= strtoupper(substr(htmlspecialchars($viewed_user['first_name'] ?? 'U'), 0, 1)) ?>
-                            </div>
-                            <div class="profile-info">
-                                <h1 class="profile-fullname"><?= htmlspecialchars(($viewed_user['first_name'] ?? 'User') . ' ' . ($viewed_user['last_name'] ?? '')) ?></h1>
-                                <div class="profile-username">@<?= htmlspecialchars($viewed_user['first_name'] ?? 'User') ?></div>
-                                <div class="profile-address">
-                                    <i class="fas fa-map-marker-alt"></i> 
-                                    <?= htmlspecialchars($viewed_user['address'] ?? 'Address not provided') ?>
+                    <!-- Enhanced User Profile Header -->
+                    <div class="profile-header">
+                        <div class="profile-cover">
+                            <div class="profile-avatar">
+                                <div class="avatar-circle">
+                                    <?= strtoupper(substr(htmlspecialchars($viewed_user['first_name'] ?? 'U'), 0, 1)) ?>
                                 </div>
-                                <!-- Replaced bio with Member Since -->
-                                <div class="member-since-profile">
-                                    <i class="fas fa-calendar-alt"></i> 
-                                    Member since 
+                            </div>
+                        </div>
+                        
+                        <div class="profile-info">
+                            <h1 class="profile-name"><?= htmlspecialchars(($viewed_user['first_name'] ?? 'User') . ' ' . ($viewed_user['last_name'] ?? '')) ?></h1>
+                            <p class="profile-username">@<?= htmlspecialchars($viewed_user['first_name'] ?? 'User') ?></p>
+                            <div class="profile-location">
+                                <i class="fas fa-map-marker-alt"></i>
+                                <span><?= htmlspecialchars($viewed_user['address'] ?? 'Address not provided') ?></span>
+                            </div>
+                            <div class="member-since-profile">
+                                <i class="fas fa-calendar-alt"></i>
+                                <span>Member since 
                                     <?php 
                                         if (!empty($viewed_user['created_at'])) {
                                             echo htmlspecialchars(date('F Y', strtotime($viewed_user['created_at'])));
@@ -362,70 +313,160 @@ function getTimeAgo($timestamp) {
                                             echo 'Unknown date';
                                         }
                                     ?>
-                                </div>
+                                </span>
                             </div>
                         </div>
+                    </div>
 
-                        <!-- Profile Stats -->
-                        <div class="section-title">Profile Stats</div>
+                    <!-- Enhanced Profile Stats -->
+                    <div class="profile-section">
+                        <h2 class="section-title">Profile Stats</h2>
                         <div class="profile-stats-grid">
                             <div class="stat-card">
-                                <span class="stat-value"><?= htmlspecialchars($viewed_user_stats['items_recycled'] ?? 0) ?></span>
-                                <span class="stat-label">Items Recycled</span>
-                            </div>
-                            <div class="stat-card">
-                                <span class="stat-value"><?= htmlspecialchars($viewed_user_stats['items_donated'] ?? 0) ?></span>
-                                <span class="stat-label">Items Donated</span>
-                            </div>
-                            <div class="stat-card">
-                                <span class="stat-value"><?= htmlspecialchars($viewed_user['points'] ?? 0) ?></span>
-                                <span class="stat-label">Total Points</span>
-                            </div>
-                        </div>
-
-                        <!-- Eco Badges -->
-                        <div class="section-title">Eco Badges</div>
-                        <div class="badges-grid">
-                        <?php
-                        // Fetch badges earned by the viewed user with badge info
-                        $stmt = $conn->prepare("
-                            SELECT b.badge_name, b.description, b.icon 
-                            FROM user_badges ub
-                            JOIN badges b ON ub.badge_id = b.badge_id
-                            WHERE ub.user_id = ?
-                            ORDER BY b.badge_id ASC
-                        ");
-                        $stmt->bind_param("i", $viewed_user_id);
-                        $stmt->execute();
-                        $result = $stmt->get_result();
-
-                        // Check if the user has earned any badges
-                        if ($result->num_rows === 0):
-                        ?>
-                            <div class="no-content">No badges earned yet.</div>
-                        <?php
-                        else:
-                            while ($badge = $result->fetch_assoc()):
-                        ?>
-                            <div class="badge-item earned">
-                                <div class="badge-icon">
-                                    <i class="<?= htmlspecialchars($badge['icon']); ?>" style="color:gold;"></i>
+                                <div class="stat-icon">
+                                    <i class="fas fa-recycle"></i>
                                 </div>
-                                <div class="badge-name"><?= htmlspecialchars($badge['badge_name']); ?></div>
-                                <div class="badge-description" style="font-size:11px; color:#555;"><?= htmlspecialchars($badge['description']); ?></div>
+                                <div class="stat-content">
+                                    <div class="stat-value"><?= htmlspecialchars($viewed_user_stats['items_recycled'] ?? 0) ?></div>
+                                    <div class="stat-label">Items Recycled</div>
+                                </div>
                             </div>
-                        <?php
-                            endwhile;
-                        endif;
-                        $stmt->close();
-                        ?>
+                            
+                            <div class="stat-card">
+                                <div class="stat-icon">
+                                    <i class="fas fa-hand-holding-heart"></i>
+                                </div>
+                                <div class="stat-content">
+                                    <div class="stat-value"><?= htmlspecialchars($viewed_user_stats['items_donated'] ?? 0) ?></div>
+                                    <div class="stat-label">Items Donated</div>
+                                </div>
+                            </div>
+                            
+                            <div class="stat-card highlight">
+                                <div class="stat-icon">
+                                    <i class="fas fa-star"></i>
+                                </div>
+                                <div class="stat-content">
+                                    <div class="stat-value"><?= htmlspecialchars($viewed_user['points'] ?? 0) ?></div>
+                                    <div class="stat-label">Total Points</div>
+                                </div>
+                            </div>
                         </div>
+                    </div>
+
+                    <!-- Enhanced Eco Badges -->
+                    <div class="profile-section">
+                        <div class="badges-section-header">
+                            <h2 class="badges-section-title">Eco Badges</h2>
+                        </div>
+                        
+                        <div class="badges-container">
+                            <div class="badges-grid limited" id="badgesGrid">
+                            <?php
+                            // Fetch badges earned by the viewed user with badge info
+                            $stmt = $conn->prepare("
+                                SELECT b.badge_id, b.badge_name, b.description, b.icon 
+                                FROM user_badges ub
+                                JOIN badges b ON ub.badge_id = b.badge_id
+                                WHERE ub.user_id = ?
+                                ORDER BY b.badge_id ASC
+                            ");
+                            $stmt->bind_param("i", $viewed_user_id);
+                            $stmt->execute();
+                            $result = $stmt->get_result();
+                            $all_badges = [];
+                            $display_limit = 4;
+
+                            // Check if the user has earned any badges
+                            if ($result->num_rows === 0):
+                            ?>
+                                <div class="no-content">No badges earned yet. Start recycling and donating to earn badges!</div>
+                            <?php
+                            else:
+                                $badge_count = 0;
+                                while ($badge = $result->fetch_assoc()):
+                                    $all_badges[] = $badge;
+                                    $badge_count++;
+                                    $badge_class = '';
+                                    if ($badge_count === 1) $badge_class = 'gold';
+                                    elseif ($badge_count === 2) $badge_class = 'silver';
+                                    elseif ($badge_count === 3) $badge_class = 'bronze';
+                                    
+                                    // Only display up to the limit
+                                    if ($badge_count <= $display_limit):
+                            ?>
+                                <div class="badge-card">
+                                    <div class="badge-icon <?= $badge_class ?>">
+                                        <i class="<?= htmlspecialchars($badge['icon']); ?>"></i>
+                                    </div>
+                                    <div class="badge-info">
+                                        <h3>
+                                            <?= htmlspecialchars($badge['badge_name']); ?>
+                                        </h3>
+                                        <p>
+                                            <?= htmlspecialchars($badge['description']); ?>
+                                        </p>
+                                        <span class="badge-status earned">
+                                            Earned
+                                        </span>
+                                    </div>
+                                </div>
+                            <?php
+                                    endif;
+                                endwhile;
+                            endif;
+                            $stmt->close();
+                            ?>
+                            </div>
+                            
+                            <?php if (count($all_badges) > $display_limit): ?>
+                            <div class="badges-more" id="badgesMore">
+                                <div class="badges-grid">
+                                <?php 
+                                // Display remaining badges
+                                for ($i = $display_limit; $i < count($all_badges); $i++):
+                                    $badge = $all_badges[$i];
+                                    $badge_class = '';
+                                    if ($i === 0) $badge_class = 'gold';
+                                    elseif ($i === 1) $badge_class = 'silver';
+                                    elseif ($i === 2) $badge_class = 'bronze';
+                                ?>
+                                    <div class="badge-card" >
+                                        <div class="badge-icon <?= $badge_class ?>" >
+                                            <i class="<?= htmlspecialchars($badge['icon']); ?>"></i>
+                                        </div>
+                                        <div class="badge-info">
+                                            <h3>
+                                                <?= htmlspecialchars($badge['badge_name']); ?>
+                                            </h3>
+                                            <p>
+                                                <?= htmlspecialchars($badge['description']); ?>
+                                            </p>
+                                            <span class="badge-status earned">
+                                                Earned
+                                            </span>
+                                        </div>
+                                    </div>
+                                <?php endfor; ?>
+                                </div>
+                            </div>
+                            
+                            <div class="view-toggle">
+                                <button class="toggle-badges-btn" id="toggleBadgesBtn" onclick="toggleMoreBadges()">
+                                    Show More Badges
+                                    <i class="fas fa-chevron-down"></i>
+                                </button>
+                            </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
 
 
-                        <!-- Recent Donations -->
-                        <div class="section-title">Recent Donations</div>
+                    <!-- Enhanced Recent Donations -->
+                    <div class="profile-section">
+                        <h2 class="section-title">Recent Donations</h2>
                         <?php if (count($viewed_user_donations) === 0): ?>
-                            <div class="no-content">No donations yet.</div>
+                            <div class="no-content">No donations yet. Start making donations to help the environment!</div>
                         <?php else: ?>
                             <?php foreach ($viewed_user_donations as $donation): ?>
                             <div class="donation-post">
@@ -476,6 +517,43 @@ function getTimeAgo($timestamp) {
                                         </div>
                                     <?php endif; ?>
                                 <?php endif; ?>
+
+                                <!-- Action Buttons -->
+                                <div class="donation-actions">
+                                    <?php if ($donation['donor_id'] == $_SESSION['user_id']): ?>
+                                        <button class="comment-btn" data-donation-id="<?= (int)$donation['donation_id'] ?>">
+                                            <i class="fas fa-comment"></i> Comments
+                                        </button>
+                                    <?php else: ?>
+                                        <button class="request-btn"
+                                                data-donation-id="<?= (int)$donation['donation_id'] ?>"
+                                                data-available="<?= (int)$donation['quantity'] ?>"
+                                                data-total="<?= (int)$donation['total_quantity'] ?>">
+                                            Request Donation
+                                        </button>
+                                        <button class="comment-btn" data-donation-id="<?= (int)$donation['donation_id'] ?>">
+                                            <i class="fas fa-comment"></i> Comments
+                                        </button>
+                                    <?php endif; ?>
+                                </div>
+
+                                <!-- Hidden comments panel for this post (toggle by JS) -->
+                                <div class="comments-panel" id="comments-panel-<?= (int)$donation['donation_id'] ?>" style="display:none; margin-top:12px;">
+                                    <ul class="comment-list" id="comment-list-<?= (int)$donation['donation_id'] ?>">
+                                        <?php
+                                        // You'll need to fetch comments for each donation here, similar to browse.php
+                                        // For now, showing a placeholder
+                                        echo '<li class="no-comments">No comments yet. Be the first to comment!</li>';
+                                        ?>
+                                    </ul>
+
+                                    <form class="comment-form-ajax" data-donation-id="<?= (int)$donation['donation_id'] ?>" onsubmit="return false;">
+                                        <input type="hidden" name="donation_id" value="<?= (int)$donation['donation_id'] ?>">
+                                        <textarea name="comment_text" class="comment-input" placeholder="Write a comment..." required></textarea>
+                                        <button type="submit" class="comment-submit-ajax">Post Comment</button>
+                                        <span class="comment-spinner" style="display:none;margin-left:8px;">⏳</span>
+                                    </form>
+                                </div>
                             </div>
                             <?php endforeach; ?>
                         <?php endif; ?>
@@ -490,8 +568,112 @@ function getTimeAgo($timestamp) {
         <span class="close-modal" onclick="document.getElementById('photoZoomModal').style.display='none'">&times;</span>
         <img id="zoomedPhoto" class="zoomed-photo" src="" alt="Zoomed Photo">
     </div>
+
+    <!-- Request Donation Popup -->
+<div id="requestPopup" class="popup-container" style="display:none;">
+    <div class="popup-content">
+        <h2 style="text-align:center; color:#2e7d32; font-weight:800; margin-bottom:15px;">
+            Request Materials
+        </h2>
+
+        <form id="requestFormAjax" method="POST" action="homepage.php">
+            <input type="hidden" id="popupDonationId" name="donation_id">
+
+            <div class="form-group">
+                <label>Waste:</label>
+                <span id="popupWasteName" style="font-weight:500;"></span>
+            </div>
+
+            <div class="form-group">
+                <label>Available Items:</label>
+                <span id="popupAvailable" style="font-weight:500;"></span>
+            </div>
+
+            <div class="form-group">
+                <label>Quantity to Claim:</label>
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <button type="button" id="btnMinus"
+                    style="width:32px;height:32px;border:none;background:#f0f0f0;border-radius:6px;cursor:pointer;font-size:18px;font-weight:bold;">−</button>
+
+                    <input type="number" id="quantityClaim" name="quantity_claim" value="1" min="1"
+                    style="width:60px;text-align:center;border:1.5px solid #ccc;border-radius:6px;padding:6px;appearance:none;-moz-appearance:textfield;">
+
+                    <button type="button" id="btnPlus"
+                    style="width:32px;height:32px;border:none;background:#f0f0f0;border-radius:6px;cursor:pointer;font-size:18px;font-weight:bold;">+</button>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Recycling Project:</label>
+                <select name="project_id" required>
+                    <option value="">Select a project</option>
+                    <?php foreach ($user_projects as $project): ?>
+                        <option value="<?= $project['project_id'] ?>"><?= htmlspecialchars($project['project_name']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Urgency Level:</label>
+                <select name="urgency_level" required>
+                    <option value="High">High (Immediate Need)</option>
+                    <option value="Medium">Medium (Within 2 weeks)</option>
+                    <option value="Low">Low (Planning ahead)</option>
+                </select>
+            </div>
+
+            <div class="popup-btn-group">
+                <button type="submit" name="submit_request_donation" class="request-btn">Submit Request</button>
+                <button type="button" id="cancelRequest" class="cancel-btn">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Request Success Popup -->
+<div id="requestSuccessPopup" class="popup-container" style="display:none;">
+    <div class="popup-content success-popup">
+        <h2>Request Sent!</h2>
+        <p>Your request has been submitted successfully. Please wait for the donor's response.</p>
+        <button class="continue-btn" id="continueBtn">Continue</button>
+    </div>
+</div>
+
+    <!-- Feedback Button -->
+    <div class="feedback-btn" id="feedbackBtn">💬</div>
+    <!-- Feedback Modal -->
+    <div class="feedback-modal" id="feedbackModal">
+        <div class="feedback-content">
+            <span class="feedback-close-btn" id="feedbackCloseBtn">&times;</span>
+            <div class="feedback-form" id="feedbackForm">
+                <h3>Share Your Feedback</h3>
+                <div class="emoji-rating" id="emojiRating">
+                    <div class="emoji-option" data-rating="1"><span class="emoji">😞</span><span class="emoji-label">Very Sad</span></div>
+                    <div class="emoji-option" data-rating="2"><span class="emoji">😕</span><span class="emoji-label">Sad</span></div>
+                    <div class="emoji-option" data-rating="3"><span class="emoji">😐</span><span class="emoji-label">Neutral</span></div>
+                    <div class="emoji-option" data-rating="4"><span class="emoji">🙂</span><span class="emoji-label">Happy</span></div>
+                    <div class="emoji-option" data-rating="5"><span class="emoji">😍</span><span class="emoji-label">Very Happy</span></div>
+                </div>
+                <div class="error-message" id="ratingError">Please select a rating</div>
+                <p class="feedback-detail">Please share in detail what we can improve more?</p>
+                <textarea id="feedbackText" placeholder="Your feedback helps us make EcoWaste better..."></textarea>
+                <div class="error-message" id="textError">Please provide your feedback</div>
+                <button type="submit" class="feedback-submit-btn" id="feedbackSubmitBtn">
+                    Submit Feedback
+                    <div class="spinner" id="spinner"></div>
+                </button>
+            </div>
+            <div class="thank-you-message" id="thankYouMessage">
+                <span class="thank-you-emoji">🎉</span>
+                <h3>Thank You!</h3>
+                <p>We appreciate your feedback and will use it to improve EcoWaste.</p>
+                <p>Your opinion matters to us!</p>
+            </div>
+        </div>
+    </div>
     
     <script>
+
         function openPhotoZoom(photoSrc) {
             const modal = document.getElementById('photoZoomModal');
             const zoomedPhoto = document.getElementById('zoomedPhoto');
@@ -509,6 +691,274 @@ function getTimeAgo($timestamp) {
                 userProfile.classList.remove('active');
             }
         });
+
+        document.addEventListener("DOMContentLoaded", function () {
+    // Grab elements
+    const feedbackBtn = document.getElementById("feedbackBtn");
+    const feedbackModal = document.getElementById("feedbackModal");
+    const feedbackCloseBtn = document.getElementById("feedbackCloseBtn");
+    const emojiOptions = feedbackModal ? feedbackModal.querySelectorAll(".emoji-option") : [];
+    const feedbackSubmitBtn = document.getElementById("feedbackSubmitBtn");
+    const feedbackText = document.getElementById("feedbackText");
+    const ratingError = document.getElementById("ratingError");
+    const textError = document.getElementById("textError");
+    const thankYouMessage = document.getElementById("thankYouMessage");
+    const feedbackForm = document.getElementById("feedbackForm");
+    const spinner = document.getElementById("spinner");
+
+    if (!feedbackBtn || !feedbackModal || !feedbackSubmitBtn || !feedbackText) return;
+
+    let selectedRating = 0;
+
+    // Open modal
+    feedbackBtn.addEventListener("click", () => {
+        feedbackModal.style.display = "flex";
+        feedbackForm.style.display = "block";
+        thankYouMessage.style.display = "none";
+    });
+
+    // Close modal
+    feedbackCloseBtn?.addEventListener("click", () => feedbackModal.style.display = "none");
+    window.addEventListener("click", e => {
+        if (e.target === feedbackModal) feedbackModal.style.display = "none";
+    });
+
+    // Emoji rating selection
+    emojiOptions.forEach(option => {
+        option.addEventListener("click", () => {
+            emojiOptions.forEach(o => o.classList.remove("selected"));
+            option.classList.add("selected");
+            selectedRating = option.getAttribute("data-rating");
+            ratingError.style.display = "none";
+        });
+    });
+
+    // Submit feedback
+    feedbackSubmitBtn.addEventListener("click", e => {
+        e.preventDefault();
+
+        let valid = true;
+        if (selectedRating === 0) { ratingError.style.display = "block"; valid = false; }
+        if (feedbackText.value.trim() === "") { textError.style.display = "block"; valid = false; }
+        else { textError.style.display = "none"; }
+
+        if (!valid) return;
+
+        spinner.style.display = "inline-block";
+        feedbackSubmitBtn.disabled = true;
+
+        // AJAX POST
+        fetch("feedback_process.php", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: `rating=${selectedRating}&feedback=${encodeURIComponent(feedbackText.value)}`
+        })
+        .then(res => res.json())
+        .then(data => {
+            spinner.style.display = "none";
+            feedbackSubmitBtn.disabled = false;
+
+            if (data.status === "success") {
+                feedbackForm.style.display = "none";
+                thankYouMessage.style.display = "block";
+
+                // Reset after 3 seconds
+                setTimeout(() => {
+                    feedbackModal.style.display = "none";
+                    feedbackForm.style.display = "block";
+                    thankYouMessage.style.display = "none";
+                    feedbackText.value = "";
+                    selectedRating = 0;
+                    emojiOptions.forEach(o => o.classList.remove("selected"));
+                }, 3000);
+            } else {
+                alert(data.message || "Failed to submit feedback.");
+            }
+        })
+        .catch(err => {
+            spinner.style.display = "none";
+            feedbackSubmitBtn.disabled = false;
+            alert("Failed to submit feedback. Please try again.");
+            console.error(err);
+        });
+    });
+});
+
+function toggleMoreBadges() {
+    const badgesMore = document.getElementById('badgesMore');
+    const toggleBtn = document.getElementById('toggleBadgesBtn');
+    const badgesGrid = document.getElementById('badgesGrid');
+    
+    if (badgesMore && toggleBtn) {
+        if (badgesMore.classList.contains('show')) {
+            badgesMore.classList.remove('show');
+            toggleBtn.innerHTML = 'Show More Badges <i class="fas fa-chevron-down"></i>';
+            badgesGrid.classList.add('limited');
+        } else {
+            badgesMore.classList.add('show');
+            toggleBtn.innerHTML = 'Show Less Badges <i class="fas fa-chevron-up"></i>';
+            badgesGrid.classList.remove('limited');
+        }
+    }
+}
+
+/* ---------- Comments ---------- */
+document.addEventListener('DOMContentLoaded', () => {
+    // Comment button toggle
+    document.querySelectorAll('.comment-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const id = btn.dataset.donationId;
+            const panel = document.querySelector(`#comments-panel-${id}`);
+            if (panel) panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
+        });
+    });
+
+    // Comment form submission
+    document.querySelectorAll('.comment-form-ajax').forEach(form => {
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const id = form.dataset.donationId;
+            const textarea = form.querySelector('textarea[name="comment_text"]');
+            const text = textarea.value.trim();
+            if (!text) return;
+
+            const fd = new FormData();
+            fd.append('donation_id', id);
+            fd.append('comment_text', text);
+            fd.append('submit_comment', '1');
+
+            fetch('homepage.php', { 
+                method: 'POST', 
+                body: fd, 
+                headers: {'X-Requested-With':'XMLHttpRequest'} 
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    const list = document.querySelector(`#comment-list-${id}`);
+                    const li = document.createElement('li');
+                    li.className = 'comment-item';
+                    li.innerHTML = `
+                        <div class="comment-avatar">U</div>
+                        <div class="comment-content">
+                            <div class="comment-author">You</div>
+                            <div class="comment-text">${escapeHtml(text)}</div>
+                            <div class="comment-time">Just now</div>
+                        </div>`;
+                    list.insertBefore(li, list.firstChild);
+                    textarea.value = '';
+                    
+                    // Remove "no comments" message if it exists
+                    const noComments = list.querySelector('.no-comments');
+                    if (noComments) noComments.remove();
+                } else {
+                    alert(data.message || 'Failed to post comment.');
+                }
+            })
+            .catch(() => alert('Network error.'));
+        });
+    });
+
+    // Utility function for HTML escaping
+    function escapeHtml(unsafe) {
+        if (!unsafe) return '';
+        return unsafe.replace(/[&<>"']/g, m => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
+        }[m]));
+    }
+});
+
+/* ---------- Request Donation Popup ---------- */
+let currentAvailable = 0;
+
+function openRequestPopup(donationId, wasteName, available) {
+    document.querySelector('#popupDonationId').value = donationId;
+    document.querySelector('#popupWasteName').textContent = wasteName;
+    document.querySelector('#popupAvailable').textContent = available;
+    document.querySelector('#quantityClaim').value = 1;
+    currentAvailable = parseInt(available) || 0;
+    document.querySelector('#requestPopup').style.display = 'flex';
+}
+
+function closeRequestPopup() { 
+    document.querySelector('#requestPopup').style.display = 'none'; 
+}
+
+function closeRequestSuccessPopup() { 
+    document.querySelector('#requestSuccessPopup').style.display = 'none'; 
+}
+
+function updateQuantity(change) {
+    const input = document.querySelector('#quantityClaim');
+    if (!input) return;
+
+    let val = parseInt(input.value) || 1;
+    val += change;
+
+    if (val < 1) val = 1;
+    if (val > currentAvailable && currentAvailable > 0) val = currentAvailable;
+
+    input.value = val;
+}
+
+// Attach request button events
+document.querySelectorAll('.request-btn').forEach(btn => {
+    if (btn.classList.contains('comment-btn')) return; // Skip comment buttons
+    
+    btn.addEventListener('click', function() {
+        const id = this.dataset.donationId;
+        if (!id) return;
+        const available = this.dataset.available || 0;
+        const categoryEl = this.closest('.donation-post')?.querySelector('.category');
+        let wasteText = 'Unknown';
+        if (categoryEl) {
+            const text = categoryEl.textContent.replace('Category:', '').trim();
+            const parts = text.split('→').map(p => p.trim());
+            if (parts.length === 2) wasteText = `${parts[1]} (${parts[0]})`;
+            else wasteText = text;
+        }
+        openRequestPopup(id, wasteText, available);
+    });
+});
+
+// Quantity controls
+const quantityInput = document.querySelector('#quantityClaim');
+const btnMinus = document.querySelector('#btnMinus');
+const btnPlus = document.querySelector('#btnPlus');
+
+if (quantityInput) {
+    quantityInput.addEventListener('keydown', function(e) {
+        if (['e', 'E', '+', '-', '.'].includes(e.key)) e.preventDefault();
+    });
+
+    btnMinus?.addEventListener('click', () => updateQuantity(-1));
+    btnPlus?.addEventListener('click', () => updateQuantity(1));
+}
+
+// Cancel and Continue buttons
+const cancelBtn = document.querySelector('#cancelRequest');
+if (cancelBtn) {
+    cancelBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        closeRequestPopup();
+    });
+}
+
+const continueBtn = document.querySelector('#continueBtn');
+if (continueBtn) {
+    continueBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        closeRequestSuccessPopup();
+    });
+}
+
+// Photo zoom function (keep your existing function)
+function openPhotoZoom(photoSrc) {
+    const modal = document.getElementById('photoZoomModal');
+    const zoomedPhoto = document.getElementById('zoomedPhoto');
+    zoomedPhoto.src = photoSrc;
+    modal.style.display = 'flex';
+}
     </script>
 </body>
 </html>
