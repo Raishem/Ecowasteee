@@ -1,32 +1,11 @@
 <?php
+session_start();
 require_once "config.php";
 $conn = getDBConnection();
 
-if ($_SERVER["REQUEST_METHOD"] === "POST") {
-    $email = trim($_POST["email"]);
-
-    // Check if email exists
-    $stmt = $conn->prepare("SELECT user_id FROM users WHERE email = ?");
-    $stmt->bind_param("s", $email);
-    $stmt->execute();
-    $stmt->store_result();
-
-    if ($stmt->num_rows > 0) {
-        $_SESSION['signup_error'] = "Email already exists. Please use another one.";
-        header("Location: signup.php");
-        exit();
-    }
-
-    // If not exists → continue inserting new user
-    $password = password_hash($_POST["password"], PASSWORD_DEFAULT);
-    $stmt = $conn->prepare("INSERT INTO users (first_name, last_name, email, password) VALUES (?, ?, ?, ?)");
-    $stmt->bind_param("ssss", $_POST["first_name"], $_POST["last_name"], $email, $password);
-    $stmt->execute();
-
-    $_SESSION['signup_success'] = "Account created successfully! You can now log in.";
-    header("Location: login.php");
-    exit();
-}
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\Exception;
+require 'vendor/autoload.php'; // PHPMailer
 
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
@@ -38,26 +17,24 @@ $error_message = '';
 
 // Process form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    require_once 'config.php';
-    
-
     // Get and sanitize form data
     $firstName = htmlspecialchars($_POST['first-name'] ?? '');
     $middleName = htmlspecialchars($_POST['middle-name'] ?? '');
     $lastName = htmlspecialchars($_POST['last-name'] ?? '');
     $email = filter_var($_POST['email'] ?? '', FILTER_SANITIZE_EMAIL);
     $password = $_POST['password'] ?? '';
+    $confirmPassword = $_POST['confirm-password'] ?? '';
     $contactNumber = htmlspecialchars($_POST['contact-number'] ?? '');
     $address = htmlspecialchars($_POST['address'] ?? '');
     $zipCode = htmlspecialchars($_POST['zip-code'] ?? '');
 
     // Validate input
-    if (empty($firstName) || empty($lastName) || empty($email) || empty($password) || 
+    if (empty($firstName) || empty($lastName) || empty($email) || empty($password) ||
         empty($contactNumber) || empty($address) || empty($zipCode)) {
         $error_message = "All required fields must be filled";
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $error_message = "Invalid email format";
-    } elseif ($password !== ($_POST['confirm-password'] ?? '')) {
+    } elseif ($password !== $confirmPassword) {
         $error_message = "Passwords do not match";
     } elseif (strlen($password) < 8) {
         $error_message = "Password must be at least 8 characters";
@@ -66,44 +43,88 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Hash password
             $passwordHash = password_hash($password, PASSWORD_DEFAULT);
             $conn = getDBConnection();
-            
+
             // Check if email exists
             $stmt = $conn->prepare("SELECT user_id FROM users WHERE email = ?");
             $stmt->bind_param("s", $email);
             $stmt->execute();
             $stmt->store_result();
-            
+
             if ($stmt->num_rows > 0) {
                 $error_message = "Email already registered";
             } else {
-                // Insert new user
-$stmt = $conn->prepare("INSERT INTO users 
-    (email, password_hash, first_name, middle_name, last_name, 
-    contact_number, address, city, zip_code) 
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                // Generate verification token
+                $verificationToken = bin2hex(random_bytes(16));
 
-if (false === $stmt) {
-    die("Prepare failed: " . $conn->error);
-}
+                // Insert new user with verification token
+                $stmt = $conn->prepare("INSERT INTO users 
+                    (email, password_hash, first_name, middle_name, last_name, 
+                    contact_number, address, zip_code, verification_token, is_verified) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)");
 
-$bindResult = $stmt->bind_param("sssssssss", 
-    $email, $passwordHash, $firstName, $middleName, $lastName,
-    $contactNumber, $address, $zipCode);
+                if (false === $stmt) {
+                    die("Prepare failed: " . $conn->error);
+                }
 
-if (false === $bindResult) {
-    die("Bind failed: " . $stmt->error);
-}
+                $bindResult = $stmt->bind_param(
+                    "sssssssss",
+                    $email,
+                    $passwordHash,
+                    $firstName,
+                    $middleName,
+                    $lastName,
+                    $contactNumber,
+                    $address,
+                    $zipCode,
+                    $verificationToken
+                );
 
-if ($stmt->execute()) {
-    $_SESSION['new_user_email'] = $email;
-    $show_success_modal = true;
-} else {
-    $error_message = "Execute failed: " . $stmt->error;
-    error_log("Database error: " . $stmt->error);
-}
+                if (false === $bindResult) {
+                    die("Bind failed: " . $stmt->error);
+                }
+
+                if ($stmt->execute()) {
+                    $_SESSION['new_user_email'] = $email;
+                    $show_success_modal = true;
+
+                    // Send verification email
+                    $mail = new PHPMailer(true);
+                    try {
+                        $mail->isSMTP();
+                        $mail->Host = SMTP_HOST;
+                        $mail->SMTPAuth = true;
+                        $mail->Username = SMTP_USER;
+                        $mail->Password = SMTP_PASS;
+                        $mail->SMTPSecure = 'tls';
+                        $mail->Port = 587;
+
+                        $mail->setFrom(SMTP_USER, 'EcoWaste');
+                        $mail->addAddress($email, $firstName);
+
+                        $mail->isHTML(true);
+                        $mail->Subject = 'Verify your EcoWaste account';
+                        $mail->Body = "
+                            Hi $firstName,<br><br>
+                            Thank you for signing up for EcoWaste!<br>
+                            Please verify your email by clicking the link below:<br>
+                            <a href='https://yourdomain.com/verify.php?token=$verificationToken'>Verify Email</a><br><br>
+                            Regards,<br>EcoWaste Team
+                        ";
+
+                        $mail->send();
+                    } catch (Exception $e) {
+                        error_log("Email could not be sent: {$mail->ErrorInfo}");
+                    }
+
+                } else {
+                    $error_message = "Execute failed: " . $stmt->error;
+                    error_log("Database error: " . $stmt->error);
+                }
             }
+
             $stmt->close();
             $conn->close();
+
         } catch (Exception $e) {
             error_log("Database error: " . $e->getMessage());
             $error_message = "A system error occurred. Please try again later.";
@@ -111,6 +132,7 @@ if ($stmt->execute()) {
     }
 }
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>

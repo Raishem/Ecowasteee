@@ -36,6 +36,10 @@ function generateCSRFToken() {
 // Constants
 define('REMEMBER_ME_EXPIRY', 86400 * 30); // 30 days
 
+define('SMTP_HOST', 'smtp.gmail.com');
+define('SMTP_USER', 'youremail@gmail.com'); // Gmail
+define('SMTP_PASS', 'yourapppassword');     // Gmail App Password
+define('SMTP_PORT', 587);
 
 
 ?>
