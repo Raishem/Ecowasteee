@@ -444,14 +444,16 @@ if (isset($_POST['action']) && $_POST['action'] === 'cancel_request') {
 
 
 
-// Get request details for editing
-if ($_GET['action'] === 'get_request_details' && isset($_GET['request_id'])) {
+// Get request details for editing - ensure delivery_end is included
+if (isset($_GET['action']) && $_GET['action'] === 'get_request_details' && isset($_GET['request_id'])) {
     $id = intval($_GET['request_id']);
     $stmt = $conn->prepare("
     SELECT dr.request_id, dr.quantity_claim, dr.urgency_level, dr.requested_at,
-           d.category, d.subcategory, d.image_path, 
-           d.delivery_start, d.delivery_end,
+           dr.delivery_status, dr.delivery_start, dr.delivery_end,
+           dr.pickup_date, dr.sorting_facility_date, dr.in_transit_date, dr.delivered_date,
+           d.category, d.subcategory, d.image_path, d.item_name,
            CONCAT(u.first_name, ' ', u.last_name) AS donor_name,
+           u.first_name, u.last_name,
            p.project_name
     FROM donation_requests dr
     JOIN donations d ON dr.donation_id = d.donation_id
@@ -538,5 +540,235 @@ if (isset($_POST['action']) && $_POST['action'] === 'update_request') {
     exit;
 }
 
+// Update delivery status - FIXED VERSION with proper date handling
+if ($action === 'update_delivery_status' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    header('Content-Type: application/json');
+    if (!isset($_SESSION['user_id'])) {
+        echo json_encode(["status" => "error", "message" => "Not logged in"]);
+        exit;
+    }
+
+    $request_id = intval($_POST['request_id'] ?? 0);
+    $delivery_status = trim($_POST['delivery_status'] ?? '');
+    $estimated_delivery = !empty($_POST['estimated_delivery']) ? $_POST['estimated_delivery'] : null;
+    $estimated_delivery_date = !empty($_POST['estimated_delivery_date']) ? $_POST['estimated_delivery_date'] : null;
+
+    if ($request_id <= 0 || empty($delivery_status)) {
+        echo json_encode(["status" => "error", "message" => "Invalid input"]);
+        exit;
+    }
+
+    // Verify ownership
+    $stmt = $conn->prepare("
+        SELECT dr.request_id, d.donor_id 
+        FROM donation_requests dr 
+        JOIN donations d ON dr.donation_id = d.donation_id 
+        WHERE dr.request_id = ?
+    ");
+    $stmt->bind_param("i", $request_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $request = $result->fetch_assoc();
+
+    if (!$request || $request['donor_id'] != $_SESSION['user_id']) {
+        echo json_encode(["status" => "error", "message" => "Unauthorized"]);
+        exit;
+    }
+
+    // Convert status from frontend format to database format
+    $status_conversion = [
+        'pending' => 'Pending',
+        'waiting_for_pickup' => 'Waiting for Pickup',
+        'at_sorting_facility' => 'At Sorting Facility',
+        'on_the_way' => 'On the Way',
+        'delivered' => 'Delivered',
+        'cancelled' => 'Cancelled'
+    ];
+    
+    $db_delivery_status = $status_conversion[$delivery_status] ?? $delivery_status;
+
+    // Build the update query based on the status
+    $update_fields = ["delivery_status = ?"];
+    $param_types = "s";
+    $param_values = [$db_delivery_status];
+
+    // Handle pickup date and delivery_end ONLY for Waiting for Pickup
+    if ($estimated_delivery && $delivery_status === 'waiting_for_pickup') {
+        $pickup_date = date('Y-m-d', strtotime($estimated_delivery));
+        $update_fields[] = "pickup_date = ?";
+        $update_fields[] = "delivery_start = ?"; // Set delivery_start as pickup date
+        $param_types .= "ss";
+        $param_values[] = $pickup_date;
+        $param_values[] = $pickup_date;
+        
+        // Handle estimated delivery end date - ONLY for Waiting for Pickup
+        if ($estimated_delivery_date) {
+            $estimated_delivery_date_formatted = date('Y-m-d', strtotime($estimated_delivery_date));
+            $update_fields[] = "delivery_end = ?";
+            $param_types .= "s";
+            $param_values[] = $estimated_delivery_date_formatted;
+            
+            error_log("[donate_process] Setting delivery_end for Waiting for Pickup: " . $estimated_delivery_date_formatted);
+        }
+    }
+
+    // Handle other status dates WITHOUT affecting delivery_start/delivery_end
+    if ($estimated_delivery && $delivery_status !== 'waiting_for_pickup') {
+        $delivery_date = date('Y-m-d', strtotime($estimated_delivery));
+        
+        // Update specific date field based on status
+        switch($delivery_status) {
+            case 'at_sorting_facility':
+                $update_fields[] = "sorting_facility_date = ?";
+                $param_types .= "s";
+                $param_values[] = $delivery_date;
+                error_log("[donate_process] Setting sorting_facility_date: " . $delivery_date);
+                break;
+            case 'on_the_way':
+                $update_fields[] = "in_transit_date = ?";
+                $param_types .= "s";
+                $param_values[] = $delivery_date;
+                error_log("[donate_process] Setting in_transit_date: " . $delivery_date);
+                break;
+            case 'delivered':
+                $update_fields[] = "delivered_date = ?";
+                $param_types .= "s";
+                $param_values[] = $delivery_date;
+                error_log("[donate_process] Setting delivered_date: " . $delivery_date);
+                break;
+        }
+        
+        // IMPORTANT: Do NOT update delivery_start or delivery_end for these statuses
+        // They should only be set during Waiting for Pickup phase
+    }
+
+    // If we're updating to a status that should clear future dates, do so
+    if (in_array($delivery_status, ['pending', 'cancelled'])) {
+        // Clear all delivery dates when going back to pending or cancelled
+        $update_fields[] = "pickup_date = NULL";
+        $update_fields[] = "sorting_facility_date = NULL";
+        $update_fields[] = "in_transit_date = NULL";
+        $update_fields[] = "delivered_date = NULL";
+        $update_fields[] = "delivery_start = NULL";
+        $update_fields[] = "delivery_end = NULL";
+    }
+
+    $update_fields_sql = implode(", ", $update_fields);
+    
+    // Debug logging
+    error_log("[donate_process] Update query: UPDATE donation_requests SET $update_fields_sql WHERE request_id = $request_id");
+    error_log("[donate_process] Status: $db_delivery_status, Estimated: $estimated_delivery, Delivery End: " . ($estimated_delivery_date ?? 'none'));
+
+    $stmt = $conn->prepare("
+        UPDATE donation_requests 
+        SET $update_fields_sql
+        WHERE request_id = ?
+    ");
+    
+    $param_types .= "i";
+    $param_values[] = $request_id;
+    
+    if ($stmt->bind_param($param_types, ...$param_values)) {
+        if ($stmt->execute()) {
+            // Log the successful update for debugging
+            error_log("[donate_process] Delivery status updated successfully - Request: $request_id, Status: $db_delivery_status");
+            
+            echo json_encode([
+                "status" => "success", 
+                "message" => "Delivery status updated successfully",
+                "delivery_end" => $estimated_delivery_date
+            ]);
+        } else {
+            error_log("[donate_process] Failed to execute update: " . $stmt->error);
+            echo json_encode(["status" => "error", "message" => "Failed to update delivery status: " . $stmt->error]);
+        }
+    } else {
+        error_log("[donate_process] Failed to bind parameters: " . $stmt->error);
+        echo json_encode(["status" => "error", "message" => "Failed to bind parameters: " . $stmt->error]);
+    }
+    exit;
+}
+
+
+// Confirm delivery receipt (Requester action)
+if ($action === 'confirm_delivery' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    header('Content-Type: application/json');
+    if (!isset($_SESSION['user_id'])) {
+        echo json_encode(["status" => "error", "message" => "Not logged in"]);
+        exit;
+    }
+
+    $request_id = intval($_POST['request_id'] ?? 0);
+    if ($request_id <= 0) {
+        echo json_encode(["status" => "error", "message" => "Invalid request id"]);
+        exit;
+    }
+
+    // Verify requester ownership
+    $stmt = $conn->prepare("
+        SELECT dr.request_id, dr.user_id, dr.delivery_status
+        FROM donation_requests dr
+        WHERE dr.request_id = ?
+    ");
+    $stmt->bind_param("i", $request_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $request = $result->fetch_assoc();
+
+    if (!$request) {
+        echo json_encode(["status" => "error", "message" => "Request not found"]);
+        exit;
+    }
+
+    if ($request['user_id'] != $_SESSION['user_id']) {
+        echo json_encode(["status" => "error", "message" => "Unauthorized"]);
+        exit;
+    }
+
+    // Only allow confirmation if status is "On the Way"
+    if (strtolower($request['delivery_status']) !== 'on the way') {
+        echo json_encode(["status" => "error", "message" => "Can only confirm delivery when item is 'On the Way'"]);
+        exit;
+    }
+
+    // Update to delivered status
+    $stmt = $conn->prepare("
+        UPDATE donation_requests 
+        SET delivery_status = 'Delivered', delivery_start = COALESCE(delivery_start, CURDATE()), delivery_end = CURDATE()
+        WHERE request_id = ?
+    ");
+    
+    if ($stmt->execute()) {
+        echo json_encode(["status" => "success", "message" => "Delivery confirmed successfully!"]);
+    } else {
+        echo json_encode(["status" => "error", "message" => "Failed to confirm delivery"]);
+    }
+    exit;
+}
+
+// Auto-update cancelled requests
+if ($action === 'auto_update_cancelled' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    header('Content-Type: application/json');
+    
+    $request_id = intval($_POST['request_id'] ?? 0);
+    if ($request_id <= 0) {
+        echo json_encode(["status" => "error", "message" => "Invalid request id"]);
+        exit;
+    }
+
+    // Update to cancelled status (this would typically be called when requester cancels)
+    $stmt = $conn->prepare("
+        UPDATE donation_requests 
+        SET delivery_status = 'Cancelled'
+        WHERE request_id = ?
+    ");
+    
+    if ($stmt->execute()) {
+        echo json_encode(["status" => "success", "message" => "Status updated to cancelled"]);
+    } else {
+        echo json_encode(["status" => "error", "message" => "Failed to update status"]);
+    }
+    exit;
+}
 
 ?>

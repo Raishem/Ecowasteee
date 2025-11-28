@@ -70,11 +70,15 @@ $stmt = $conn->prepare("
     SELECT 
         dr.request_id,
         dr.status AS request_status,
+        dr.delivery_status,
         dr.quantity_claim,
         dr.urgency_level,
         dr.requested_at,
+        dr.delivery_start,
+        dr.delivery_end,
         d.subcategory,
         d.category,
+        d.item_name,
         d.total_quantity,
         u.first_name,
         u.last_name,
@@ -87,7 +91,6 @@ $stmt = $conn->prepare("
     WHERE d.donor_id = ?
     ORDER BY dr.requested_at DESC
 ");
-
 
 $stmt->bind_param("i", $user_id);
 $stmt->execute();
@@ -298,96 +301,81 @@ while ($row = $result->fetch_assoc()) {
                     </div>
 
 
-<!-- My Requested Donations Tab -->
-<div id="my-requests" class="tab-content">
-    <?php if (!empty($myRequests)): ?>
-        <?php foreach ($myRequests as $rq): ?>
-            <?php $status = strtolower(trim($rq['status'] ?? '')); ?>
-            <div class="donation-card" data-request-id="<?= htmlspecialchars($rq['request_id']); ?>">
-                <div class="donation-header">
-                    <span class="donation-title"><?= htmlspecialchars($rq['subcategory'] ?? 'Donation Request') ?></span>
+                    <!-- My Requested Donations Tab -->
+                    <div id="my-requests" class="tab-content">
+                        <?php if (!empty($myRequests)): ?>
+                            <?php foreach ($myRequests as $rq): ?>
+                                <?php $status = strtolower(trim($rq['status'] ?? '')); ?>
+                                <div class="donation-card" data-request-id="<?= htmlspecialchars($rq['request_id']); ?>">
+                                    <div class="donation-header">
+                                        <span class="donation-title"><?= htmlspecialchars($rq['subcategory'] ?? 'Donation Request') ?></span>
+                                        <span class="donation-status 
+                                            <?= $status == 'pending' ? 'status-pending' :
+                                            ($status == 'approved' ? 'status-approved' :
+                                            ($status == 'requested' ? 'status-received' : '')) ?>">
+                                            <?= htmlspecialchars(ucwords($rq['status'])) ?>
+                                        </span>
+                                    </div>
 
-                    <!-- Request Status Badge (top-right) -->
-                    <span class="donation-status 
-                        <?= $status == 'pending' ? 'status-pending' :
-                           ($status == 'approved' ? 'status-approved' :
-                           ($status == 'requested' ? 'status-received' : '')) ?>">
-                        <?= htmlspecialchars(ucwords($rq['status'])) ?>
-                    </span>
-                </div>
+                                    <div class="donation-details">
+                                        <p><strong>Donation By:</strong> <?= htmlspecialchars($rq['donor_first_name'] . ' ' . $rq['donor_last_name']) ?></p>
+                                        <p><strong>Project Name:</strong> <?= htmlspecialchars($rq['project_name'] ?? '—') ?></p>
+                                        <p><strong>Type of Waste:</strong> <?= htmlspecialchars($rq['category'] ?? '—') ?></p>
+                                        <p><strong>Quantity:</strong> 
+                                            <?= htmlspecialchars($rq['quantity_claim'] ?? 0) ?> /
+                                            <?= htmlspecialchars($rq['total_quantity'] ?? 0) ?> Units
+                                        </p>
+                                        
+                                        <!-- DELIVERY STATUS SECTION -->
+                                        <p>
+                                            <strong>Delivery Status:</strong>
+                                            <span class="delivery-badge 
+                                                <?= strtolower($rq['delivery_status'] ?? 'pending') == 'waiting for pickup' ? 'ds-ready' :
+                                                (strtolower($rq['delivery_status'] ?? 'pending') == 'at sorting facility' ? 'ds-sorting' :
+                                                (strtolower($rq['delivery_status'] ?? 'pending') == 'on the way' ? 'ds-transit' :
+                                                (strtolower($rq['delivery_status'] ?? 'pending') == 'delivered' ? 'ds-delivered' :
+                                                (strtolower($rq['delivery_status'] ?? 'pending') == 'cancelled' ? 'ds-cancelled' : 'ds-pending')))) ?>">
+                                                <?= htmlspecialchars(ucwords($rq['delivery_status'] ?? 'Pending')) ?>
+                                            </span>
+                                        </p>
 
-                <div class="donation-details">
-                    <?php if ($status === 'pending'): ?>
-                        <!-- FULL DETAILS (for Pending requests only) -->
-                        <p><strong>Donation By:</strong> <?= htmlspecialchars($rq['donor_first_name'] . ' ' . $rq['donor_last_name']) ?></p>
-                        <p><strong>Project Name:</strong> <?= htmlspecialchars($rq['project_name'] ?? '—') ?></p>
-                        <p><strong>Type of Waste:</strong> <?= htmlspecialchars($rq['category'] ?? '—') ?></p>
-                        <p><strong>Quantity:</strong> 
-                            <?= htmlspecialchars($rq['quantity_claim'] ?? 0) ?> /
-                            <?= htmlspecialchars($rq['total_quantity'] ?? 0) ?> Units
-                        </p>
-                        <p><strong>Request Date:</strong> <?= date("M d, Y H:i", strtotime($rq['requested_at'])) ?></p>
-                        <p><strong>Urgency Level:</strong> <?= htmlspecialchars($rq['urgency_level'] ?? 'Normal') ?></p>
-                        <p><strong>Status:</strong> <?= htmlspecialchars(ucwords($rq['status'])) ?></p>
+                                        <?php if (!empty($rq['delivery_start'])): ?>
+                                            <p><strong>Estimated Delivery:</strong> 
+                                                <?= date("M d, Y", strtotime($rq['delivery_start'])) ?>
+                                                <?php if (!empty($rq['delivery_end']) && $rq['delivery_end'] != $rq['delivery_start']): ?>
+                                                    - <?= date("M d, Y", strtotime($rq['delivery_end'])) ?>
+                                                <?php endif; ?>
+                                            </p>
+                                        <?php endif; ?>
 
-                    <?php else: ?>
-                        <!-- SIMPLIFIED DETAILS (for Approved and beyond) -->
-                        <?php 
-                        $deliveryStatus = strtolower($rq['delivery_status'] ?? 'pending');
-                        $showDeliveryDate = in_array($deliveryStatus, [
-                            'waiting for pickup',
-                            'at sorting facility',
-                            'on the way',
-                            'delivered'
-                        ]);
-                        ?>
+                                        <p><strong>Request Date:</strong> <?= date("M d, Y H:i", strtotime($rq['requested_at'])) ?></p>
+                                        <p><strong>Urgency Level:</strong> <?= htmlspecialchars($rq['urgency_level'] ?? 'Normal') ?></p>
+                                    </div>
 
-                        <p><strong>Donation By:</strong> <?= htmlspecialchars($rq['donor_first_name'] . ' ' . $rq['donor_last_name']) ?></p>
-                        <p><strong>Requested Date:</strong> <?= isset($rq['requested_at']) ? date("M d, Y", strtotime($rq['requested_at'])) : '—' ?></p>
-
-                        <p>
-                            <strong>Delivery Status:</strong>
-                            <span class="delivery-badge 
-                                <?= $deliveryStatus == 'pending' ? 'ds-pending' :
-                                ($deliveryStatus == 'waiting for pickup' ? 'ds-ready' :
-                                ($deliveryStatus == 'at sorting facility' ? 'ds-sorting' :
-                                ($deliveryStatus == 'on the way' ? 'ds-transit' :
-                                ($deliveryStatus == 'delivered' ? 'ds-delivered' :
-                                ($deliveryStatus == 'cancelled' ? 'ds-cancelled' : 'ds-pending'))))) ?>">
-                                <?= htmlspecialchars(ucwords($rq['delivery_status'] ?? 'Pending')) ?>
-                            </span>
-                        </p>
-
-                        <?php if ($showDeliveryDate): ?>
-                            <p><strong>Delivery Date:</strong>
-                                <?= !empty($rq['delivery_start'])
-                                    ? date("M d, Y", strtotime($rq['delivery_start']))
-                                    : '—'; ?>
-                            </p>
+                                    <div class="card-actions">
+                                        <?php if ($status === 'pending'): ?>
+                                            <button class="edit-request-btn" data-id="<?= htmlspecialchars($rq['request_id']); ?>">Edit Request</button>
+                                            <button class="cancel-request-btn" data-id="<?= htmlspecialchars($rq['request_id']); ?>">Cancel Request</button>
+                                        <?php elseif ($status === 'approved'): ?>
+                                            <!-- Requester actions for approved requests -->
+                                            <?php if (strtolower($rq['delivery_status'] ?? 'pending') === 'on the way'): ?>
+                                                <button class="confirm-delivery-btn" data-id="<?= htmlspecialchars($rq['request_id']); ?>">Confirm Receipt</button>
+                                            <?php endif; ?>
+                                            <button class="view-details-btn" data-id="<?= htmlspecialchars($rq['request_id']); ?>">View Details</button>
+                                        <?php else: ?>
+                                            <button class="view-details-btn" data-id="<?= htmlspecialchars($rq['request_id']); ?>">View Details</button>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <div class="empty-state">
+                                <i class="fas fa-hand-paper"></i>
+                                <h3>No donation requests</h3>
+                                <p>You haven't requested any donations yet.</p>
+                            </div>
                         <?php endif; ?>
-
-                    <?php endif; ?>
-                </div>
-
-                <div class="card-actions">
-                    <?php if ($status === 'pending'): ?>
-                        <button class="edit-request-btn" data-id="<?= htmlspecialchars($rq['request_id']); ?>">Edit Request</button>
-                        <button class="cancel-request-btn" data-id="<?= htmlspecialchars($rq['request_id']); ?>">Cancel Request</button>
-
-                    <?php else: ?>
-                        <button class="view-details-btn" data-id="<?= htmlspecialchars($rq['request_id']); ?>">View Details</button>
-                    <?php endif; ?>
-                </div>
-            </div>
-        <?php endforeach; ?>
-    <?php else: ?>
-        <div class="empty-state">
-            <i class="fas fa-hand-paper"></i>
-            <h3>No donation requests</h3>
-            <p>You haven't requested any donations yet.</p>
-        </div>
-    <?php endif; ?>
-</div>
+                    </div>
 
 
 
@@ -425,32 +413,103 @@ while ($row = $result->fetch_assoc()) {
                     </div>
 
 
-                    <!-- View Details Modal -->
-                    <div id="request-details-modal" class="modal" style="display:none;">
-                    <div class="modal-content">
-                        <span class="close">&times;</span>
-                        <h3>Request Details</h3>
-                        <div class="details-body">
-                        <p><strong>Donation By:</strong> <span id="modal-donor-name"></span></p>
-                        <p><strong>Requested By:</strong> <span id="modal-requester-name">You</span></p>
-                        <p><strong>Project Name:</strong> <span id="modal-project-name"></span></p>
-                        <p><strong>Type of Waste:</strong> <span id="modal-category"></span></p>
-                        <p><strong>Quantity:</strong> <span id="modal-quantity"></span></p>
-                        <p><strong>Urgency Level:</strong> <span id="modal-urgency"></span></p>
-                        <p><strong>Request Date:</strong> <span id="modal-date"></span></p>
-                        <p><strong>Delivery Date:</strong> <span id="modal-delivery-date"></span></p>
-                        <p><strong>Delivery Status:</strong> <span id="modal-delivery-status"></span></p>
-                        <div id="modal-donation-image" style="margin-top:10px;"></div>
-                        </div>
+                   <!-- View Details Modal -->
+<div id="request-details-modal" class="modal" style="display:none;">
+    <div class="modal-content" style="max-width:700px;">
+        <span class="close">&times;</span>
+        <h3>Request Details</h3>
+        <div class="details-body">
+            <div class="request-info-section">
+                <h4>Request Information</h4>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <strong>Donation By:</strong> <span id="modal-donor-name"></span>
+                    </div>
+                    <div class="info-item">
+                        <strong>Requested By:</strong> <span id="modal-requester-name">You</span>
+                    </div>
+                    <div class="info-item">
+                        <strong>Project Name:</strong> <span id="modal-project-name"></span>
+                    </div>
+                    <div class="info-item">
+                        <strong>Type of Waste:</strong> <span id="modal-category"></span>
+                    </div>
+                    <div class="info-item">
+                        <strong>Quantity:</strong> <span id="modal-quantity"></span>
+                    </div>
+                    <div class="info-item">
+                        <strong>Urgency Level:</strong> <span id="modal-urgency"></span>
+                    </div>
+                    <div class="info-item">
+                        <strong>Request Date:</strong> <span id="modal-date"></span>
+                    </div>
+                </div>
+            </div>
 
-                        <div class="modal-footer" style="margin-top:20px;">
-                        <button id="modal-cancel-request" class="cancel-btn">Cancel Request</button>
-                        <p id="cancel-warning" class="warning-text" style="display:none; color:gray; font-size:0.9em; margin-top:8px;">
-                            Cannot cancel request. Delivery is in progress or is on its way.
-                        </p>
+            <div class="delivery-timeline-section">
+                <h4>Delivery Timeline</h4>
+                <div class="timeline">
+                    <div class="timeline-item" id="timeline-pending">
+                        <div class="timeline-marker"></div>
+                        <div class="timeline-content">
+                            <strong>Request Submitted</strong>
+                            <span class="timeline-date" id="timeline-requested-date"></span>
                         </div>
                     </div>
+                    
+                    <div class="timeline-item" id="timeline-pickup">
+                        <div class="timeline-marker"></div>
+                        <div class="timeline-content">
+                            <strong>Ready for Pickup</strong>
+                            <span class="timeline-date" id="timeline-pickup-date">Pending</span>
+                        </div>
                     </div>
+                    
+                    <div class="timeline-item" id="timeline-sorting">
+                        <div class="timeline-marker"></div>
+                        <div class="timeline-content">
+                            <strong>At Sorting Facility</strong>
+                            <span class="timeline-date" id="timeline-sorting-date">Pending</span>
+                        </div>
+                    </div>
+                    
+                    <div class="timeline-item" id="timeline-transit">
+                        <div class="timeline-marker"></div>
+                        <div class="timeline-content">
+                            <strong>In Transit</strong>
+                            <span class="timeline-date" id="timeline-transit-date">Pending</span>
+                        </div>
+                    </div>
+                    
+                    <div class="timeline-item" id="timeline-delivered">
+                        <div class="timeline-marker"></div>
+                        <div class="timeline-content">
+                            <strong>Delivered</strong>
+                            <span class="timeline-date" id="timeline-delivered-date">Pending</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="current-status-section">
+                <h4>Current Status</h4>
+                <div class="status-summary">
+                    <p><strong>Delivery Status:</strong> <span id="modal-delivery-status"></span></p>
+                    <p id="modal-next-step" style="font-style: italic; color: #666;"></p>
+                </div>
+            </div>
+
+            <div id="modal-donation-image" style="margin-top:20px;"></div>
+        </div>
+
+        <div class="modal-footer" style="margin-top:20px;">
+            <button id="modal-cancel-request" class="cancel-btn">Cancel Request</button>
+            <p id="cancel-warning" class="warning-text" style="display:none; color:gray; font-size:0.9em; margin-top:8px;">
+                Cannot cancel request. Delivery is in progress or is on its way.
+            </p>
+        </div>
+    </div>
+</div>
 
 
                     <!-- Requests for My Donations Tab -->
@@ -483,10 +542,36 @@ while ($row = $result->fetch_assoc()) {
                                         <p><strong>Urgency Level:</strong> <?= htmlspecialchars($r['urgency_level'] ?? 'Normal') ?></p>
                                         <p><strong>Status:</strong> <?= htmlspecialchars($r['request_status']) ?></p>
                                     </div>
+
+                                    <!-- Display Delivery Status if approved -->
+                                    <?php if (strtolower($r['request_status']) === 'approved'): ?>
+                                        <p><strong>Delivery Status:</strong> 
+                                            <span class="delivery-status 
+                                                <?= ($r['delivery_status'] ?? 'Pending') == 'Waiting for Pickup' ? 'ds-ready' :
+                                                (($r['delivery_status'] ?? 'Pending') == 'At Sorting Facility' ? 'ds-sorting' :
+                                                (($r['delivery_status'] ?? 'Pending') == 'On the Way' ? 'ds-transit' :
+                                                (($r['delivery_status'] ?? 'Pending') == 'Delivered' ? 'ds-delivered' :
+                                                (($r['delivery_status'] ?? 'Pending') == 'Cancelled' ? 'ds-cancelled' : 'ds-pending')))) ?>">
+                                                <?= htmlspecialchars($r['delivery_status'] ?? 'Pending') ?>
+                                            </span>
+                                        </p>
+                                        <?php if (!empty($r['delivery_start'])): ?>
+                                            <p><strong>Estimated Delivery:</strong> 
+                                                <?= date("M d, Y", strtotime($r['delivery_start'])) ?>
+                                                <?php if (!empty($r['delivery_end']) && $r['delivery_end'] != $r['delivery_start']): ?>
+                                                    - <?= date("M d, Y", strtotime($r['delivery_end'])) ?>
+                                                <?php endif; ?>
+                                            </p>
+                                        <?php endif; ?>
+                                    <?php endif; ?>
+
                                     <div class="card-actions">
                                         <?php if (strtolower($r['request_status']) === 'pending'): ?>
                                             <button class="approve-request-btn" data-id="<?= $r['request_id'] ?>">Approve</button>
                                             <button class="decline-request-btn" data-id="<?= $r['request_id'] ?>">Decline</button>
+                                            <?php elseif (strtolower($r['request_status']) === 'approved'): ?>
+                                                <button class="manage-status-btn" data-id="<?= $r['request_id'] ?>">Manage Status</button>
+                                            <?php elseif (strtolower($r['request_status']) === 'declined'): ?>
                                         <?php elseif (strtolower($r['request_status']) === 'declined'): ?>
                                             <button class="delete-request-btn" data-id="<?= $r['request_id'] ?>">Delete</button>
                                         <?php endif; ?>
@@ -503,6 +588,106 @@ while ($row = $result->fetch_assoc()) {
                         <?php endif; ?>
                     </div>
 
+                    <!-- Enhanced Status Management Modal -->
+                    <div id="statusManagementModal" class="modal" style="display:none;">
+                        <div class="modal-content" style="max-width:600px;">
+                            <span class="close">&times;</span>
+                            <h3>Manage Delivery Status</h3>
+                            <div class="status-management-body">
+                                <div class="request-info-card">
+                                    <h4 id="status-item-name"></h4>
+                                    <p><strong>Category:</strong> <span id="status-category"></span></p>
+                                    <p><strong>Requested by:</strong> <span id="status-requester"></span></p>
+                                    <p><strong>Project:</strong> <span id="status-project"></span></p>
+                                </div>
+                                
+                                <div class="status-checklist">
+                                    <div class="status-step" data-status="Pending">
+                                        <div class="step-header">
+                                            <span class="step-number">1</span>
+                                            <span class="step-title">Pending Item</span>
+                                        </div>
+                                        <div class="step-date-display" style="display:none;"></div>
+                                        <p class="step-note">Initial status when request is approved</p>
+                                    </div>
+                                    
+                                    <div class="status-step" data-status="Waiting for Pickup">
+                                        <div class="step-header">
+                                            <span class="step-number">2</span>
+                                            <span class="step-title">Ready for Pickup</span>
+                                            <div class="action-buttons"></div>
+                                        </div>
+                                        <div class="step-details" style="display:none;">
+                                            <label>Estimated Pickup Date:</label>
+                                            <input type="date" class="estimated-date pickup-date" data-status="Waiting for Pickup">
+                                            
+                                            <!-- NEW: Estimated Delivery Date Field -->
+                                            <label style="margin-top: 10px;">Estimated Delivery End Date:</label>
+                                            <input type="date" class="estimated-delivery-date" data-status="Waiting for Pickup">
+                                            <small style="color: #666; font-size: 12px; display: block; margin-top: 5px;">
+                                                This will set the delivery date range: [Pickup Date] - [This Date]
+                                            </small>
+                                        </div>
+                                        <div class="step-date-display" style="display:none;"></div>
+                                    </div>
+                                    
+                                    <div class="status-step" data-status="At Sorting Facility">
+                                        <div class="step-header">
+                                            <span class="step-number">3</span>
+                                            <span class="step-title">At Sorting Facility</span>
+                                            <div class="action-buttons"></div>
+                                        </div>
+                                        <div class="step-details" style="display:none;">
+                                            <label>Estimated Processing Date:</label>
+                                            <input type="date" class="estimated-date sorting-date" data-status="At Sorting Facility">
+                                        </div>
+                                        <div class="step-date-display" style="display:none;"></div>
+                                    </div>
+                                    
+                                    <div class="status-step" data-status="On the Way">
+                                        <div class="step-header">
+                                            <span class="step-number">4</span>
+                                            <span class="step-title">In Transit</span>
+                                            <div class="action-buttons"></div>
+                                        </div>
+                                        <div class="step-details" style="display:none;">
+                                            <label>Estimated Delivery Date:</label>
+                                            <input type="date" class="estimated-date transit-date" data-status="On the Way">
+                                        </div>
+                                        <div class="step-date-display" style="display:none;"></div>
+                                    </div>
+                                    
+                                    <div class="status-step" data-status="Delivered">
+                                        <div class="step-header">
+                                            <span class="step-number">5</span>
+                                            <span class="step-title">Delivered</span>
+                                        </div>
+                                        <div class="step-date-display" style="display:none;"></div>
+                                        <p class="step-note">Status will update automatically when requester confirms receipt</p>
+                                    </div>
+                                    
+                                    <div class="status-step" data-status="Cancelled">
+                                        <div class="step-header">
+                                            <span class="step-number">—</span>
+                                            <span class="step-title">Cancelled</span>
+                                        </div>
+                                        <div class="step-date-display" style="display:none;"></div>
+                                        <p class="step-note">Status will update automatically if requester cancels</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="current-status-display">
+                                    <strong>Current Status:</strong>
+                                    <span id="current-delivery-status" class="status-badge"></span>
+                                    <span id="estimated-delivery-text" class="estimated-text"></span>
+                                </div>
+                            </div>
+                            
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" id="closeStatusModal">Close</button>
+                            </div>
+                        </div>
+                    </div>
 
 
                     <!-- Received Donations Tab -->
@@ -780,146 +965,283 @@ $(document).on("click", ".cancel-request-btn", function() {
     });
 });
 
-// ===================== VIEW REQUEST DETAILS MODAL ====================
+// ===================== ENHANCED VIEW REQUEST DETAILS MODAL ====================
 $(document).on('click', '.view-details-btn', function() {
-  const requestId = $(this).data('id');
+    const requestId = $(this).data('id');
 
-  $.ajax({
-    url: 'get_request_details.php',
-    method: 'GET',
-    data: { id: requestId },
-    dataType: 'json',
+    $.ajax({
+        url: 'donate_process.php',
+        method: 'GET',
+        data: { 
+            action: 'get_request_details', 
+            request_id: requestId 
+        },
+        dataType: 'json',
 
-    success: function(res) {
-      if (res.status === 'success' && res.data) {
-        const d = res.data;
+        success: function(res) {
+            if (res.status === 'success' && res.data) {
+                const d = res.data;
+                
+                // Populate basic request info
+                $('#modal-donor-name').text(d.donor_name || 'Unknown');
+                $('#modal-project-name').text(d.project_name || '—');
+                $('#modal-category').text((d.category || '') + (d.subcategory ? ' → ' + d.subcategory : ''));
+                $('#modal-quantity').text(d.quantity_claim || '—');
+                $('#modal-urgency').text(d.urgency_level || '—');
+                $('#modal-date').text(d.requested_at ? new Date(d.requested_at).toLocaleString() : '—');
 
-        // Populate modal fields
-        $('#modal-donor-name').text(d.donor_name || 'Unknown');
-        $('#modal-project-name').text(d.project_name || '—');
-        $('#modal-category').text((d.category || '') + (d.subcategory ? ' → ' + d.subcategory : ''));
-        $('#modal-quantity').text(d.quantity_claim || '—');
-        $('#modal-urgency').text(d.urgency_level || '—');
-        $('#modal-date').text(d.requested_at ? new Date(d.requested_at).toLocaleString() : '—');
+                // ==================== ENHANCED TIMELINE DISPLAY ====================
+                const currentStatus = d.delivery_status || 'Pending';
+                
+                // Format dates for display
+                const formatDateTime = (dateString) => {
+                    if (!dateString) return null;
+                    return new Date(dateString).toLocaleString('en-US', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+                };
 
-        
-        // --- DELIVERY STATUS & DATE HANDLING ---
-        const deliveryStatus = (d.delivery_status || '').toLowerCase();
-        const showDeliveryDate = ['waiting for pickup', 'at sorting facility', 'on the way', 'delivered'].includes(deliveryStatus);
+                const formatDate = (dateString) => {
+                    if (!dateString) return null;
+                    return new Date(dateString).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                    });
+                };
 
-        // 🟩 Display Delivery Status (with color coding)
-        if (deliveryStatus) {
-        const formattedStatus = d.delivery_status.replace(/\b\w/g, c => c.toUpperCase());
-        $('#modal-delivery-status')
-            .text(formattedStatus)
-            .css({
-            padding: '4px 10px',
-            borderRadius: '6px',
-            color: '#fff',
-            fontWeight: '600',
-            display: 'inline-block',
-            backgroundColor:
-                deliveryStatus === 'waiting for pickup' ? '#ff9800' :
-                deliveryStatus === 'at sorting facility' ? '#9c27b0' :
-                deliveryStatus === 'on the way' ? '#2196f3' :
-                deliveryStatus === 'delivered' ? '#4caf50' :
-                deliveryStatus === 'cancelled' ? '#f44336' : '#9e9e9e'
-            })
-            .show();
-        } else {
-        $('#modal-delivery-status').text('Pending').css({
-            backgroundColor: '#9e9e9e',
-            color: '#fff',
-            padding: '4px 10px',
-            borderRadius: '6px'
-        });
+                // Reset timeline
+                $('.timeline-item').removeClass('completed current upcoming');
+                $('.timeline-date').text('Pending');
+
+                // Request Submitted (always completed)
+                $('#timeline-pending').addClass('completed');
+                $('#timeline-requested-date').text(formatDateTime(d.requested_at) || '—');
+
+                // Ready for Pickup
+                if (d.pickup_date) {
+                    $('#timeline-pickup').addClass('completed');
+                    $('#timeline-pickup-date').text(formatDateTime(d.pickup_date));
+                } else if (['Waiting for Pickup', 'At Sorting Facility', 'On the Way', 'Delivered'].includes(currentStatus)) {
+                    $('#timeline-pickup').addClass('current');
+                    $('#timeline-pickup-date').text('Scheduled');
+                }
+
+                // At Sorting Facility
+                if (d.sorting_facility_date) {
+                    $('#timeline-sorting').addClass('completed');
+                    $('#timeline-sorting-date').text(formatDateTime(d.sorting_facility_date));
+                } else if (['At Sorting Facility', 'On the Way', 'Delivered'].includes(currentStatus)) {
+                    $('#timeline-sorting').addClass('current');
+                    $('#timeline-sorting-date').text('In Progress');
+                } else if (d.pickup_date) {
+                    $('#timeline-sorting').addClass('upcoming');
+                }
+
+                // In Transit
+                if (d.in_transit_date) {
+                    $('#timeline-transit').addClass('completed');
+                    $('#timeline-transit-date').text(formatDateTime(d.in_transit_date));
+                } else if (['On the Way', 'Delivered'].includes(currentStatus)) {
+                    $('#timeline-transit').addClass('current');
+                    $('#timeline-transit-date').text('Estimated: ' + (d.delivery_start ? formatDate(d.delivery_start) : 'Soon'));
+                } else if (d.sorting_facility_date) {
+                    $('#timeline-transit').addClass('upcoming');
+                }
+
+                // Delivered
+                if (d.delivered_date) {
+                    $('#timeline-delivered').addClass('completed');
+                    $('#timeline-delivered-date').text(formatDateTime(d.delivered_date));
+                } else if (currentStatus === 'Delivered') {
+                    $('#timeline-delivered').addClass('current');
+                    $('#timeline-delivered-date').text('Completed');
+                } else if (d.in_transit_date) {
+                    $('#timeline-delivered').addClass('upcoming');
+                }
+
+                // ==================== CURRENT STATUS DISPLAY ====================
+                const deliveryStatus = (d.delivery_status || '').toLowerCase();
+                const formattedStatus = d.delivery_status ? d.delivery_status.replace(/\b\w/g, c => c.toUpperCase()) : 'Pending';
+                
+                $('#modal-delivery-status')
+                    .text(formattedStatus)
+                    .css({
+                        padding: '6px 12px',
+                        borderRadius: '6px',
+                        color: '#fff',
+                        fontWeight: '600',
+                        display: 'inline-block',
+                        backgroundColor:
+                            deliveryStatus === 'waiting for pickup' ? '#ff9800' :
+                            deliveryStatus === 'at sorting facility' ? '#9c27b0' :
+                            deliveryStatus === 'on the way' ? '#2196f3' :
+                            deliveryStatus === 'delivered' ? '#4caf50' :
+                            deliveryStatus === 'cancelled' ? '#f44336' : '#9e9e9e'
+                    });
+
+                // ==================== ESTIMATED DELIVERY DATE DISPLAY ====================
+                // Add estimated delivery date to the request information section
+                let estimatedDeliveryHtml = '';
+                if (d.delivery_start && d.delivery_end) {
+                    const startDate = formatDate(d.delivery_start);
+                    const endDate = formatDate(d.delivery_end);
+                    estimatedDeliveryHtml = `
+                        <div class="info-item">
+                            <strong>Estimated Delivery:</strong> 
+                            <span style="color: #2e8b57; font-weight: 600;">${startDate} - ${endDate}</span>
+                        </div>
+                    `;
+                } else if (d.delivery_start) {
+                    estimatedDeliveryHtml = `
+                        <div class="info-item">
+                            <strong>Estimated Delivery:</strong> 
+                            <span style="color: #2e8b57; font-weight: 600;">${formatDate(d.delivery_start)}</span>
+                        </div>
+                    `;
+                } else if (d.delivery_status === 'Waiting for Pickup' || d.delivery_status === 'At Sorting Facility') {
+                    estimatedDeliveryHtml = `
+                        <div class="info-item">
+                            <strong>Estimated Delivery:</strong> 
+                            <span style="color: #ff9800; font-style: italic;">To be determined</span>
+                        </div>
+                    `;
+                }
+
+                // Insert estimated delivery after the urgency level in the info grid
+                if (estimatedDeliveryHtml) {
+                    // Find the urgency level item and insert after it
+                    $('.info-item:contains("Urgency Level")').after(estimatedDeliveryHtml);
+                }
+
+                // Next step information
+                let nextStep = '';
+                switch(currentStatus) {
+                    case 'Pending':
+                        nextStep = 'Waiting for donor to approve and schedule pickup';
+                        break;
+                    case 'Waiting for Pickup':
+                        if (d.delivery_start) {
+                            nextStep = `Item is ready for pickup. Estimated delivery: ${formatDate(d.delivery_start)}`;
+                        } else {
+                            nextStep = 'Item is ready for pickup. Waiting for donor to provide delivery estimate.';
+                        }
+                        break;
+                    case 'At Sorting Facility':
+                        if (d.delivery_start) {
+                            nextStep = `Item is being processed. Estimated delivery: ${formatDate(d.delivery_start)}`;
+                        } else {
+                            nextStep = 'Item is being processed at the sorting facility.';
+                        }
+                        break;
+                    case 'On the Way':
+                        if (d.delivery_start) {
+                            nextStep = `Item is on its way! Estimated delivery: ${formatDate(d.delivery_start)}`;
+                        } else {
+                            nextStep = 'Item is on its way to you.';
+                        }
+                        break;
+                    case 'Delivered':
+                        nextStep = 'Delivery completed successfully.';
+                        break;
+                    case 'Cancelled':
+                        nextStep = 'This request has been cancelled.';
+                        break;
+                }
+                $('#modal-next-step').text(nextStep);
+
+                // ==================== IMAGE DISPLAY ====================
+                let imageHtml = '';
+                if (d.image_path) {
+                    try {
+                        // Try to parse as JSON (if it's an array of images)
+                        const images = JSON.parse(d.image_path);
+                        if (Array.isArray(images) && images.length > 0) {
+                            images.forEach(img => {
+                                imageHtml += `<img src="${img}" alt="Donation image" style="max-width:100%;max-height:200px;border-radius:8px;border:1px solid #ddd; margin:5px;">`;
+                            });
+                        }
+                    } catch (e) {
+                        // If not JSON, treat as single image path
+                        imageHtml = `<img src="${d.image_path}" alt="Donation image" style="max-width:100%;max-height:300px;border-radius:8px;border:1px solid #ddd;">`;
+                    }
+                } else if (d.image) {
+                    imageHtml = `<img src="uploads/${d.image}" alt="Donation image" style="max-width:100%;max-height:300px;border-radius:8px;border:1px solid #ddd;">`;
+                } else if (d.donation_image) {
+                    imageHtml = `<img src="uploads/${d.donation_image}" alt="Donation image" style="max-width:100%;max-height:300px;border-radius:8px;border:1px solid #ddd;">`;
+                }
+
+                $('#modal-donation-image').html(
+                    imageHtml 
+                        ? `<div style="text-align: center; margin-top: 15px;">
+                            <h4>Donation Images</h4>
+                            ${imageHtml}
+                        </div>`
+                        : '<div style="text-align: center; color: #666; font-style: italic; margin-top: 15px;">No image available</div>'
+                );
+
+                // ==================== CANCEL BUTTON LOGIC ====================
+                const deliveryPending = !d.delivery_start && !d.delivery_end && 
+                                      currentStatus !== 'Delivered' && 
+                                      currentStatus !== 'Cancelled' &&
+                                      currentStatus !== 'On the Way';
+
+                if (deliveryPending) {
+                    $('#modal-cancel-request')
+                        .prop('disabled', false)
+                        .css({
+                            backgroundColor: '#ff9800',
+                            color: '#fff',
+                            cursor: 'pointer',
+                            opacity: 1,
+                            transition: '0.3s'
+                        })
+                        .hover(
+                            function() { $(this).css('backgroundColor', '#e68900'); },
+                            function() { $(this).css('backgroundColor', '#ff9800'); }
+                        );
+                    $('#cancel-warning').hide();
+                } else {
+                    $('#modal-cancel-request')
+                        .prop('disabled', true)
+                        .css({
+                            backgroundColor: '#b0b0b0',
+                            color: '#fff',
+                            cursor: 'not-allowed',
+                            opacity: 0.8
+                        })
+                        .off('mouseenter mouseleave');
+                    
+                    let warningText = 'Cannot cancel request. ';
+                    if (currentStatus === 'Delivered') {
+                        warningText += 'Delivery has already been completed.';
+                    } else if (currentStatus === 'Cancelled') {
+                        warningText += 'Request has already been cancelled.';
+                    } else if (currentStatus === 'On the Way') {
+                        warningText += 'Item is already in transit.';
+                    } else {
+                        warningText += 'Delivery is in progress.';
+                    }
+                    $('#cancel-warning').text(warningText).show();
+                }
+
+                // Store request ID for cancel logic
+                $('#modal-cancel-request').data('request-id', requestId);
+
+                // Open modal
+                $('#request-details-modal').fadeIn(200);
+            } else {
+                alert(res.message || 'Unable to fetch request details.');
+            }
+        },
+        error: function() {
+            alert('Error fetching details. Please try again.');
         }
-
-        // 🟨 Display Delivery Date only when allowed
-        if (showDeliveryDate && d.delivery_start) {
-        const start = new Date(d.delivery_start).toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
-        let displayDate = start;
-
-        if (d.delivery_end) {
-            const end = new Date(d.delivery_end).toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
-            displayDate = `${start} - ${end}`;
-        }
-
-        $('#modal-delivery-date').text(displayDate);
-        $('#modal-delivery-date').closest('p').show();
-        } else {
-        // Show "Pending" if no date yet and status < eligible
-        $('#modal-delivery-date').text('Pending');
-        $('#modal-delivery-date').closest('p').toggle(showDeliveryDate);
-        }
-
-
-
-
-        // Handle image display — consistent with "My Donations"
-        let imageUrl = '';
-        if (d.image_path) {
-          imageUrl = d.image_path;
-        } else if (d.image) {
-          imageUrl = `uploads/${d.image}`;
-        } else if (d.donation_image) {
-          imageUrl = `uploads/${d.donation_image}`;
-        }
-
-        $('#modal-donation-image').html(
-          imageUrl
-            ? `<img src="${imageUrl}" alt="Donation image" style="width:100%;max-height:250px;border-radius:8px;">`
-            : '<em>No image available</em>'
-        );
-
-        // ✅ Cancel Button Logic + Styling
-        const deliveryPending = !d.delivery_start && !d.delivery_end;
-
-        if (deliveryPending) {
-          // Pending → orange and active
-          $('#modal-cancel-request')
-            .prop('disabled', false)
-            .css({
-              backgroundColor: '#ff9800',
-              color: '#fff',
-              cursor: 'pointer',
-              opacity: 1,
-              transition: '0.3s'
-            })
-            .hover(
-              function() { $(this).css('backgroundColor', '#e68900'); },
-              function() { $(this).css('backgroundColor', '#ff9800'); }
-            );
-          $('#cancel-warning').hide();
-        } else {
-          // Delivery set → gray and disabled
-          $('#modal-cancel-request')
-            .prop('disabled', true)
-            .css({
-              backgroundColor: '#b0b0b0',
-              color: '#fff',
-              cursor: 'not-allowed',
-              opacity: 0.8
-            })
-            .off('mouseenter mouseleave');
-          $('#cancel-warning')
-            .text('Cannot cancel request. Delivery schedule has been set by the donor.')
-            .show();
-        }
-
-        // Store request ID for cancel logic
-        $('#modal-cancel-request').data('request-id', requestId);
-
-        // Open modal
-        $('#request-details-modal').fadeIn(200);
-      } else {
-        alert(res.message || 'Unable to fetch request details.');
-      }
-    },
-    error: function() {
-      alert('Error fetching details. Please try again.');
-    }
-  });
+    });
 });
 
 // Close modal on X click or outside click
@@ -1037,6 +1359,840 @@ $(document).on('click', '#modal-cancel-request', function () {
             }
         });
     });
+
+// ==================== ENHANCED STATUS MANAGEMENT MODAL WITH STATE PERSISTENCE ====================
+let statusModalState = {
+    currentRequestId: null,
+    currentStatus: null,
+    stepStates: {},
+    editMode: false
+};
+
+$(document).on('click', '.manage-status-btn', function() {
+    const requestId = $(this).data('id');
+    statusModalState.currentRequestId = requestId;
+    
+    // Fetch request details
+    $.get('donate_process.php', { 
+        action: 'get_request_details', 
+        request_id: requestId 
+    }, function(response) {
+        try {
+            const res = typeof response === 'object' ? response : JSON.parse(response);
+            
+            if (res.status === 'success' && res.data) {
+                const data = res.data;
+                
+                // Populate modal with request info
+                $('#status-item-name').text(data.item_name || data.subcategory || 'Donation Item');
+                $('#status-category').text(data.category || '—');
+                $('#status-requester').text(data.first_name + ' ' + data.last_name);
+                $('#status-project').text(data.project_name || '—');
+                
+                // Set current status
+                const currentStatus = data.delivery_status || 'Pending';
+                statusModalState.currentStatus = currentStatus;
+                
+                $('#current-delivery-status')
+                    .text(currentStatus)
+                    .removeClass()
+                    .addClass('status-badge ' + 
+                        (currentStatus === 'Waiting for Pickup' ? 'ds-ready' :
+                         currentStatus === 'At Sorting Facility' ? 'ds-sorting' :
+                         currentStatus === 'On the Way' ? 'ds-transit' :
+                         currentStatus === 'Delivered' ? 'ds-delivered' :
+                         currentStatus === 'Cancelled' ? 'ds-cancelled' : 'ds-pending'));
+                
+                // Store request data
+                $('#statusManagementModal').data('request-data', data);
+                $('#statusManagementModal').data('request-id', requestId);
+                
+                // Reset modal state and initialize with fresh database data
+                resetStatusModalState();
+                statusModalState.currentRequestId = requestId;
+                statusModalState.currentStatus = currentStatus;
+
+                // Initialize steps with fresh database data
+                initializeStatusStepsWithPersistence(currentStatus, data);
+                
+                // Show modal
+                $('#statusManagementModal').fadeIn(200);
+            } else {
+                Swal.fire({ icon: 'error', title: 'Error', text: res.message || 'Failed to load request details' });
+            }
+        } catch (e) {
+            console.error('Error parsing response:', e);
+            Swal.fire({ icon: 'error', title: 'Error', text: 'Failed to load request details' });
+        }
+    });
+});
+
+// Fixed function to initialize status steps with proper state loading from database
+function initializeStatusStepsWithPersistence(currentStatus, requestData) {
+    const statusOrder = ['Pending', 'Waiting for Pickup', 'At Sorting Facility', 'On the Way', 'Delivered', 'Cancelled'];
+    const currentIndex = statusOrder.indexOf(currentStatus);
+    
+    // Reset all steps but preserve edit mode if active
+    $('.status-step').removeClass('completed current upcoming editable');
+    if (!statusModalState.editMode) {
+        $('.status-step').removeClass('edit-mode');
+    }
+    $('.step-details').hide();
+    $('.step-date-display').hide().empty();
+    $('.action-buttons').empty();
+    
+    $('.status-step').each(function() {
+        const stepStatus = $(this).data('status');
+        const stepIndex = statusOrder.indexOf(stepStatus);
+        const stepHeader = $(this).find('.step-header');
+        const actionButtons = $(this).find('.action-buttons');
+        
+        // Clear existing badges
+        stepHeader.find('.step-badge').remove();
+        
+        // Get step-specific date from ACTUAL DATABASE DATA
+        let stepDate = '';
+        let dateField = '';
+        let isStepCompleted = false;
+        
+        switch(stepStatus) {
+            case 'Waiting for Pickup':
+                stepDate = requestData.pickup_date; // From database
+                dateField = 'pickup-date';
+                isStepCompleted = stepDate !== null && stepDate !== undefined && stepDate !== '';
+                break;
+            case 'At Sorting Facility':
+                stepDate = requestData.sorting_facility_date; // From database
+                dateField = 'sorting-date';
+                isStepCompleted = stepDate !== null && stepDate !== undefined && stepDate !== '';
+                break;
+            case 'On the Way':
+                stepDate = requestData.in_transit_date; // From database
+                dateField = 'transit-date';
+                isStepCompleted = stepDate !== null && stepDate !== undefined && stepDate !== '';
+                break;
+            case 'Delivered':
+                stepDate = requestData.delivered_date; // From database
+                isStepCompleted = stepDate !== null && stepDate !== undefined && stepDate !== '';
+                break;
+        }
+        
+        // Check if this step is in edit mode from our state
+        const isInEditMode = statusModalState.stepStates[stepStatus] === 'edit';
+        
+        // FIXED: Determine step state based on ACTUAL DATABASE STATUS, not just currentStatus
+        if (stepIndex < currentIndex || isStepCompleted) {
+            // COMPLETED STEP - Show Edit button (or in edit mode)
+            $(this).addClass('completed');
+            
+            if (isInEditMode) {
+                $(this).addClass('edit-mode');
+                stepHeader.append('<span class="step-badge status-current">Editing</span>');
+                
+                // Show date inputs for editing
+                $(this).find('.step-details').show();
+                
+                // Add Save and Cancel buttons
+                const saveBtn = $(`<button class="save-edit-btn" data-status="${stepStatus}">Save Changes</button>`);
+                const cancelBtn = $(`<button class="cancel-edit-btn" data-status="${stepStatus}">Cancel</button>`);
+                actionButtons.append(saveBtn, cancelBtn);
+            } else {
+                stepHeader.append('<span class="step-badge status-completed">Completed</span>');
+                
+                // Show date display from ACTUAL DATABASE
+                if (stepDate) {
+                    const displayText = getDateDisplayText(stepStatus, stepDate);
+                    $(this).find('.step-date-display').html(displayText).show();
+                }
+                
+                // Add Edit button for editable completed steps
+                if (stepStatus === 'Waiting for Pickup' || stepStatus === 'At Sorting Facility' || stepStatus === 'On the Way') {
+                    const editBtn = $(`<button class="edit-step-btn" data-status="${stepStatus}">Edit</button>`);
+                    actionButtons.append(editBtn);
+                }
+            }
+            
+        } else if (stepIndex === currentIndex) {
+            // CURRENT STEP - Show Mark button
+            $(this).addClass('current');
+            stepHeader.append('<span class="step-badge status-current">Current</span>');
+            
+            // Show date input for current editable steps
+            if (stepStatus === 'Waiting for Pickup' || stepStatus === 'At Sorting Facility' || stepStatus === 'On the Way') {
+                $(this).find('.step-details').show();
+                const markBtn = $(`<button class="update-status-btn" data-status="${stepStatus}">Mark as ${getButtonText(stepStatus)}</button>`);
+                actionButtons.append(markBtn);
+            }
+            
+        } else if (stepIndex > currentIndex) {
+            // FUTURE STEP - Show upcoming state
+            $(this).addClass('upcoming');
+            
+            // Show date input for future editable steps
+            if (stepStatus === 'Waiting for Pickup' || stepStatus === 'At Sorting Facility' || stepStatus === 'On the Way') {
+                $(this).find('.step-details').show();
+                const markBtn = $(`<button class="update-status-btn" data-status="${stepStatus}">Mark as ${getButtonText(stepStatus)}</button>`);
+                actionButtons.append(markBtn);
+            }
+        }
+        
+        // Auto steps (no manual interaction)
+        if (stepStatus === 'Pending' || stepStatus === 'Delivered' || stepStatus === 'Cancelled') {
+            stepHeader.append('<span class="step-badge status-auto">Auto</span>');
+        }
+        
+        // Pre-fill date inputs from ACTUAL DATABASE DATA
+        if (stepDate && dateField) {
+            $(this).find(`.${dateField}`).val(formatDateForInput(stepDate));
+        }
+
+        // NEW: Pre-fill estimated delivery date for Waiting for Pickup
+        if (stepStatus === 'Waiting for Pickup' && requestData.delivery_end) {
+            $(this).find('.estimated-delivery-date').val(formatDateForInput(requestData.delivery_end));
+        }
+    });
+}
+
+// Helper function for button text
+function getButtonText(status) {
+    switch(status) {
+        case 'Waiting for Pickup': return 'Ready';
+        case 'At Sorting Facility': return 'At Facility';
+        case 'On the Way': return 'In Transit';
+        default: return status;
+    }
+}
+
+// Helper function to format dates for display
+function formatDate(dateString) {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'short', 
+        day: 'numeric' 
+    });
+}
+
+// Helper function to format dates for input fields
+function formatDateForInput(dateString) {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toISOString().split('T')[0];
+}
+
+// Helper function to generate date display text
+function getDateDisplayText(stepStatus, dateString) {
+    const formattedDate = formatDate(dateString);
+    switch(stepStatus) {
+        case 'Waiting for Pickup':
+            return `<strong>Estimated Pickup:</strong> ${formattedDate}`;
+        case 'At Sorting Facility':
+            return `<strong>Processing Date:</strong> ${formattedDate}`;
+        case 'On the Way':
+            return `<strong>Estimated Delivery:</strong> ${formattedDate}`;
+        case 'Delivered':
+            return `<strong>Delivered On:</strong> ${formattedDate}`;
+        default:
+            return `<strong>Date:</strong> ${formattedDate}`;
+    }
+}
+
+// ==================== MARK AS (STATUS PROGRESSION) ====================
+$(document).on('click', '.update-status-btn', function() {
+    const status = $(this).data('status');
+    const requestId = $('#statusManagementModal').data('request-id');
+    const stepElement = $(this).closest('.status-step');
+    
+    // Get the date input
+    let estimatedDate = '';
+    switch(status) {
+        case 'Waiting for Pickup':
+            estimatedDate = stepElement.find('.pickup-date').val();
+            break;
+        case 'At Sorting Facility':
+            estimatedDate = stepElement.find('.sorting-date').val();
+            break;
+        case 'On the Way':
+            estimatedDate = stepElement.find('.transit-date').val();
+            break;
+    }
+    
+    // Validate date for required steps
+    if ((status === 'At Sorting Facility' || status === 'On the Way') && !estimatedDate) {
+        Swal.fire({ 
+            icon: 'warning', 
+            title: 'Date Required', 
+            text: 'Please provide an estimated date before updating the status.' 
+        });
+        return;
+    }
+    
+    // For Waiting for Pickup, validate both dates
+    if (status === 'Waiting for Pickup') {
+        const estimatedDeliveryDate = stepElement.find('.estimated-delivery-date').val();
+        
+        if (!estimatedDate) {
+            Swal.fire({ 
+                icon: 'warning', 
+                title: 'Pickup Date Required', 
+                text: 'Please provide an estimated pickup date.' 
+            });
+            return;
+        }
+        if (!estimatedDeliveryDate) {
+            Swal.fire({ 
+                icon: 'warning', 
+                title: 'Delivery Date Required', 
+                text: 'Please provide an estimated delivery end date.' 
+            });
+            return;
+        }
+        
+        // Validate that delivery date is after pickup date
+        const pickupDate = new Date(estimatedDate);
+        const deliveryDate = new Date(estimatedDeliveryDate);
+        if (deliveryDate <= pickupDate) {
+            Swal.fire({ 
+                icon: 'warning', 
+                title: 'Invalid Date Range', 
+                text: 'Estimated delivery date must be after the pickup date.' 
+            });
+            return;
+        }
+    }
+    
+    Swal.fire({
+        title: 'Update Status?',
+        text: `Mark this item as ${status}?`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Yes, Update',
+        cancelButtonText: 'Cancel'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            updateDeliveryStatus(requestId, status, estimatedDate, stepElement);
+        }
+    });
+});
+
+
+// Enhanced status update function with better delivery date handling
+function updateDeliveryStatus(requestId, status, estimatedDate, stepElement) {
+    const statusConversion = {
+        'Pending': 'pending',
+        'Waiting for Pickup': 'waiting_for_pickup',
+        'At Sorting Facility': 'at_sorting_facility',
+        'On the Way': 'on_the_way',
+        'Delivered': 'delivered',
+        'Cancelled': 'cancelled'
+    };
+    
+    const backendStatus = statusConversion[status] || status.toLowerCase().replace(/ /g, '_');
+    
+    // Get estimated delivery date for "Waiting for Pickup"
+    let estimatedDeliveryDate = '';
+    if (status === 'Waiting for Pickup') {
+        estimatedDeliveryDate = stepElement.find('.estimated-delivery-date').val();
+        
+        console.log('Dates collected:', {
+            pickupDate: estimatedDate,
+            deliveryEndDate: estimatedDeliveryDate
+        });
+    }
+    
+    // Prepare the data to send - FIXED: Use proper form data format
+    const postData = new FormData();
+    postData.append('action', 'update_delivery_status');
+    postData.append('request_id', requestId);
+    postData.append('delivery_status', backendStatus);
+    
+    if (estimatedDate) {
+        postData.append('estimated_delivery', estimatedDate);
+    }
+    
+    // Add estimated delivery date only for Waiting for Pickup - FIXED: Always include when available
+    if (status === 'Waiting for Pickup' && estimatedDeliveryDate) {
+        postData.append('estimated_delivery_date', estimatedDeliveryDate);
+    }
+    
+    console.log('Sending data to server:');
+    for (let [key, value] of postData.entries()) {
+        console.log(key + ': ' + value);
+    }
+    
+    $.ajax({
+        url: 'donate_process.php',
+        method: 'POST',
+        data: postData,
+        processData: false,
+        contentType: false,
+        success: function(response) {
+            console.log('Server response:', response);
+            try {
+                const res = typeof response === 'object' ? response : JSON.parse(response);
+                
+                if (res.status === 'success') {
+                    // Update modal state
+                    statusModalState.currentStatus = status;
+                    statusModalState.editMode = false;
+                    delete statusModalState.stepStates[status]; // Remove edit state for this step
+                    
+                    // Update UI immediately
+                    updateStepToCompleted(stepElement, status, estimatedDate);
+                    
+                    // Update the specific request card in real-time
+                    updateRequestCardInRealTime(requestId, status, estimatedDate, estimatedDeliveryDate);
+                    
+                    Swal.fire({ 
+                        icon: 'success', 
+                        title: 'Updated!', 
+                        text: res.message || 'Status updated successfully',
+                        timer: 1500,
+                        showConfirmButton: false
+                    });
+                    
+                } else {
+                    Swal.fire({ icon: 'error', title: 'Error', text: res.message || 'Failed to update status' });
+                }
+            } catch (e) {
+                console.error('Error parsing response:', e, response);
+                Swal.fire({ icon: 'error', title: 'Error', text: 'Failed to update status' });
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error('AJAX error:', status, error);
+            Swal.fire({ icon: 'error', title: 'Server Error', text: 'Failed to update status' });
+        }
+    });
+}
+
+
+// Update step to completed state with Edit button
+function updateStepToCompleted(stepElement, status, estimatedDate) {
+    const stepHeader = stepElement.find('.step-header');
+    const actionButtons = stepElement.find('.action-buttons');
+    
+    // Update step classes
+    stepElement.removeClass('current upcoming edit-mode').addClass('completed');
+    
+    // Update badge
+    stepHeader.find('.step-badge').remove();
+    stepHeader.append('<span class="step-badge status-completed">Completed</span>');
+    
+    // Show date display
+    if (estimatedDate) {
+        const displayText = getDateDisplayText(status, estimatedDate);
+        stepElement.find('.step-date-display').html(displayText).show();
+    }
+    
+    // Replace Mark button with Edit button
+    actionButtons.empty();
+    if (status === 'Waiting for Pickup' || status === 'At Sorting Facility' || status === 'On the Way') {
+        const editBtn = $(`<button class="edit-step-btn" data-status="${status}">Edit</button>`);
+        actionButtons.append(editBtn);
+    }
+    
+    // Hide date inputs
+    stepElement.find('.step-details').hide();
+}
+
+// ==================== EDIT MODE FUNCTIONALITY ====================
+$(document).on('click', '.edit-step-btn', function() {
+    const status = $(this).data('status');
+    const stepElement = $(this).closest('.status-step');
+    const actionButtons = stepElement.find('.action-buttons');
+    
+    // Enter edit mode and update state
+    stepElement.addClass('edit-mode');
+    statusModalState.editMode = true;
+    statusModalState.stepStates[status] = 'edit';
+    
+    // Show date inputs
+    stepElement.find('.step-details').show();
+    
+    // Replace Edit button with Save and Cancel buttons
+    actionButtons.empty();
+    
+    const saveBtn = $(`<button class="save-edit-btn" data-status="${status}">Save Changes</button>`);
+    const cancelBtn = $(`<button class="cancel-edit-btn" data-status="${status}">Cancel</button>`);
+    
+    actionButtons.append(saveBtn, cancelBtn);
+});
+
+// Save edited date
+$(document).on('click', '.save-edit-btn', function() {
+    const status = $(this).data('status');
+    const requestId = $('#statusManagementModal').data('request-id');
+    const stepElement = $(this).closest('.status-step');
+    const actionButtons = stepElement.find('.action-buttons');
+    
+    // Get the updated date
+    let estimatedDate = '';
+    switch(status) {
+        case 'Waiting for Pickup':
+            estimatedDate = stepElement.find('.pickup-date').val();
+            break;
+        case 'At Sorting Facility':
+            estimatedDate = stepElement.find('.sorting-date').val();
+            break;
+        case 'On the Way':
+            estimatedDate = stepElement.find('.transit-date').val();
+            break;
+    }
+    
+    if (!estimatedDate) {
+        Swal.fire({ icon: 'warning', title: 'Date Required', text: 'Please provide a date.' });
+        return;
+    }
+    
+    // Update the date via AJAX
+    updateDeliveryDate(requestId, status, estimatedDate, stepElement, actionButtons);
+});
+
+// Cancel edit mode
+$(document).on('click', '.cancel-edit-btn', function() {
+    const status = $(this).data('status');
+    const stepElement = $(this).closest('.status-step');
+    const actionButtons = stepElement.find('.action-buttons');
+    
+    // Exit edit mode and update state
+    stepElement.removeClass('edit-mode');
+    statusModalState.editMode = false;
+    delete statusModalState.stepStates[status];
+    
+    stepElement.find('.step-details').hide();
+    
+    // Restore Edit button
+    actionButtons.empty();
+    const editBtn = $(`<button class="edit-step-btn" data-status="${status}">Edit</button>`);
+    actionButtons.append(editBtn);
+});
+
+// Enhanced date update function
+function updateDeliveryDate(requestId, status, estimatedDate, stepElement, actionButtons) {
+    const statusConversion = {
+        'Waiting for Pickup': 'waiting_for_pickup',
+        'At Sorting Facility': 'at_sorting_facility',
+        'On the Way': 'on_the_way'
+    };
+    
+    const backendStatus = statusConversion[status];
+    
+    // Get estimated delivery date for "Waiting for Pickup" when editing
+    let estimatedDeliveryDate = '';
+    if (status === 'Waiting for Pickup') {
+        estimatedDeliveryDate = stepElement.find('.estimated-delivery-date').val();
+    }
+    
+    const postData = new FormData();
+    postData.append('action', 'update_delivery_status');
+    postData.append('request_id', requestId);
+    postData.append('delivery_status', backendStatus);
+    
+    if (estimatedDate) {
+        postData.append('estimated_delivery', estimatedDate);
+    }
+    
+    // Include estimated delivery date for Waiting for Pickup
+    if (status === 'Waiting for Pickup' && estimatedDeliveryDate) {
+        postData.append('estimated_delivery_date', estimatedDeliveryDate);
+    }
+    
+    console.log('Sending edit data to server:');
+    for (let [key, value] of postData.entries()) {
+        console.log(key + ': ' + value);
+    }
+    
+    $.ajax({
+        url: 'donate_process.php',
+        method: 'POST',
+        data: postData,
+        processData: false,
+        contentType: false,
+        success: function(response) {
+            try {
+                const res = typeof response === 'object' ? response : JSON.parse(response);
+                
+                if (res.status === 'success') {
+                    // Update date display
+                    const displayText = getDateDisplayText(status, estimatedDate);
+                    stepElement.find('.step-date-display').html(displayText).show();
+                    
+                    // Exit edit mode and update state
+                    stepElement.removeClass('edit-mode');
+                    statusModalState.editMode = false;
+                    delete statusModalState.stepStates[status];
+                    
+                    stepElement.find('.step-details').hide();
+                    
+                    // Restore Edit button
+                    actionButtons.empty();
+                    const editBtn = $(`<button class="edit-step-btn" data-status="${status}">Edit</button>`);
+                    actionButtons.append(editBtn);
+                    
+                    Swal.fire({ 
+                        icon: 'success', 
+                        title: 'Date Updated!', 
+                        text: 'Delivery date has been updated successfully.',
+                        timer: 1500,
+                        showConfirmButton: false
+                    });
+                    
+                    // Update request card in real-time
+                    updateRequestCardInRealTime(requestId, status, estimatedDate, estimatedDeliveryDate);
+                    
+                } else {
+                    Swal.fire({ icon: 'error', title: 'Error', text: res.message || 'Failed to update date' });
+                }
+            } catch (e) {
+                Swal.fire({ icon: 'error', title: 'Error', text: 'Failed to update date' });
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error('AJAX error:', status, error);
+            Swal.fire({ icon: 'error', title: 'Server Error', text: 'Failed to update date' });
+        }
+    });
+}
+
+// Enhanced function to update specific request card in real-time
+function updateRequestCardInRealTime(requestId, newStatus, estimatedDate, estimatedDeliveryDate) {
+    const requestCard = $(`.donation-card:has(.manage-status-btn[data-id="${requestId}"])`);
+    
+    if (requestCard.length) {
+        // Update delivery status display
+        const deliveryStatusElement = requestCard.find('.delivery-status');
+        const deliveryStatusText = requestCard.find('p:contains("Delivery Status:")');
+        const estimatedDateElement = requestCard.find('p:contains("Estimated Delivery:")');
+        
+        // Update status badge
+        deliveryStatusElement
+            .text(newStatus)
+            .removeClass()
+            .addClass('delivery-status ' + 
+                (newStatus === 'Waiting for Pickup' ? 'ds-ready' :
+                 newStatus === 'At Sorting Facility' ? 'ds-sorting' :
+                 newStatus === 'On the Way' ? 'ds-transit' :
+                 newStatus === 'Delivered' ? 'ds-delivered' :
+                 newStatus === 'Cancelled' ? 'ds-cancelled' : 'ds-pending'));
+        
+        // IMPORTANT: Only update Estimated Delivery display for Waiting for Pickup status
+        // For other statuses, keep the original delivery range from Waiting for Pickup
+        if (newStatus === 'Waiting for Pickup' && estimatedDate && estimatedDeliveryDate) {
+            const formattedStartDate = formatDate(estimatedDate);
+            const formattedEndDate = formatDate(estimatedDeliveryDate);
+            const dateRangeText = `${formattedStartDate} - ${formattedEndDate}`;
+            
+            if (estimatedDateElement.length) {
+                estimatedDateElement.html(`<strong>Estimated Delivery:</strong> ${dateRangeText}`);
+            } else {
+                // Create new estimated date element if it doesn't exist
+                deliveryStatusText.after(`<p><strong>Estimated Delivery:</strong> ${dateRangeText}</p>`);
+            }
+        } else if (newStatus === 'Waiting for Pickup' && estimatedDate) {
+            const formattedDate = formatDate(estimatedDate);
+            if (estimatedDateElement.length) {
+                estimatedDateElement.html(`<strong>Estimated Delivery:</strong> ${formattedDate}`);
+            } else {
+                deliveryStatusText.after(`<p><strong>Estimated Delivery:</strong> ${formattedDate}</p>`);
+            }
+        }
+
+        
+        // Add visual feedback
+        requestCard.css('transition', 'all 0.3s ease');
+        requestCard.css('background-color', '#f0fff0');
+        setTimeout(() => {
+            requestCard.css('background-color', '');
+        }, 1000);
+    } else {
+        // Fallback: refresh the entire tab if specific card not found
+        refreshRequestsForMeTab();
+    }
+}
+
+// Function to refresh the "Requests for My Donations" tab
+function refreshRequestsForMeTab() {
+    const tabContent = $("#requests-for-me");
+    
+    // Show loading state
+    const originalContent = tabContent.html();
+    tabContent.html(`
+        <div class="loading-state" style="text-align: center; padding: 40px;">
+            <i class="fas fa-spinner fa-spin" style="font-size: 24px; color: #2e8b57;"></i>
+            <p>Updating requests...</p>
+        </div>
+    `);
+    
+    // Reload the tab content
+    setTimeout(() => {
+        location.reload();
+    }, 1000);
+}
+
+// Close status modal with state reset for new requests
+$(document).on('click', '#closeStatusModal, #statusManagementModal .close', function() {
+    // Only reset state if we're closing without a pending action
+    if (!statusModalState.editMode) {
+        resetStatusModalState();
+    }
+    $('#statusManagementModal').fadeOut(200);
+});
+
+$(window).on('click', function(e) {
+    if ($(e.target).is('#statusManagementModal')) {
+        // Only reset state if we're closing without a pending action
+        if (!statusModalState.editMode) {
+            resetStatusModalState();
+        }
+        $('#statusManagementModal').fadeOut(200);
+    }
+});
+
+// Function to reset modal state when completely closed
+function resetStatusModalState() {
+    statusModalState = {
+        currentRequestId: null,
+        currentStatus: null,
+        stepStates: {},
+        editMode: false
+    };
+    
+    // Also reset any UI elements that might retain state
+    $('.status-step').removeClass('edit-mode');
+    $('.step-details').hide();
+}
+
+
+// ==================== CONFIRM DELIVERY (REQUESTER ACTION) ====================
+$(document).on('click', '.confirm-delivery-btn', function() {
+    const requestId = $(this).data('id');
+    
+    Swal.fire({
+        title: 'Confirm Delivery?',
+        text: 'Please confirm that you have received the donation items.',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Yes, I Received It',
+        cancelButtonText: 'Not Yet',
+        reverseButtons: true
+    }).then((result) => {
+        if (result.isConfirmed) {
+            $.post('donate_process.php', {
+                action: 'confirm_delivery',
+                request_id: requestId
+            }, function(response) {
+                try {
+                    const res = typeof response === 'object' ? response : JSON.parse(response);
+                    
+                    if (res.status === 'success') {
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Delivery Confirmed!',
+                            text: res.message || 'Thank you for confirming receipt!',
+                            timer: 2000,
+                            showConfirmButton: false
+                        });
+                        
+                        // Refresh the tab to show updated status
+                        $("#my-requests").load(location.href + " #my-requests > *");
+                    } else {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: res.message || 'Failed to confirm delivery'
+                        });
+                    }
+                } catch (e) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error',
+                        text: 'Failed to confirm delivery'
+                    });
+                }
+            });
+        }
+    });
+});
+
+// ==================== AUTO UPDATE CANCELLED STATUS ====================
+// This would be called when requester cancels a request
+function updateToCancelledStatus(requestId) {
+    $.post('donate_process.php', {
+        action: 'auto_update_cancelled',
+        request_id: requestId
+    }, function(response) {
+        // Optional: handle response if needed
+        console.log('Cancelled status updated:', response);
+    });
+}
+
+// Update existing cancel request to also update delivery status
+$(document).on("click", ".cancel-request-btn", function() {
+    const btn = $(this);
+    const requestId = btn.data("id");
+
+    if (!requestId) return Swal.fire({ icon: "error", title: "Error", text: "Invalid request ID" });
+    
+    Swal.fire({
+        title: 'Cancel Request?',
+        text: 'This will cancel your donation request and update the status.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Yes, Cancel Request',
+        cancelButtonText: 'Keep Request',
+        reverseButtons: true
+    }).then((result) => {
+        if (result.isConfirmed) {
+            // First update to cancelled status
+            updateToCancelledStatus(requestId);
+            
+            // Then proceed with existing cancel logic
+            $.post("donate_process.php", { action: "cancel_request", request_id: requestId }, function(response) {
+                try {
+                    const data = typeof response === "object" ? response : JSON.parse(response);
+
+                    if (data.status === "success") {
+                        Swal.fire({
+                            icon: "success",
+                            title: "Request Canceled",
+                            text: "Your donation request has been canceled.",
+                            timer: 1500,
+                            showConfirmButton: false
+                        });
+
+                        const removedCard = btn.closest(".donation-card");
+                        removedCard.fadeOut(400, function() {
+                            $(this).remove();
+
+                            const myRequestsContainer = $("#my-requests");
+                            if (myRequestsContainer.find(".donation-card").length === 0) {
+                                let empty = myRequestsContainer.find(".empty-state").first();
+                                if (empty.length === 0) {
+                                    myRequestsContainer.append(
+                                        `<div class="empty-state">
+                                            <i class="fas fa-hand-paper"></i>
+                                            <h3>No donation requests</h3>
+                                            <p>You haven't requested any donations yet.</p>
+                                        </div>`
+                                    );
+                                } else {
+                                    empty.show();
+                                }
+                            }
+                        });
+                    } else {
+                        Swal.fire({ icon: "error", title: "Failed", text: data.message || "Could not cancel request." });
+                    }
+                } catch (e) {
+                    Swal.fire({ icon: "error", title: "Error", text: "Invalid server response." });
+                    console.error("Invalid JSON:", response, e);
+                }
+            });
+        }
+    });
+});
 
     // ==================== FEEDBACK MODAL SYSTEM ====================
     $(document).ready(function() {
