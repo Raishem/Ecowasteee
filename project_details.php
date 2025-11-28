@@ -302,11 +302,10 @@ try {
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Open+Sans:wght@400;500;600&display=swap">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="assets/css/header.css">
-    <!-- projects.css intentionally excluded; using project-details-modern-v2.css instead for modern styling -->
-    <link rel="stylesheet" href="assets/css/project-details-modern-v2.css">
+    <link rel="stylesheet" href="assets/css/project-details.css">
+    <link rel="stylesheet" href="assets/css/project-details-modern-v2.css?v=5">
     <link rel="stylesheet" href="assets/css/project-description.css">
     <link rel="stylesheet" href="assets/css/project-materials.css?v=4">
-    <link rel="stylesheet" href="assets/css/project-stages.css">
     <script src="assets/js/stage-completion.js?v=1" defer></script>
     <style>
     .delete-btn {
@@ -1596,7 +1595,11 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!json || !json.success) { showToast(json && json.message ? json.message : 'Could not add material', 'error'); return; }
 
             const mat = json.material;
-            const ul = document.querySelector('.materials-list-stage');
+            let ul = document.querySelector('.workflow-stage.active .materials-list-stage') || document.querySelector('.materials-list-stage') || document.querySelector('.materials-list') || document.querySelector('.stage-materials');
+            if (ul && ul.tagName && ul.tagName.toLowerCase() !== 'ul') {
+                const inner = ul.querySelector('ul.materials-list-stage') || ul.querySelector('.materials-list-stage');
+                if (inner) ul = inner;
+            }
             if (ul) {
                 const li = document.createElement('li');
                 li.className = 'material-item';
@@ -1760,7 +1763,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 const mat = json.material;
                 // append to list
-                const ul = document.querySelector('.materials-list-stage');
+                let ul = document.querySelector('.workflow-stage.active .materials-list-stage') || document.querySelector('.materials-list-stage') || document.querySelector('.materials-list') || document.querySelector('.stage-materials');
+                if (ul && ul.tagName && ul.tagName.toLowerCase() !== 'ul') {
+                    const inner = ul.querySelector('ul.materials-list-stage') || ul.querySelector('.materials-list-stage');
+                    if (inner) ul = inner;
+                }
                     if (ul) {
                         const li = document.createElement('li');
                         li.className = 'material-item';
@@ -2917,6 +2924,34 @@ document.addEventListener('DOMContentLoaded', function(){
                         unset($fs);
                         $workflow_stages = array_values($filtered);
 
+                        // Normalize to canonical 3-stage workflow when templates are incomplete
+                        $canonical = [
+                            ['name' => 'Preparation', 'description' => 'Collect materials, clean and sort materials, prepare workspace'],
+                            ['name' => 'Construction', 'description' => 'Build your project, follow safety guidelines, document progress'],
+                            ['name' => 'Share', 'description' => 'Share your project with others.']
+                        ];
+                        // Map existing by lowercase name
+                        $existingMap = [];
+                        foreach ($workflow_stages as $ws) { $existingMap[strtolower(trim($ws['name'] ?? $ws['stage_name'] ?? ''))] = $ws; }
+                        $merged = [];
+                        $nextNum = 1;
+                        foreach ($canonical as $can) {
+                            $lname = strtolower($can['name']);
+                            if (isset($existingMap[$lname])) {
+                                $entry = $existingMap[$lname];
+                                $entry['number'] = $nextNum;
+                                if (!isset($entry['description']) || trim($entry['description']) === '') $entry['description'] = $can['description'];
+                                $merged[] = $entry;
+                                unset($existingMap[$lname]);
+                            } else {
+                                $merged[] = ['name' => $can['name'], 'description' => $can['description'], 'number' => $nextNum];
+                            }
+                            $nextNum++;
+                        }
+                        // Append any non-canonical stages that existed after canonical ones
+                        foreach ($existingMap as $rem) { $rem['number'] = $nextNum++; $merged[] = $rem; }
+                        $workflow_stages = $merged;
+
                         // NOTE: removed automatic injection of a "Material Collection" stage here.
                         // Historically we inserted a lightweight Material Collection stage when
                         // templates did not define one but project materials existed. That caused
@@ -2928,7 +2963,8 @@ document.addEventListener('DOMContentLoaded', function(){
                 if (empty($workflow_stages)) {
                     $workflow_stages = [
                         ['name' => 'Preparation', 'description' => 'Collect materials, clean and sort materials, prepare workspace', 'number' => 1],
-                        ['name' => 'Creation', 'description' => 'Build your project, follow safety guidelines, document progress', 'number' => 2],
+                        ['name' => 'Construction', 'description' => 'Build your project, follow safety guidelines, document progress', 'number' => 2],
+                        ['name' => 'Share', 'description' => 'Share your project with others.', 'number' => 3],
                     ];
                 }
 
@@ -3195,7 +3231,11 @@ document.addEventListener('DOMContentLoaded', function(){
                             <?php endif; ?>
 
                             <?php // Inject materials list into Material Collection stage (read-only) ?>
-                            <?php if (strtolower(trim($stage['name'] ?? '')) === 'material collection'): ?>
+                            <?php 
+                                $stage_name_l = strtolower(trim($stage['name'] ?? $stage['stage_name'] ?? ''));
+                                $show_material_list = (strpos($stage_name_l, 'material') !== false) || (strpos($stage_name_l, 'prepar') !== false) || ($index === 0);
+                            ?>
+                            <?php if ($show_material_list): ?>
     <div class="stage-materials">
         <h4>Materials Needed</h4>
         <?php if (isset($is_debug) && $is_debug): ?>
@@ -3298,74 +3338,25 @@ document.addEventListener('DOMContentLoaded', function(){
 
                                             <?php if (!$is_locked): ?>
                                             <div class="stage-actions">
-                                                <?php if (strtolower(trim($stage['name'] ?? '')) === 'material collection'): ?>
-                                                    <button type="button" class="btn add-material-btn" onclick="showAddMaterialModal()">
-                                                        <i class="fas fa-plus"></i> Add Material
+                                                <?php 
+                                                    $stage_name_l = strtolower(trim($stage['name'] ?? $stage['stage_name'] ?? ''));
+                                                    $show_add_material_btn = (strpos($stage_name_l, 'material') !== false) || (strpos($stage_name_l, 'prepar') !== false) || ($index === 0);
+                                                ?>
+                                                <?php if ($show_add_material_btn): ?>
+                                                        <button type="button" class="btn add-material-btn" onclick="showAddMaterialModal()">
+                                                            <i class="fas fa-plus"></i> Add Material
+                                                        </button>
+                                                <?php endif; ?>
+                                                
+                                                <!-- Complete stage button (show for current/incomplete stages, hidden for locked or completed) -->
+                                                <?php 
+                                                    $template_num = isset($stage['template_number']) ? (int)$stage['template_number'] : (int)($stage['number'] ?? 0);
+                                                ?>
+                                                <?php if (!$is_completed): ?>
+                                                    <button type="button" class="btn btn-primary complete-stage-btn" data-stage-number="<?= $template_num ?>" onclick="(async function(){ try { await requestToggleStage(<?= $template_num ?>, <?= json_encode($project_id) ?>); } catch(e) { showToast('Error completing stage: ' + (e.message || 'Unknown'), 'error'); } })(); return false;">
+                                                        <i class="fas fa-check"></i> Check
                                                     </button>
-                                <?php endif; ?>
-
-                                <!-- Stage-level upload removed; per-material upload button remains beside Obtained badge -->
-                                <?php
-                                    // Determine whether this stage can be completed: it must not be locked (i.e., earlier stages done)
-                                    $can_attempt = !$is_locked || $is_current || $is_completed;
-                                    // For Material Collection, compute whether requirements are satisfied (all materials obtained or with photos)
-                                    $req_ok = true;
-                                    if (stripos($stage['name'], 'material') !== false) {
-                                        try {
-                                            $totStmt = $conn->prepare("SELECT COUNT(*) AS total FROM project_materials WHERE project_id = ?");
-                                            $totStmt->bind_param('i', $project_id);
-                                            $totStmt->execute();
-                                            $tot = (int)$totStmt->get_result()->fetch_assoc()['total'];
-
-                                            $haveStmt = $conn->prepare("SELECT COUNT(*) AS have FROM project_materials pm WHERE pm.project_id = ? AND (LOWER(pm.status) = 'obtained' OR EXISTS(SELECT 1 FROM material_photos mp WHERE mp.material_id = pm.material_id LIMIT 1))");
-                                            $haveStmt->bind_param('i', $project_id);
-                                            $haveStmt->execute();
-                                            $have = (int)$haveStmt->get_result()->fetch_assoc()['have'];
-
-                                            if ($tot > 0 && $have < $tot) $req_ok = false;
-
-                                            // Additionally require stage-level photos (before & after) to be present
-                                            // to match server-side complete_stage.php checks.
-                                            try {
-                                                $template_num_chk = isset($stage['template_number']) ? (int)$stage['template_number'] : (int)($stage['number'] ?? 0);
-                                                if ($template_num_chk > 0) {
-                                                    $ptypeStmt = $conn->prepare("SELECT COALESCE(photo_type,'other') AS photo_type, COUNT(*) AS c FROM stage_photos WHERE project_id = ? AND stage_number = ? GROUP BY photo_type");
-                                                    if ($ptypeStmt) {
-                                                        $ptypeStmt->bind_param('ii', $project_id, $template_num_chk);
-                                                        $ptypeStmt->execute();
-                                                        $pres = $ptypeStmt->get_result();
-                                                        $haveTypes = [];
-                                                        while ($r = $pres->fetch_assoc()) {
-                                                            $pt = strtolower(trim($r['photo_type']));
-                                                            if ($pt === '') $pt = 'other';
-                                                            $haveTypes[$pt] = (int)$r['c'];
-                                                        }
-                                                        // require both before and after
-                                                        if ((!isset($haveTypes['before']) || $haveTypes['before'] <= 0) || (!isset($haveTypes['after']) || $haveTypes['after'] <= 0)) {
-                                                            $req_ok = false;
-                                                        }
-                                                    }
-                                                }
-                                            } catch (Exception $e) { /* ignore photo check errors - be conservative */ }
-                                        } catch (Exception $e) { /* ignore and allow */ }
-                                    }
-
-                                    // The complete button is visible for all non-locked stages; if locked, show disabled with tooltip
-                                    $btn_classes = 'complete-stage-btn';
-                                    $btn_disabled = false;
-                                    $btn_title = '';
-                                    if ($is_locked && !$is_completed) {
-                                        $btn_disabled = true;
-                                        $btn_title = 'Locked: complete previous stages first';
-                                    } elseif (!$req_ok && !$is_completed) {
-                                        $btn_disabled = true;
-                                        $btn_title = 'Requirements not met for this stage';
-                                    }
-                                ?>
-                                <?php $template_num = isset($stage['template_number']) ? (int)$stage['template_number'] : (int)$stage['number']; ?>
-                                                <?php // Render a non-interactive status label instead of an actionable button ?>
-                                                <?php $template_num = isset($stage['template_number']) ? (int)$stage['template_number'] : (int)$stage['number']; ?>
-                                                <?php // Do not render a stage-level status label here; the tab badge shows the status below the step name. ?>
+                                                <?php endif; ?>
                             </div>
                             <?php else: ?>
                                 <div class="stage-locked-note" title="This stage is locked until previous stages are completed.">🔒 Stage locked — complete previous stage to unlock.</div>

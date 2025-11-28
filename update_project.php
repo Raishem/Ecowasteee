@@ -67,7 +67,6 @@ try {
             // Accept either 'name' or 'material_name' to be compatible with the dynamic modal
             $name = _get_str('name');
             if (!$name) $name = _get_str('material_name');
-            $unit = _get_str('unit') ?: ''; // unit is optional in the modal
             $quantity = filter_input(INPUT_POST,'quantity',FILTER_VALIDATE_INT);
             if (!$name) {
                 // Try to recover from alternate POST keys (some clients use material_name)
@@ -77,13 +76,13 @@ try {
                 }
             }
             if (!$name) { echo json_encode(['success'=>false,'message'=>'Missing material data','received_keys'=>array_values(array_keys($_POST))]); exit; }
-            $stmt = $conn->prepare('INSERT INTO project_materials (project_id, material_name, quantity, unit, created_at) VALUES (?, ?, ?, ?, NOW())');
+            $stmt = $conn->prepare('INSERT INTO project_materials (project_id, material_name, quantity) VALUES (?, ?, ?)');
             $qty = is_numeric($quantity) ? (int)$quantity : 0;
-            // types: project_id (i), name (s), qty (i), unit (s)
-            $stmt->bind_param('isis',$project_id,$name,$qty,$unit);
+            // types: project_id (i), name (s), qty (i)
+            $stmt->bind_param('isi',$project_id,$name,$qty);
             $stmt->execute();
             $mid = $conn->insert_id;
-            $f = $conn->prepare('SELECT material_id, material_name, quantity, unit, COALESCE(status,\'needed\') as status FROM project_materials WHERE material_id = ?');
+            $f = $conn->prepare('SELECT material_id, material_name, quantity, COALESCE(status,\'needed\') as status FROM project_materials WHERE material_id = ?');
             $f->bind_param('i',$mid); $f->execute(); $fres = $f->get_result(); $mat = $fres ? $fres->fetch_assoc() : null;
 
             // If a material was added, ensure any Material Collection stage marked completed is unset
