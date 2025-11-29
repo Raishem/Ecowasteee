@@ -440,7 +440,7 @@
 .btn.small:not(.danger){ background:#fff; color:#1a1a1a; border:1px solid rgba(0,0,0,0.06); }
 .btn.small:hover{ transform:translateY(-1px); }
 
-.add-material-btn{ background:var(--accent); color:#fff; border:none; padding:10px 16px; border-radius:10px; box-shadow: 0 6px 20px rgba(46,139,87,0.12); font-weight:700 }
+.add-material-btn, .add-material { background:var(--accent); color:#fff; border:none; padding:10px 16px; border-radius:10px; box-shadow: 0 6px 20px rgba(46,139,87,0.12); font-weight:700 }
 .add-material-btn i{ margin-right:8px }
 
 /* Make the stage completion button visually match the Add Material button for consistency */

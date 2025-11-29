@@ -3043,280 +3043,94 @@ document.addEventListener('DOMContentLoaded', function(){
                 </script>
                 <?php endif; ?>
 
-                <div class="progress-indicator">
-                    <strong><?= $progress_percent ?>%</strong>
-                    <?php if ($progress_percent === 100): ?>
-                        of stages completed.
-                    <?php else: ?>
-                        of stages completed. (<?= $completed_stages ?> of <?= $total_stages ?>)
-                    <?php endif; ?>
-                </div>
-                <div class="progress-bar">
-                    <div class="progress-fill" style="width: <?= $progress_percent ?>%;"></div>
-                </div>
+                    <?php // Render unified workflow partial (progress, tabs, stages)
+                        include __DIR__ . '/includes/project-workflow.php'; ?>
 
-                <!-- Tabs: show step titles and highlight current -->
-                <div class="stage-tabs">
-                    <?php foreach ($workflow_stages as $i => $st): 
-                        $tn = isset($st['template_number']) ? (int)$st['template_number'] : (int)($st['stage_number'] ?? $st['number'] ?? $i + 1);
-                        // determine badge class
-                        $is_completed = array_key_exists($i, $completed_stage_map);
-                        // If this is a Material Collection (now also 'Preparation') stage and DB shows completed, re-validate server-side
-                        $stage_name_lower = strtolower($st['stage_name'] ?? $st['name'] ?? '');
-                        if ($is_completed && (stripos($stage_name_lower, 'material') !== false || stripos($stage_name_lower, 'prepar') !== false)) {
-                            try {
-                                $cstmt = $conn->prepare("SELECT COUNT(*) AS not_obtained FROM project_materials WHERE project_id = ? AND (status IS NULL OR LOWER(status) <> 'obtained')");
-                                $cstmt->bind_param('i', $project_id);
-                                $cstmt->execute();
-                                $cres = $cstmt->get_result()->fetch_assoc();
-                                $not_obtained = $cres ? (int)$cres['not_obtained'] : 0;
-                                if ($not_obtained > 0) {
-                                    // some materials still missing — treat as not completed for rendering
-                                    $is_completed = false;
-                                }
-                            } catch (Exception $e) { /* ignore validation errors */ }
-                        }
-                        $is_current = !$is_completed && ($i === $current_stage_index);
-                        $is_locked = !$is_completed && ($i > $current_stage_index);
-                        $badgeClass = $is_completed ? 'completed' : ($is_current ? 'current' : ($is_locked ? 'locked' : 'incomplete'));
-
-                        // determine small thumbnail: prefer stage_photos, fallback to material photo for material collection
-                        $thumb = '';
-                        try {
-                            // stage photos
-                            $tp = $conn->prepare("SELECT photo_path FROM stage_photos WHERE project_id = ? AND stage_number = ? ORDER BY created_at DESC LIMIT 1");
-                            $tp->bind_param('ii', $project_id, $tn);
-                            $tp->execute();
-                            $tres = $tp->get_result()->fetch_assoc();
-                            if ($tres && !empty($tres['photo_path'])) $thumb = 'assets/uploads/' . $tres['photo_path'];
-                        } catch (Exception $e) { /* ignore */ }
-                        if (empty($thumb) && (stripos($st['stage_name'] ?? $st['name'] ?? '', 'material') !== false || stripos($st['stage_name'] ?? $st['name'] ?? '', 'prepar') !== false)) {
-                            try {
-                                $mp = $conn->prepare("SELECT photo_path FROM material_photos WHERE project_id = ? AND material_id IN (SELECT material_id FROM project_materials WHERE project_id = ?) ORDER BY created_at DESC LIMIT 1");
-                                $mp->bind_param('ii', $project_id, $project_id);
-                                $mp->execute();
-                                $mres = $mp->get_result()->fetch_assoc();
-                                if ($mres && !empty($mres['photo_path'])) $thumb = 'assets/uploads/' . $mres['photo_path'];
-                            } catch (Exception $e) { /* ignore */ }
-                        }
-                    ?>
-                        <?php
-                            $stage_name_lower = strtolower($st['stage_name'] ?? $st['name'] ?? '');
-                            $iconClass = 'fas fa-circle';
-                                    if (stripos($stage_name_lower, 'material') !== false || stripos($stage_name_lower, 'prepar') !== false) $iconClass = 'fas fa-box-open';
-                            else if (stripos($stage_name_lower, 'prepar') !== false) $iconClass = 'fas fa-tools';
-                            else if (stripos($stage_name_lower, 'construct') !== false) $iconClass = 'fas fa-hard-hat';
-                            else if (stripos($stage_name_lower, 'finish') !== false) $iconClass = 'fas fa-paint-roller';
-                            else if (stripos($stage_name_lower, 'share') !== false) $iconClass = 'fas fa-share-alt';
-                            // Use !important on inline style to override any stylesheet rules that may use !important
-                            $inlineStyle = $is_locked ? 'style="cursor: not-allowed !important;"' : '';
-                        ?>
-                        <button <?= $inlineStyle ?> class="stage-tab <?php echo ($i === $current_stage_index) ? 'active' : ''; ?> <?php echo $is_locked ? 'locked' : ''; ?>" data-stage-index="<?= $i ?>" data-stage-number="<?= $tn ?>" aria-label="<?= htmlspecialchars($st['stage_name'] ?? $st['name'] ?? 'Step') ?>">
-                            <span class="tab-icon"><i class="<?= $iconClass ?>" aria-hidden="true"></i></span>
-                            <span class="tab-meta">
-                                <span class="tab-title"><?= htmlspecialchars($st['stage_name'] ?? $st['name'] ?? ('Step ' . ($i+1))) ?></span>
-                                <span class="tab-badge <?= $badgeClass ?>"><?php echo $is_completed ? 'Completed' : ($is_current ? 'Current' : ($is_locked ? 'Locked' : 'Incomplete')) ?></span>
-                            </span>
-                        </button>
-                    <?php endforeach; ?>
-                    <div style="margin-left:auto;font-size:13px;color:#666;">
-                        <!-- removed 'Show all steps' control for simplified UI -->
+            <!-- Materials Section -->
+            <div class="materials-section">
+                <div class="materials-header">
+                    <div class="materials-title-wrapper">
+                        <i class="fas fa-box"></i>
+                        <h2>Materials Needed</h2>
                     </div>
+                    <button class="add-material" onclick="showAddMaterialModal()">
+                        <i class="fas fa-plus"></i>
+                        Add Material
+                    </button>
                 </div>
 
-                <div class="workflow-stages-container stages-timeline">
-                    <?php
-                    // $completed_stage_map was built above. Use it to render stages.
-                    foreach ($workflow_stages as $index => $stage): 
-                        $is_completed = array_key_exists($index, $completed_stage_map);
-                        // re-validate Material Collection completed state to avoid false positives
-                        $stage_name_lower = strtolower($stage['name'] ?? $stage['stage_name'] ?? '');
-                        if ($is_completed && stripos($stage_name_lower, 'material') !== false) {
-                            try {
-                                $cstmt2 = $conn->prepare("SELECT COUNT(*) AS not_obtained FROM project_materials WHERE project_id = ? AND (status IS NULL OR LOWER(status) <> 'obtained')");
-                                $cstmt2->bind_param('i', $project_id);
-                                $cstmt2->execute();
-                                $cres2 = $cstmt2->get_result()->fetch_assoc();
-                                $not_obtained2 = $cres2 ? (int)$cres2['not_obtained'] : 0;
-                                if ($not_obtained2 > 0) {
-                                    $is_completed = false;
-                                }
-                            } catch (Exception $e) { /* ignore */ }
-                        }
-                        // current stage is the first incomplete stage (index == completed count)
-                        $is_current = !$is_completed && ($index === $current_stage_index);
-                        // locked if it's after the current stage and not completed
-                        $is_locked = !$is_completed && ($index > $current_stage_index);
-                        if ($is_completed) {
-                            $stage_class = 'completed';
-                        } elseif ($is_current) {
-                            $stage_class = 'current';
-                        } elseif ($index > $current_stage_index) {
-                            $stage_class = 'locked';
-                        } else {
-                            // earlier incomplete stages are shown as inactive (not locked)
-                            $stage_class = 'inactive';
-                        }
-                    ?>
-                        <?php $activeClass = $is_current ? 'active' : ''; ?>
-                        <div class="workflow-stage stage-card <?= $stage_class ?> <?= $activeClass ?>" data-stage-index="<?= $index ?>">
-                                <?php $icon = $stage_icons[$stage['number']] ?? 'fa-circle'; ?>
-                                <i class="fas <?= $icon ?> stage-icon" aria-hidden="true"></i>
-                                <div class="stage-content">
-                                    <div class="stage-header">
-                                        <div class="stage-info">
-                                            <h3 class="stage-title">
-                                                <?= htmlspecialchars($stage['name']) ?>
-                                                <?php if ($is_completed): ?>
-                                                    <i class="fas fa-check-circle stage-check" title="Completed"></i>
-                                                <?php endif; ?>
-                                            </h3>
-                                            <?php if ($is_completed && isset($completed_stage_map[$index])): ?>
-                                                <div class="stage-completed-at">Completed: <?= date('M d, Y', strtotime($completed_stage_map[$index])) ?></div>
+                <div class="materials-list">
+                    <ul>
+                        <?php if (empty($materials)): ?>
+                            <li class="empty-state">No materials listed.</li>
+                        <?php else: ?>
+                            <?php foreach ($materials as $m): ?>
+                                <?php $mid = (int)($m['material_id'] ?? $m['id'] ?? 0); ?>
+                                <?php $currentQty = isset($m['quantity']) ? (int)$m['quantity'] : 0; ?>
+                                <?php $currentStatus = strtolower($m['status'] ?? ''); if ($currentQty <= 0) { $currentStatus = 'obtained'; } if ($currentStatus === '') $currentStatus = 'needed'; ?>
+                                <?php // Pre-check for a photo for this material (most recent)
+                                    $hasPhoto = false; $firstPhotoRel = null; $firstPhotoId = null;
+                                    try {
+                                        $pp = $conn->prepare("SELECT id, photo_path FROM material_photos WHERE material_id = ? ORDER BY uploaded_at DESC LIMIT 1");
+                                        if ($pp) {
+                                            $pp->bind_param('i', $mid);
+                                            $pp->execute();
+                                            $pres = $pp->get_result();
+                                            if ($prow = $pres->fetch_assoc()) { $hasPhoto = true; $firstPhotoRel = htmlspecialchars($prow['photo_path']); $firstPhotoId = (int)$prow['id']; }
+                                        }
+                                    } catch (Exception $e) { /* ignore */ }
+                                ?>
+                                <li class="material-item<?= ($currentStatus !== 'needed') ? ' material-obtained' : '' ?>" data-material-id="<?= $mid ?>">
+                                    <div class="material-main">
+                                        <span class="mat-name"><?= htmlspecialchars($m['material_name'] ?? $m['name'] ?? '') ?></span>
+                                        <div class="mat-meta">
+                                            <?php if ($currentQty > 0): ?>
+                                                <span class="mat-qty"><?= htmlspecialchars($currentQty) ?></span>
                                             <?php endif; ?>
-                                            <div class="stage-desc"><?= nl2br(htmlspecialchars($stage['description'] ?? '')) ?></div>
+                                            <?php if ($currentStatus !== 'needed' && $currentStatus !== ''): ?>
+                                                <span class="badge obtained" aria-hidden="true"><i class="fas fa-check-circle"></i> Obtained</span>
+                                                <?php if (!$hasPhoto): ?>
+                                                    <button type="button" class="btn small upload-material-photo" data-material-id="<?= $mid ?>" title="Upload photo" aria-label="Upload material photo"><i class="fas fa-camera"></i></button>
+                                                <?php endif; ?>
+                                            <?php endif; ?>
                                         </div>
                                     </div>
-                            
-                            <?php
-                            // Get photos for this stage (count + preview)
-                            $photos_stmt = $conn->prepare("SELECT photo_path FROM stage_photos WHERE project_id = ? AND stage_number = ?");
-                            $photos_stmt->bind_param("ii", $project_id, $stage['number']);
-                            $photos_stmt->execute();
-                            $photos_result = $photos_stmt->get_result();
-                            $stage_photos = $photos_result->fetch_all(MYSQLI_ASSOC);
-                            $photo_count = count($stage_photos);
-                            
-                            if ($photo_count > 0): ?>
-                            <div class="stage-photos">
-                                <?php foreach ($stage_photos as $photo): ?>
-                                    <img src="assets/uploads/<?= htmlspecialchars($photo['photo_path']) ?>" 
-                                         alt="Stage photo" 
-                                         onclick="openImageViewer('assets/uploads/<?= htmlspecialchars($photo['photo_path']) ?>')"
-                                         class="stage-photo">
-                                <?php endforeach; ?>
-                                <div class="photo-count"><?= $photo_count ?> photo<?= $photo_count>1 ? 's' : '' ?></div>
-                            </div>
-                            <?php endif; ?>
 
-                            <?php // Inject materials list into Material Collection stage (read-only) ?>
-                            <?php if (in_array(strtolower(trim($stage['name'] ?? '')), ['material collection','preparation'])): ?>
-    <div class="stage-materials">
-        <h4>Materials Needed</h4>
-        <?php if (isset($is_debug) && $is_debug): ?>
-        <div id="matDebugPanel" style="border:1px dashed #bfe6c9;padding:10px;margin:8px 0;border-radius:8px;background:#f7fbf7;color:#0f5132;">
-            <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
-                <strong style="flex:1;">Material Collection Debug</strong>
-                <button id="matDebugRecompute" class="btn small" style="background:#fff;color:#1b543d;border:1px solid rgba(0,0,0,0.06);">Recompute</button>
-                <button id="matDebugCopy" class="btn small" style="background:#fff;color:#1b543d;border:1px solid rgba(0,0,0,0.06);">Copy</button>
-            </div>
-            <div id="matDebugSummary" style="font-size:13px;white-space:pre-wrap;max-height:160px;overflow:auto;background:transparent;padding:6px 4px;">Computing...</div>
-        </div>
-        <?php endif; ?>
-        <?php if (empty($materials)): ?>
-            <p class="empty-state">No materials listed.</p>
-        <?php else: ?>
-            <ul class="materials-list-stage">
-                <?php foreach ($materials as $m): ?>
-                    <?php $mid = (int)($m['material_id'] ?? $m['id'] ?? 0); ?>
-                    <?php 
-                        $currentQty = isset($m['quantity']) ? (int)$m['quantity'] : 0;
-                        $currentStatus = strtolower($m['status'] ?? '');
-                        // If quantity is zero or less, treat as obtained even if DB status wasn't updated yet
-                        if ($currentQty <= 0) { $currentStatus = 'obtained'; }
-                        if ($currentStatus === '') $currentStatus = 'needed';
-
-                        // Pre-check for an existing photo (only need the most recent)
-                        $hasPhoto = false; $firstPhotoRel = null; $firstPhotoId = null;
-                        try {
-                            $pp = $conn->prepare("SELECT id, photo_path FROM material_photos WHERE material_id = ? ORDER BY uploaded_at DESC LIMIT 1");
-                            if ($pp) {
-                                $pp->bind_param('i', $mid);
-                                $pp->execute();
-                                $pres = $pp->get_result();
-                                if ($prow = $pres->fetch_assoc()) {
-                                    $hasPhoto = true;
-                                    $firstPhotoRel = htmlspecialchars($prow['photo_path']);
-                                    $firstPhotoId = (int)$prow['id'];
-                                }
-                            }
-                        } catch (Exception $e) { /* ignore */ }
-                    ?>
-                    <li class="material-item<?= ($currentStatus !== 'needed') ? ' material-obtained' : '' ?>" data-material-id="<?= $mid ?>">
-                        <div class="material-main">
-                            <span class="mat-name"><?= htmlspecialchars($m['material_name'] ?? $m['name'] ?? '') ?></span>
-                            <div class="mat-meta">
-                                <?php if ($currentQty > 0): ?>
-                                    <span class="mat-qty"><?= htmlspecialchars($currentQty) ?></span>
-                                <?php endif; ?>
-                                <?php if ($currentStatus !== 'needed' && $currentStatus !== ''): ?>
-                                    <span class="badge obtained" aria-hidden="true"><i class="fas fa-check-circle"></i> Obtained</span>
-                                    <?php if (!$hasPhoto): ?>
-                                        <button type="button" class="btn small upload-material-photo" data-material-id="<?= $mid ?>" title="Upload photo"><i class="fas fa-camera"></i></button>
+                                    <?php if ($currentStatus !== 'needed' && $currentStatus !== ''): ?>
+                                        <div class="material-photos" data-material-id="<?= $mid ?>">
+                                            <?php if ($hasPhoto): ?>
+                                                <div class="material-photo" data-photo-id="<?= $firstPhotoId ?>">
+                                                    <img src="<?= $firstPhotoRel ?>" alt="Material photo" onclick="openImageViewer('<?= $firstPhotoRel ?>')">
+                                                    <button type="button" class="material-photo-delete" title="Delete photo" onclick="(function(el){try{el.style.boxShadow='0 0 0 6px rgba(220,53,69,0.95)'; setTimeout(function(){try{el.style.boxShadow='';}catch(e){}},800);}catch(e){}; try{processMaterialPhotoDelete(el);}catch(e){}; })(this); return false;" onpointerdown="try{this.style.boxShadow='0 0 0 6px rgba(220,53,69,0.95)';}catch(e){}" onmousedown="try{this.style.boxShadow='0 0 0 6px rgba(220,53,69,0.95)';}catch(e){}" ontouchstart="try{this.style.boxShadow='0 0 0 6px rgba(220,53,69,0.95)';}catch(e){}"><i class="fas fa-trash"></i></button>
+                                                </div>
+                                            <?php else: ?>
+                                                <div class="material-photo placeholder" aria-hidden="true">No photo</div>
+                                            <?php endif; ?>
+                                        </div>
                                     <?php endif; ?>
-                                <?php endif; ?>
-                            </div>
-                        </div>
-                        <!-- Photos for obtained materials will be shown here (thumbnails go below the row) -->
-                        <?php if ($currentStatus !== 'needed' && $currentStatus !== ''): ?>
-                            <div class="material-photos" data-material-id="<?= $mid ?>">
-                                <?php
-                                    if ($hasPhoto) {
-                                        echo '<div class="material-photo" data-photo-id="' . $firstPhotoId . '"><img src="' . $firstPhotoRel . '" alt="Material photo" onclick="openImageViewer(\'' . $firstPhotoRel . '\')"><button type="button" class="material-photo-delete" title="Delete photo" onclick="(function(el){try{el.style.boxShadow=\'0 0 0 6px rgba(220,53,69,0.95)\'; setTimeout(function(){try{el.style.boxShadow=\\\'\\\';}catch(e){}},800);}catch(e){}; try{processMaterialPhotoDelete(el);}catch(e){}; })(this); return false;" onpointerdown="try{this.style.boxShadow=\'0 0 0 6px rgba(220,53,69,0.95)\';}catch(e){}" onmousedown="try{this.style.boxShadow=\'0 0 0 6px rgba(220,53,69,0.95)\';}catch(e){}" ontouchstart="try{this.style.boxShadow=\'0 0 0 6px rgba(220,53,69,0.95)\';}catch(e){}"><i class="fas fa-trash"></i></button></div>';
-                                    } else {
-                                        // For obtained materials without a photo, render a small placeholder
-                                        echo '<div class="material-photo placeholder" aria-hidden="true">No photo</div>';
-                                    }
-                                ?>
-                            </div>
-                        <?php endif; ?>
-                        <div class="material-actions">
-                            <?php if ($currentStatus === 'needed' || $currentStatus === ''): ?>
-                                <!-- Find Donations (no icon) -->
-                                <a class="btn small find-donations-btn" href="browse.php?query=<?= urlencode($m['material_name'] ?? $m['name'] ?? '') ?>&from_project=<?= $project_id ?>" title="Find donations for this material">
-                                    Find Donations
-                                </a>
-                                <form method="POST" class="inline-form" data-obtain-modal="1" style="display:inline-flex !important;align-items:center;margin:0;padding:0;">
-                                    <input type="hidden" name="material_id" value="<?= $mid ?>">
-                                    <input type="hidden" name="status" value="obtained">
-                                    <button type="submit" name="update_material_status" class="btn small obtain-btn" title="Mark obtained" aria-label="Mark material obtained" style="display:inline-block !important;visibility:visible !important;">
-                                        <i class="fas fa-check" aria-hidden="true"></i> Check
-                                    </button>
-                                </form>
-                                <!-- Remove material form (trash icon only) -->
-                                <form method="POST" class="inline-form" data-confirm="Are you sure you want to remove this material?">
-                                    <input type="hidden" name="material_id" value="<?= $mid ?>">
-                                    <button type="submit" name="remove_material" class="btn small danger" title="Delete">
-                                        <i class="fas fa-trash" aria-hidden="true"></i>
-                                    </button>
-                                </form>
-                            <?php else: ?>
-                                <!-- Obtained: actions removed; upload rendered below in .material-photos -->
-                            <?php endif; ?>
-                        </div>
-                    </li>
-                <?php endforeach; ?>
-            </ul>
-        <?php endif; ?>
-    </div>
-<?php endif; ?>
 
-                                            <?php if (!$is_locked): ?>
-                                            <div class="stage-actions">
-                                                <?php if (in_array(strtolower(trim($stage['name'] ?? '')), ['material collection','preparation'])): ?>
-                                                    <button type="button" class="btn add-material-btn" onclick="showAddMaterialModal()">
-                                                        <i class="fas fa-plus"></i> Add Material
-                                                    </button>
-                                                <?php endif; ?>
-                            </div>
-                            <?php else: ?>
-                                <div class="stage-locked-note" title="This stage is locked until previous stages are completed.">🔒 Stage locked — complete previous stage to unlock.</div>
-                            <?php endif; ?>
-                        </div> <!-- /.stage-content -->
-                        </div> <!-- /.workflow-stage / .stage-card -->
-                    <?php endforeach; ?>
+                                    <div class="material-actions">
+                                        <?php if ($currentStatus === 'needed' || $currentStatus === ''): ?>
+                                            <a class="btn small find-donations-btn" href="browse.php?query=<?= urlencode($m['material_name'] ?? $m['name'] ?? '') ?>&from_project=<?= $project_id ?>" title="Find donations for this material">Find Donations</a>
+                                            <form method="POST" class="inline-form" data-obtain-modal="1" style="display:inline-flex !important;align-items:center;margin:0;padding:0;">
+                                                <input type="hidden" name="material_id" value="<?= $mid ?>">
+                                                <input type="hidden" name="status" value="obtained">
+                                                <button type="submit" name="update_material_status" class="btn small obtain-btn" title="Mark obtained" aria-label="Mark material obtained" style="display:inline-block !important;visibility:visible !important;"><i class="fas fa-check" aria-hidden="true"></i> Check</button>
+                                            </form>
+                                            <form method="POST" class="inline-form" data-confirm="Are you sure you want to remove this material?">
+                                                <input type="hidden" name="material_id" value="<?= $mid ?>">
+                                                <button type="submit" name="remove_material" class="btn small danger" title="Delete"><i class="fas fa-trash" aria-hidden="true"></i></button>
+                                            </form>
+                                        <?php else: ?>
+                                            <!-- Obtained: actions removed; upload rendered in .material-photos -->
+                                        <?php endif; ?>
+                                    </div>
+                                </li>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </ul>
                 </div>
-            </section>
+            </div>
 
             
         </div>
@@ -3471,6 +3285,10 @@ document.addEventListener('DOMContentLoaded', function(){
                         <div class="form-group">
                             <label for="quantity">Quantity</label>
                             <input type="number" id="quantity" name="quantity" min="1" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="unit">Unit (optional)</label>
+                            <input type="text" id="unit" name="unit" placeholder="e.g., pcs, kg, boxes">
                         </div>
                         <div class="modal-actions">
                             <button type="button" class="action-btn" data-action="close-add">Cancel</button>

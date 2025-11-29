@@ -191,8 +191,8 @@ try {
             <!-- Workflow & Materials Section (ensure consistent 3 tabs across projects) -->
             <section class="workflow-section card">
                 <h2 class="section-title"><i class="fas fa-tasks"></i> Project Workflow</h2>
-                <div class="progress-indicator"><strong>0%</strong> of stages completed. (0 of 3)</div>
-                <div class="progress-bar"><div class="progress-fill" style="width:0%"></div></div>
+                    <?php // Render unified workflow partial (progress, tabs, stages)
+                        include __DIR__ . '/includes/project-workflow.php'; ?>
 
                 <?php
                 // Server-driven workflow: force three stages (Preparation, Construction, Share)
@@ -241,8 +241,8 @@ try {
                 if ($total_stages === 0) $current_stage_index = 0; elseif ($completed_stages >= $total_stages) $current_stage_index = max(0, $total_stages - 1); else $current_stage_index = $completed_stages;
                 ?>
 
-                <div class="stage-tabs">
-                    <?php foreach ($workflow_stages as $i => $st):
+                <!-- stage tabs + stages rendered by includes/project-workflow.php -->
+                <?php // nothing here; include above renders tabs and stages ?>
                         $tn = isset($st['template_number']) ? (int)$st['template_number'] : (int)($st['number'] ?? $i + 1);
                         $is_completed = array_key_exists($i, $completed_stage_map);
                         $is_current = !$is_completed && ($i === $current_stage_index);
@@ -256,10 +256,7 @@ try {
                         <span class="tab-meta"><span class="tab-title"><?= htmlspecialchars($st['name']) ?></span><span class="tab-badge <?= $badgeClass ?>"><?php echo $is_completed ? 'Completed' : ($is_current ? 'Current' : ($is_locked ? 'Locked' : 'Incomplete')) ?></span></span>
                     </button>
                     <?php endforeach; ?>
-                </div>
-
-                <div class="workflow-stages-container stages-timeline">
-                    <?php foreach ($workflow_stages as $index => $stage):
+                
                         $is_completed = array_key_exists($index, $completed_stage_map);
                         $is_current = !$is_completed && ($index === $current_stage_index);
                         $is_locked = !$is_completed && ($index > $current_stage_index);

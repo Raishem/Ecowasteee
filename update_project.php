@@ -77,13 +77,45 @@ try {
                 }
             }
             if (!$name) { echo json_encode(['success'=>false,'message'=>'Missing material data','received_keys'=>array_values(array_keys($_POST))]); exit; }
-            $stmt = $conn->prepare('INSERT INTO project_materials (project_id, material_name, quantity, unit, created_at) VALUES (?, ?, ?, ?, NOW())');
+            // Be robust to older schemas which may not have `unit` and/or `created_at`.
+            $hasUnit = false; $hasCreated = false;
+            try {
+                $res = $conn->query("SHOW COLUMNS FROM project_materials LIKE 'unit'");
+                $hasUnit = ($res && $res->num_rows > 0);
+            } catch (Exception $e) { $hasUnit = false; }
+            try {
+                $res2 = $conn->query("SHOW COLUMNS FROM project_materials LIKE 'created_at'");
+                $hasCreated = ($res2 && $res2->num_rows > 0);
+            } catch (Exception $e) { $hasCreated = false; }
+
+            // Prefer NOT to explicitly set created_at so the INSERT works whether or not the column exists.
+            // Only include 'unit' if schema exposes it.
+            if ($hasUnit) {
+                $stmt = $conn->prepare('INSERT INTO project_materials (project_id, material_name, quantity, unit) VALUES (?, ?, ?, ?)');
+            } else {
+                $stmt = $conn->prepare('INSERT INTO project_materials (project_id, material_name, quantity) VALUES (?, ?, ?)');
+            }
             $qty = is_numeric($quantity) ? (int)$quantity : 0;
-            // types: project_id (i), name (s), qty (i), unit (s)
-            $stmt->bind_param('isis',$project_id,$name,$qty,$unit);
+            // Bind parameters based on schema
+            if ($hasUnit && $hasCreated) {
+                // i (project), s (name), i (qty), s (unit)
+                $stmt->bind_param('isis',$project_id,$name,$qty,$unit);
+            } else if ($hasUnit && !$hasCreated) {
+                // project, name, qty, unit
+                $stmt->bind_param('isis',$project_id,$name,$qty,$unit);
+            } else if (!$hasUnit && $hasCreated) {
+                $stmt->bind_param('isi',$project_id,$name,$qty);
+            } else {
+                $stmt->bind_param('isi',$project_id,$name,$qty);
+            }
             $stmt->execute();
             $mid = $conn->insert_id;
-            $f = $conn->prepare('SELECT material_id, material_name, quantity, unit, COALESCE(status,\'needed\') as status FROM project_materials WHERE material_id = ?');
+            // Select new material and include 'unit' only if it exists in schema
+            if ($hasUnit) {
+                $f = $conn->prepare('SELECT material_id, material_name, quantity, unit, COALESCE(status,\'needed\') as status FROM project_materials WHERE material_id = ?');
+            } else {
+                $f = $conn->prepare('SELECT material_id, material_name, quantity, COALESCE(status,\'needed\') as status FROM project_materials WHERE material_id = ?');
+            }
             $f->bind_param('i',$mid); $f->execute(); $fres = $f->get_result(); $mat = $fres ? $fres->fetch_assoc() : null;
 
             // If a material was added, ensure any Material Collection stage marked completed is unset
