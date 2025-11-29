@@ -29,6 +29,7 @@ if (!$user) {
     <title>Projects | EcoWaste</title>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&family=Open+Sans&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="assets/css/common.css">
     <link rel="stylesheet" href="assets/css/projects.css">
 
 </head>
@@ -160,6 +161,7 @@ if (!$user) {
                                 </div>
                                 <div class="project-actions">
                                         <a href="project_details.php?id=<?php echo $project['project_id']; ?>" class="action-btn view-details" data-project-id="<?php echo $project['project_id']; ?>"><i class="fas fa-eye"></i> View Details</a>
+                                        <button type="button" class="action-btn delete-btn" onclick="confirmDeleteProject(<?= $project['project_id'] ?>)" title="Delete project"><i class="fas fa-trash"></i></button>
                                     </div>
                             </div>
                             <?php
@@ -1116,6 +1118,84 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
 });
+
+function confirmDeleteProject(projectId) {
+    // Create modal overlay
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-exclamation-triangle" style="color: #dc3545; margin-right: 10px;"></i>Delete Project</h2>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete this project?</p>
+                <p style="color: #999; font-size: 13px; margin-top: 15px;">This action cannot be undone. All project data, materials, and photos will be permanently removed.</p>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn secondary" onclick="this.closest('.modal-overlay').remove();">Cancel</button>
+                <button class="modal-btn danger" id="confirmDeleteBtn">Delete Project</button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(overlay);
+    
+    // Close on overlay click
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) {
+            overlay.remove();
+        }
+    });
+    
+    // Handle delete confirmation
+    document.getElementById('confirmDeleteBtn').addEventListener('click', () => {
+        performDeleteProject(projectId, overlay);
+    });
+}
+
+function performDeleteProject(projectId, overlay) {
+    const confirmBtn = document.getElementById('confirmDeleteBtn');
+    confirmBtn.disabled = true;
+    confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting...';
+    
+    const fd = new FormData();
+    fd.append('project_id', projectId);
+    
+    fetch('delete_project.php', {
+        method: 'POST',
+        body: fd,
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(res => res.json().catch(() => null))
+    .then(data => {
+        overlay.remove();
+        
+        if (data && data.success) {
+            // Show success toast and reload
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.textContent = '✓ Project deleted successfully';
+            document.body.appendChild(toast);
+            setTimeout(() => window.location.reload(), 1200);
+        } else {
+            // Show error toast
+            const toast = document.createElement('div');
+            toast.className = 'toast error';
+            toast.textContent = '✗ ' + (data?.message || 'Failed to delete project');
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 4000);
+        }
+    })
+    .catch(err => {
+        overlay.remove();
+        const toast = document.createElement('div');
+        toast.className = 'toast error';
+        toast.textContent = '✗ Network error - please try again';
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 4000);
+    });
+}
 </script>
 </body>
 </html>

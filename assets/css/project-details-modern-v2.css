@@ -220,6 +220,10 @@
     border-radius: 12px;
     padding: 2rem;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+    /* Keep the workflow visible near the top while scrolling */
+    position: sticky;
+    top: 88px;
+    z-index: 40;
 }
 
 .progress-indicator {
@@ -432,3 +436,27 @@
         justify-content: flex-end;
     }
 }
+
+/* --- Workflow positioning and visibility fixes requested by user --- */
+/* Hide all stage cards by default; only show the active/current one */
+.workflow-stage, .stage-card { display: none; }
+.workflow-stage.active, .stage-card.active, .workflow-stage.current, .stage-card.current { display: block; }
+
+/* Move the workflow card left closer to the sidebar (reduce gutter) */
+.main-content.project-details {
+    /* shift content slightly left so the workflow card sits nearer the sidebar */
+    padding-left: 8px !important;
+    padding-right: 24px !important;
+}
+.main-content.project-details .workflow-section {
+    margin-left: -72px; /* negative to reduce the visual gap to sidebar; tweak if needed */
+    width: calc(100% + 72px);
+}
+
+/* Ensure the tabs/tiles remain horizontally scrollable on narrow viewports */
+.stage-tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+/* Remove duplicate full-stage list appearance; keep only the active stage visible */
+.workflow-stages-container .workflow-stage:not(.active) { display: none !important; }
+
+/* End workflow fixes */

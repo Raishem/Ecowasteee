@@ -221,6 +221,19 @@ body .stage-tabs .stage-tab.locked * {
     border: 1px solid #e9ecef;
     border-bottom-color: #fff;
 }
+/* Ensure stage tabs remain visible and scrollable on narrow viewports */
+.stage-tabs {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    align-items: center;
+}
+.stage-tabs::-webkit-scrollbar { height: 8px; }
+.stage-tab {
+    flex: 0 0 auto;
+    min-width: 120px;
+}
 
 .stage-tab i {
     font-size: 1.25rem;
