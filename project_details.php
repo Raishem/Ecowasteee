@@ -400,6 +400,68 @@ try {
         opacity: 0.6;
         cursor: not-allowed;
     }
+    <!-- Ensure tabs appear consistently and match project screenshots -->
+    <style>
+        /* compact styling for the top 3 stage tabs (card-like) */
+        .stage-tabs {
+            display: flex;
+            flex-direction: row;
+            justify-content: center;
+            gap: 14px;
+            align-items: center;
+            padding: 18px 18px 8px;
+            background: transparent;
+            margin: 12px 0 18px;
+            width: 100%;
+            box-sizing: border-box;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+        }
+            display: flex;
+            gap: 14px;
+            align-items: stretch;
+            padding: 18px 18px 8px;
+            background: transparent;
+            margin: 12px 0 18px;
+        }
+        .stage-tabs .stage-tab {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            flex-direction: column;
+            width: 160px;
+            background: #fff;
+            border-radius: 12px;
+            padding: 14px;
+            box-shadow: 0 6px 18px rgba(16,24,40,0.06);
+            border: 1px solid rgba(19,78,25,0.04);
+            color: #0f1720;
+            text-align: center;
+            cursor: pointer;
+            transition: transform .12s ease, box-shadow .12s ease;
+            flex: 0 0 auto;
+        }
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-direction: column;
+            width: 160px;
+            background: #fff;
+            border-radius: 12px;
+            padding: 14px;
+            box-shadow: 0 6px 18px rgba(16,24,40,0.06);
+            border: 1px solid rgba(19,78,25,0.04);
+            color: #0f1720;
+            text-align: center;
+            cursor: pointer;
+            transition: transform .12s ease, box-shadow .12s ease;
+        }
+        .stage-tabs .stage-tab.locked { opacity: .62; cursor: not-allowed; }
+        .stage-tabs .stage-tab.active { transform: translateY(-4px); border-color: rgba(34,154,84,0.18); box-shadow: 0 10px 28px rgba(34,154,84,0.08); }
+        .stage-tab .tab-icon { width: 46px; height: 46px; border-radius: 10px; display:flex; align-items:center; justify-content:center; background:#f4f6f5; margin-bottom:8px; color:#2a6d32; font-size:18px; }
+        .stage-tab .tab-title { font-weight:600; font-size:14px; color:#0b3b20; display:block; margin-bottom:6px; }
+        .stage-tab .tab-badge { font-size:12px; display:inline-block; padding:6px 8px; border-radius:999px; color:#33503a; background: #eef7ee; }
+        .stage-tab .tab-badge.completed { background: #dff2df; color: #1f6a2c; font-weight:600; }
     </style>
     <script>
     // Small, resilient delete fallback: ensures the trash button can delete a project
@@ -775,6 +837,226 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
+<!-- Workflow & Documentation preserved from original -->
+<section class="workflow-section card">
+    <h2 class="section-title"><i class="fas fa-tasks"></i> Project Workflow</h2>
+    <?php
+    // Force exactly three workflow tabs in the UI: Preparation, Construction, Share
+    // If templates exist in DB for these names, preserve their template_number mapping so server-side
+    // completion checks still work. Otherwise fall back to 1,2,3.
+    $desired = [
+        ['key' => 'preparation', 'label' => 'Preparation', 'description' => 'Collect materials, clean and sort materials, prepare workspace'],
+        ['key' => 'construction', 'label' => 'Construction', 'description' => 'Build or transform materials into the finished item'],
+        ['key' => 'share', 'label' => 'Share', 'description' => 'Share your project with the community']
+    ];
+
+    $available_templates = [];
+    try {
+        $tpl_stmt = $conn->prepare("SELECT stage_number, stage_name, description FROM stage_templates");
+        if ($tpl_stmt) {
+            $tpl_stmt->execute();
+            $tres = $tpl_stmt->get_result();
+            while ($r = $tres->fetch_assoc()) {
+                $available_templates[] = $r;
+            }
+        }
+    } catch (Exception $e) { /* ignore */ }
+
+    $workflow_stages = [];
+    foreach ($desired as $i => $d) {
+        $foundTemplate = null;
+        foreach ($available_templates as $t) {
+            $name = strtolower($t['stage_name'] ?? '');
+            if ($d['key'] === 'preparation' && (stripos($name, 'prepar') !== false || stripos($name, 'material') !== false)) { $foundTemplate = $t; break; }
+            if ($d['key'] === 'construction' && stripos($name, 'construct') !== false) { $foundTemplate = $t; break; }
+            if ($d['key'] === 'share' && stripos($name, 'share') !== false) { $foundTemplate = $t; break; }
+        }
+        $tplNum = null;
+        $desc = $d['description'];
+        if ($foundTemplate) { $tplNum = (int)$foundTemplate['stage_number']; if (!empty($foundTemplate['description'])) $desc = $foundTemplate['description']; }
+        // Ensure we always have a stable display_name for the top tabs so the UI
+        // consistently shows "Preparation / Construction / Share" regardless of
+        // template names in the DB.
+        $displayName = $d['label'];
+        $workflow_stages[] = [ 'name' => $d['label'], 'display_name' => $displayName, 'description' => $desc, 'number' => $i + 1, 'template_number' => $tplNum ];
+    }
+
+    // Map template_number => workflow index
+    $numToIndex = [];
+    foreach ($workflow_stages as $i => $st) {
+        $num = isset($st['template_number']) ? (int)$st['template_number'] : (isset($st['number']) ? (int)$st['number'] : ($i + 1));
+        $numToIndex[$num] = $i;
+    }
+
+    // Get completed stages from DB
+    $completed_stage_map = [];
+    try {
+        $stage_stmt = $conn->prepare("SELECT stage_number, MAX(completed_at) AS completed_at FROM project_stages WHERE project_id = ? GROUP BY stage_number");
+        if ($stage_stmt) {
+            $stage_stmt->bind_param('i', $project_id);
+            $stage_stmt->execute();
+            $stage_result = $stage_stmt->get_result();
+            while ($s = $stage_result->fetch_assoc()) {
+                $raw_num = (int)$s['stage_number'];
+                if (!is_null($s['completed_at']) && isset($numToIndex[$raw_num])) {
+                    $idx = $numToIndex[$raw_num];
+                    $completed_stage_map[$idx] = $s['completed_at'];
+                }
+            }
+        }
+    } catch (Exception $e) { $completed_stage_map = []; }
+
+    $total_stages = count($workflow_stages);
+    $completed_stages = 0;
+    for ($i = 0; $i < $total_stages; $i++) { if (array_key_exists($i, $completed_stage_map)) $completed_stages++; }
+    $completed_stages = max(0, min($completed_stages, $total_stages));
+    $progress_percent = $total_stages > 0 ? (int) round(($completed_stages / $total_stages) * 100) : 0;
+    if ($total_stages === 0) $current_stage_index = 0; elseif ($completed_stages >= $total_stages) $current_stage_index = max(0, $total_stages - 1); else $current_stage_index = $completed_stages;
+    ?>
+
+    <div class="progress-indicator">
+        <strong><?= $progress_percent ?>%</strong>
+        <?php if ($progress_percent === 100): ?> of stages completed.<?php else: ?> of stages completed. (<?= $completed_stages ?> of <?= $total_stages ?>)<?php endif; ?>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" style="width: <?= $progress_percent ?>%;"></div></div>
+
+    <div class="stage-tabs">
+        <?php foreach ($workflow_stages as $i => $st):
+            $tn = isset($st['template_number']) ? (int)$st['template_number'] : (int)($st['number'] ?? $i + 1);
+            $is_completed = array_key_exists($i, $completed_stage_map);
+            // Treat the first workflow stage (Preparation) as the "materials" stage
+            // so projects using different template names still show the tab & materials.
+            $stage_name_lower = strtolower($st['name'] ?? $st['stage_name'] ?? '');
+            $is_material_stage = ($i === 0) || (stripos($stage_name_lower, 'material') !== false) || (stripos($stage_name_lower, 'prepar') !== false);
+            if ($is_completed && $is_material_stage) {
+                try {
+                    $cstmt = $conn->prepare("SELECT COUNT(*) AS not_obtained FROM project_materials WHERE project_id = ? AND (status IS NULL OR LOWER(status) <> 'obtained')");
+                    $cstmt->bind_param('i', $project_id);
+                    $cstmt->execute();
+                    $cres = $cstmt->get_result()->fetch_assoc();
+                    $not_obtained = $cres ? (int)$cres['not_obtained'] : 0;
+                    if ($not_obtained > 0) $is_completed = false;
+                } catch (Exception $e) { /* ignore */ }
+            }
+            $is_current = !$is_completed && ($i === $current_stage_index);
+            $is_locked = !$is_completed && ($i > $current_stage_index);
+            $badgeClass = $is_completed ? 'completed' : ($is_current ? 'current' : ($is_locked ? 'locked' : 'incomplete'));
+        ?>
+            <?php $stage_name_lower = strtolower($st['name'] ?? $st['stage_name'] ?? '');
+                $iconClass = 'fas fa-circle';
+                if (stripos($stage_name_lower, 'material') !== false) $iconClass = 'fas fa-box-open';
+                else if (stripos($stage_name_lower, 'prepar') !== false) $iconClass = 'fas fa-tools';
+                else if (stripos($stage_name_lower, 'construct') !== false) $iconClass = 'fas fa-hard-hat';
+                else if (stripos($stage_name_lower, 'share') !== false) $iconClass = 'fas fa-share-alt';
+            ?>
+            <button class="stage-tab <?php echo ($i === $current_stage_index) ? 'active' : ''; ?> <?php echo $is_locked ? 'locked' : ''; ?>" data-stage-index="<?= $i ?>" data-stage-number="<?= $tn ?>" aria-label="<?= htmlspecialchars($st['name'] ?? 'Step') ?>">
+                <span class="tab-icon"><i class="<?= $iconClass ?>" aria-hidden="true"></i></span>
+                <span class="tab-meta">
+                    <span class="tab-title"><?= htmlspecialchars($st['display_name'] ?? $st['name']) ?></span>
+                    <span class="tab-badge <?= $badgeClass ?>"><?php echo $is_completed ? 'Completed' : ($is_current ? 'Current' : ($is_locked ? 'Locked' : 'Incomplete')) ?></span>
+                </span>
+            </button>
+        <?php endforeach; ?>
+    </div>
+
+    <div class="workflow-stages-container stages-timeline">
+        <?php foreach ($workflow_stages as $index => $stage):
+            $is_completed = array_key_exists($index, $completed_stage_map);
+            $stage_name_lower = strtolower($stage['name'] ?? $stage['stage_name'] ?? '');
+            $is_material_stage = ($index === 0) || (stripos($stage_name_lower, 'material') !== false) || (stripos($stage_name_lower, 'prepar') !== false);
+            if ($is_completed && $is_material_stage) {
+                try {
+                    $cstmt2 = $conn->prepare("SELECT COUNT(*) AS not_obtained FROM project_materials WHERE project_id = ? AND (status IS NULL OR LOWER(status) <> 'obtained')");
+                    $cstmt2->bind_param('i', $project_id);
+                    $cstmt2->execute();
+                    $cres2 = $cstmt2->get_result()->fetch_assoc();
+                    $not_obtained2 = $cres2 ? (int)$cres2['not_obtained'] : 0;
+                    if ($not_obtained2 > 0) $is_completed = false;
+                } catch (Exception $e) { /* ignore */ }
+            }
+            $is_current = !$is_completed && ($index === $current_stage_index);
+            $is_locked = !$is_completed && ($index > $current_stage_index);
+            if ($is_completed) $stage_class = 'completed'; elseif ($is_current) $stage_class = 'current'; elseif ($index > $current_stage_index) $stage_class = 'locked'; else $stage_class = 'inactive';
+        ?>
+        <div class="workflow-stage stage-card <?= $stage_class ?> <?= $is_current ? 'active' : '' ?>" data-stage-index="<?= $index ?>">
+            <i class="fas fa-circle stage-icon" aria-hidden="true"></i>
+            <div class="stage-content">
+                <div class="stage-header">
+                    <div class="stage-info">
+                        <h3 class="stage-title"><?= htmlspecialchars($stage['name']) ?> <?php if ($is_completed): ?><i class="fas fa-check-circle stage-check" title="Completed"></i><?php endif; ?></h3>
+                        <?php if ($is_completed && isset($completed_stage_map[$index])): ?><div class="stage-completed-at">Completed: <?= date('M d, Y', strtotime($completed_stage_map[$index])) ?></div><?php endif; ?>
+                        <div class="stage-desc"><?= nl2br(htmlspecialchars($stage['description'] ?? '')) ?></div>
+                    </div>
+                </div>
+
+                <?php if ($index === 0 /* Preparation */ || strtolower(trim($stage['name'] ?? '')) === 'material collection'): ?>
+                    <div class="stage-materials">
+                        <h4>Materials Needed</h4>
+                        <?php if (empty($materials)): ?>
+                            <p class="empty-state">No materials listed.</p>
+                        <?php else: ?>
+                            <ul class="materials-list-stage">
+                                <?php foreach ($materials as $m):
+                                    $mid = (int)($m['material_id'] ?? $m['id'] ?? 0);
+                                    $currentQty = isset($m['quantity']) ? (int)$m['quantity'] : 0;
+                                    $currentStatus = strtolower($m['status'] ?? '');
+                                    if ($currentQty <= 0) { $currentStatus = 'obtained'; }
+                                    if ($currentStatus === '') $currentStatus = 'needed';
+                                    // find latest material photo
+                                    $hasPhoto = false; $firstPhotoRel = null; $firstPhotoId = null;
+                                    try {
+                                        $pp = $conn->prepare("SELECT id, photo_path FROM material_photos WHERE material_id = ? ORDER BY uploaded_at DESC LIMIT 1");
+                                        if ($pp) { $pp->bind_param('i', $mid); $pp->execute(); $pres = $pp->get_result(); if ($prow = $pres->fetch_assoc()) { $hasPhoto = true; $firstPhotoRel = htmlspecialchars($prow['photo_path']); $firstPhotoId = (int)$prow['id']; } }
+                                    } catch (Exception $e) {}
+                                ?>
+                                <li class="material-item<?= ($currentStatus !== 'needed') ? ' material-obtained' : '' ?>" data-material-id="<?= $mid ?>">
+                                    <div class="material-main">
+                                        <span class="mat-name"><?= htmlspecialchars($m['material_name'] ?? $m['name'] ?? '') ?></span>
+                                        <div class="mat-meta">
+                                            <?php if ($currentQty > 0): ?><span class="mat-qty"><?= htmlspecialchars($currentQty) ?></span><?php endif; ?>
+                                            <?php if ($currentStatus !== 'needed' && $currentStatus !== ''): ?>
+                                                <span class="badge obtained" aria-hidden="true"><i class="fas fa-check-circle"></i> Obtained</span>
+                                                <?php if (!$hasPhoto): ?><button type="button" class="btn small upload-material-photo" data-material-id="<?= $mid ?>" title="Upload photo"><i class="fas fa-camera"></i></button><?php endif; ?>
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
+                                    <?php if ($currentStatus !== 'needed' && $currentStatus !== ''): ?>
+                                        <div class="material-photos" data-material-id="<?= $mid ?>">
+                                            <?php if ($hasPhoto) echo '<div class="material-photo" data-photo-id="' . $firstPhotoId . '"><img src="' . $firstPhotoRel . '" alt="Material photo"></div>'; else echo '<div class="material-photo placeholder">No photo</div>'; ?>
+                                        </div>
+                                    <?php endif; ?>
+                                    <div class="material-actions">
+                                        <?php if ($currentStatus === 'needed' || $currentStatus === ''): ?>
+                                            <a class="btn small find-donations-btn" href="browse.php?query=<?= urlencode($m['material_name'] ?? $m['name'] ?? '') ?>&from_project=<?= $project_id ?>">Find Donations</a>
+                                            <form method="POST" class="inline-form" data-obtain-modal="1" style="display:inline-flex;align-items:center;">
+                                                <input type="hidden" name="material_id" value="<?= $mid ?>">
+                                                <input type="hidden" name="status" value="obtained">
+                                                <button type="submit" name="update_material_status" class="btn small obtain-btn" title="Mark obtained"><i class="fas fa-check" aria-hidden="true"></i></button>
+                                            </form>
+                                            <form method="POST" class="inline-form" data-confirm="Are you sure you want to remove this material?">
+                                                <input type="hidden" name="material_id" value="<?= $mid ?>">
+                                                <button type="submit" name="remove_material" class="btn small danger"><i class="fas fa-trash" aria-hidden="true"></i></button>
+                                            </form>
+                                        <?php endif; ?>
+                                    </div>
+                                </li>
+                                <?php endforeach; ?>
+                            </ul>
+                        <?php endif; ?>
+                    </div>
+                <?php endif; ?>
+
+                <div class="stage-actions">
+                    <?php if ($index === 0 /* Preparation */ || strtolower(trim($stage['name'] ?? '')) === 'material collection'): ?>
+                        <button type="button" class="btn add-material-btn" onclick="showAddMaterialModal()"><i class="fas fa-plus"></i> Add Material</button>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+        <?php endforeach; ?>
+    </div>
+</section>
+
 <script>
 // Materials AJAX handlers
 (function(){
@@ -1044,7 +1326,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="modal-body" style="padding: 20px 16px;">
                             <p id="confirmMessage" style="margin:0;color:#333;font-size:16px"></p>
                         </div>
-                        <div class="modal-actions" style="padding: 16px; border-top: 1px solid #eee; display: flex; justify-content: flex-end; gap: 12px;">
+                        <div class="modal-actions" style="padding: 12px 16px; display: flex; justify-content: flex-end; gap: 8px;">
                             <button type="button" class="action-btn" data-action="confirm-cancel" style="padding: 8px 16px; border: 1px solid #ddd; background: white; border-radius: 4px; cursor: pointer;">Cancel</button>
                             <button type="button" class="action-btn danger-btn" data-action="confirm-ok" style="padding: 8px 16px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">Delete</button>
                         </div>
@@ -1721,7 +2003,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 if (!isNaN(templateNum) && isFinite(templateNum)) {
                                     try {
                                         try { if (window.__ECOWASTE_DEBUG__) console.debug('[auto-uncomplete] calling requestToggleStage for', templateNum); } catch(e){}
-                                        try { await requestToggleStage(templateNum, <?= json_encode($project_id) ?>, { force_uncomplete: 1 }); } catch(e) {}
+                                        try { await requestToggleStage(templateNum, projectId); } catch(e) {}
                                         try { markStageUncompletedUI(templateNum); } catch(e){}
                                         return; // success — stop retrying
                                     } catch(e) { /* auto-uncomplete (post-add) failed */ }
@@ -1785,9 +2067,11 @@ document.addEventListener('DOMContentLoaded', function() {
                                         <input type="hidden" name="status" value="obtained">
                                         <button type="submit" name="update_material_status" class="btn small" aria-label="Mark material obtained"><i class="fas fa-check" aria-hidden="true"></i></button>
                                     </form>
-                                    <form method="POST" class="inline-form" data-confirm="Remove this material?" action="project_details.php?id=${projectId}">
+                                    <form method="POST" class="inline-form" data-confirm="Are you sure you want to remove this material?" action="project_details.php?id=${projectId}">
                                         <input type="hidden" name="material_id" value="${mat.material_id}">
-                                        <button type="submit" name="remove_material" class="btn small danger" aria-label="Delete material"><i class="fas fa-trash" aria-hidden="true"></i></button>
+                                        <button type="submit" name="remove_material" class="btn small danger" aria-label="Delete material">
+                                            <i class="fas fa-trash" aria-hidden="true"></i>
+                                        </button>
                                     </form>
                                 </div>
                             `;
@@ -1828,2255 +2112,15 @@ document.addEventListener('DOMContentLoaded', function() {
                             }
                             if (!isNaN(templateNum) && isFinite(templateNum)) {
                                 try {
-                                    await requestToggleStage(templateNum, <?= json_encode($project_id) ?>);
+                                    await requestToggleStage(templateNum, projectId);
                                     try { markStageUncompletedUI(templateNum); } catch(e){}
                                 } catch(e){ /* auto-uncomplete after modal add failed */ }
                             }
                         }
                     }
                 } catch(e) { /* auto-uncomplete modal add check failed */ }
-            } catch (err) { showToast('Network error', 'error'); }
-        })();
+    } catch (err) { showToast('Network error', 'error'); }
     });
-
-    // Initialize Material Collection completion state on load
-    document.addEventListener('DOMContentLoaded', function(){ try{ refreshMaterialCollectionReqState(); }catch(e){} });
-
-    // Delegated handler: upload photo for a specific material
-    // Helper: recompute whether Material Collection stage requirements are satisfied
-    function refreshMaterialCollectionReqState(){
-        try {
-            // For each materials container in the page, compute whether its stage requirements are satisfied
-            const allMaterialsNodes = Array.from(document.querySelectorAll('.stage-materials'));
-            if (!allMaterialsNodes || allMaterialsNodes.length === 0) return;
-
-            allMaterialsNodes.forEach(materialsNode => {
-                try {
-                    const stageCard = materialsNode.closest('.stage-card') || materialsNode.closest('.workflow-stage') || materialsNode.parentElement;
-                    if (!stageCard) return;
-                    // prefer a button inside .stage-actions; fall back to any complete-stage-btn with matching data-stage-number
-                    let btn = stageCard.querySelector('.stage-actions button[data-stage-number]');
-                    if (!btn) btn = stageCard.querySelector('button.complete-stage-btn[data-stage-number]');
-                    // Note: don't return if there's no button. We used to rely on the button to identify
-                    // the stage and hold request state, but buttons were removed per UX changes. Instead,
-                    // fall back to using attributes on the stage card itself (data-stage-number / data-stage-index).
-
-                    const items = Array.from(materialsNode.querySelectorAll('.material-item'));
-                    const total = items.length;
-                    let have = 0;
-                    items.forEach(li => {
-                        const statusBadge = li.querySelector('.badge.obtained');
-                        const photos = li.querySelector('.material-photos');
-                        const hasPhoto = photos && photos.querySelector('.material-photo:not(.placeholder)');
-                        if (statusBadge || hasPhoto) have++;
-
-                        // If a photo exists, hide the upload button in the mat-meta to avoid redundant uploads
-                        try {
-                            const metaEl = li.querySelector('.mat-meta');
-                            if (metaEl && hasPhoto) {
-                                const up = metaEl.querySelector('.upload-material-photo');
-                                if (up) up.remove();
-                            }
-                        } catch(e) { /* ignore */ }
-                    });
-
-                    // final decision: satisfied when every material has either obtained badge or photo
-                    const finalOk = (total === 0) ? true : (have >= total);
-                    // debug removed
-
-                    // If debug flag present in URL (search or hash), render/refresh a small overlay showing per-stage counts
-                    try {
-                        const searchAndHash = String((location && (location.search || '') + (location.hash || '')) || '');
-                        const isDebug = /(?:\?|&|#)debug=1\b/.test(searchAndHash) || searchAndHash.indexOf('debug=1') !== -1;
-                        if (isDebug) {
-                            let dbg = document.getElementById('matDebugOverlay');
-                            if (!dbg) {
-                                dbg = document.createElement('div'); dbg.id = 'matDebugOverlay';
-                                dbg.style.position = 'fixed'; dbg.style.right = '12px'; dbg.style.bottom = '12px'; dbg.style.width = '360px'; dbg.style.maxHeight = '60vh'; dbg.style.overflow = 'auto'; dbg.style.background = 'rgba(0,0,0,0.85)'; dbg.style.color = '#fff'; dbg.style.zIndex = '99999'; dbg.style.padding = '10px'; dbg.style.fontSize = '13px'; dbg.style.borderRadius = '8px'; dbg.style.boxShadow = '0 8px 24px rgba(0,0,0,0.4)';
-                                // add a small header with manual run button
-                                const hdr = document.createElement('div'); hdr.style.display = 'flex'; hdr.style.justifyContent = 'space-between'; hdr.style.alignItems = 'center'; hdr.style.marginBottom = '8px';
-                                const hTitle = document.createElement('div'); hTitle.textContent = 'Material Debug'; hTitle.style.fontWeight = '700'; hTitle.style.fontSize = '13px';
-                                const runBtn = document.createElement('button'); runBtn.textContent = 'Run check'; runBtn.style.fontSize = '12px'; runBtn.style.padding = '4px 8px'; runBtn.style.borderRadius = '6px'; runBtn.style.cursor = 'pointer'; runBtn.style.border = 'none'; runBtn.style.background = '#2E8B57'; runBtn.style.color = '#fff'; runBtn.addEventListener('click', function(){ try{ window.runMaterialStageCheck && window.runMaterialStageCheck(); }catch(e){} });
-                                hdr.appendChild(hTitle); hdr.appendChild(runBtn);
-                                dbg.appendChild(hdr);
-                                const content = document.createElement('div'); content.id = 'matDebugContent'; dbg.appendChild(content);
-                                document.body.appendChild(dbg);
-                            }
-                            const idx = stageCard.getAttribute('data-stage-index') || 'unknown';
-                            const title = stageCard.querySelector('.stage-title') ? stageCard.querySelector('.stage-title').textContent.trim() : ('Stage ' + idx);
-                            // accumulate per-stage entries and then render them once (avoid duplicate appends)
-                            let content = document.getElementById('matDebugContent');
-                            if (content) {
-                                // initialize storage on element if not present
-                                if (!content._entries) content._entries = [];
-                                // store an object keyed by stage idx to avoid duplicates
-                                content._entries[idx] = `<div style="margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,0.08)"><strong>${title}</strong><br>stageIndex: ${idx}<br>materials: ${total}<br>satisfied: ${have}<br>reqOk: ${reqOk}</div>`;
-                                // render all entries
-                                content.innerHTML = Object.keys(content._entries).sort().map(k => content._entries[k]).join('');
-                            }
-                        }
-                    } catch(di) { /* debug overlay failed (silenced) */ }
-
-                    const forceEnabled = (btn && btn.dataset && btn.dataset.forceEnabled) ? true : false;
-                    if (!finalOk && !forceEnabled) {
-                        // visual disabled (but keep clickable so JS can re-evaluate)
-                        try { if (btn) btn.setAttribute('aria-disabled', 'true'); } catch(e){}
-                        try { if (btn) btn.classList.add('is-disabled'); } catch(e){}
-                        if (btn) btn.title = 'Requirements not met for this stage';
-                        // store reqOk for either button or stageCard so other flows can inspect it
-                        try { if (btn) btn.dataset.reqOk = '0'; else stageCard.dataset.reqOk = '0'; } catch(e){}
-                        // If debug flag present, attach a small helper that explains missing requirements
-                        try {
-                            const searchAndHash = String((location && (location.search || '') + (location.hash || '')) || '');
-                            const isDebug = /(?:\?|&|#)debug=1\b/.test(searchAndHash) || searchAndHash.indexOf('debug=1') !== -1;
-                            if (isDebug) {
-                                // remove existing helper for this stage
-                                let existing = stageCard.querySelector('.why-disabled-btn');
-                                if (existing) existing.remove();
-                                const why = document.createElement('button');
-                                why.type = 'button';
-                                why.className = 'why-disabled-btn';
-                                why.textContent = '?';
-                                why.title = 'Why is this disabled?';
-                                why.setAttribute('aria-hidden','false');
-                                // build missing list when clicked
-                                why.addEventListener('click', function(ev){
-                                    ev.stopPropagation();
-                                    // remove any other panels
-                                    document.querySelectorAll('.why-disabled-panel').forEach(n=>n.remove());
-                                    const panel = document.createElement('div');
-                                    panel.className = 'why-disabled-panel';
-                                    const title = document.createElement('h4'); title.textContent = 'Missing requirements'; panel.appendChild(title);
-                                    const list = document.createElement('ul');
-                                    const itemsScoped = Array.from(materialsNode.querySelectorAll('.material-item'));
-                                    itemsScoped.forEach(li => {
-                                        const name = (li.querySelector('.mat-name') && li.querySelector('.mat-name').textContent.trim()) || ('#' + (li.dataset.materialId || ''));
-                                        const missingPhoto = !(li.querySelector('.material-photos') && li.querySelector('.material-photos').querySelector('.material-photo:not(.placeholder)'));
-                                        const missingObtained = !li.querySelector('.badge.obtained');
-                                        if (missingPhoto || missingObtained) {
-                                            const liNode = document.createElement('li');
-                                            liNode.textContent = name + ':';
-                                            if (missingObtained) {
-                                                const t = document.createElement('span'); t.textContent = ' Not marked obtained'; t.className = 'missing-obtained'; liNode.appendChild(t);
-                                            }
-                                            if (missingPhoto) {
-                                                const t2 = document.createElement('span'); t2.textContent = ' Missing photo'; t2.className = 'missing-photo'; liNode.appendChild(t2);
-                                            }
-                                            list.appendChild(liNode);
-                                        }
-                                    });
-                                    if (!list.children.length) {
-                                        const ok = document.createElement('div'); ok.textContent = 'No missing items detected.'; panel.appendChild(ok);
-                                    } else panel.appendChild(list);
-                                    document.body.appendChild(panel);
-                                    // position near the button (prefer above if space, otherwise below)
-                                    const r = why.getBoundingClientRect();
-                                    const aboveTop = window.scrollY + r.top - panel.offsetHeight - 10;
-                                    const belowTop = window.scrollY + r.bottom + 8;
-                                    let top = aboveTop;
-                                    if (aboveTop < window.scrollY + 8) top = belowTop;
-                                    let left = window.scrollX + r.left;
-                                    // clamp to viewport
-                                    const maxLeft = window.scrollX + Math.max(document.documentElement.clientWidth, window.innerWidth) - panel.offsetWidth - 8;
-                                    if (left > maxLeft) left = maxLeft;
-                                    if (left < window.scrollX + 8) left = window.scrollX + 8;
-                                    panel.style.top = top + 'px';
-                                    panel.style.left = left + 'px';
-                                });
-                                // Insert the helper right after the primary complete button to avoid overflow hiding
-                                try {
-                                    const primaryBtn = stageCard.querySelector('.complete-stage-btn');
-                                    if (primaryBtn && primaryBtn.parentNode) primaryBtn.parentNode.insertBefore(why, primaryBtn.nextSibling);
-                                    else {
-                                        const actions = stageCard.querySelector('.stage-actions');
-                                        if (actions) actions.appendChild(why);
-                                    }
-                                } catch(e) { const actions = stageCard.querySelector('.stage-actions'); if (actions) actions.appendChild(why); }
-                            }
-                        } catch(e){ /* why helper failed (silenced) */ }
-                    } else {
-                        try { if (btn) btn.removeAttribute('aria-disabled'); } catch(e){}
-                        try { if (btn) btn.classList.remove('is-disabled'); } catch(e){}
-                        if (btn) btn.title = '';
-                        try { if (btn) btn.dataset.reqOk = '1'; else stageCard.dataset.reqOk = '1'; } catch(e){}
-                        // If the stage now satisfies requirements, ensure status label and server state follow
-                        try {
-                            // determine stage number reliably
-                            let stageNum = stageCard.getAttribute('data-stage-number') || stageCard.getAttribute('data-stage-index') || (btn ? btn.getAttribute('data-stage-number') : null);
-                            if (!stageNum) {
-                                const tab = document.querySelector('.stage-tab.active, .stage-tab.current');
-                                if (tab) stageNum = tab.getAttribute('data-stage-number') || tab.getAttribute('data-stage-index');
-                            }
-                            const sn = stageNum ? parseInt(stageNum, 10) : NaN;
-                            if (!isNaN(sn)) {
-                                // If stage DOM isn't marked completed yet, request server to mark completed
-                                const isCompleted = stageCard.classList.contains('completed');
-                                if (finalOk && !isCompleted) {
-                                    try {
-                                        // Optimistic UI: mark stage/tab as completed immediately so the user sees instant feedback.
-                                        try {
-                                            stageCard.classList.add('completed');
-                                            stageCard.classList.remove('current');
-                                            const tab = document.querySelector('.stage-tab[data-stage-index="' + (parseInt(stageCard.getAttribute('data-stage-index')||sn,10)) + '"]') || document.querySelector('.stage-tab[data-stage-number="' + sn + '"]');
-                                            if (tab) {
-                                                const badge = tab.querySelector('.tab-badge');
-                                                if (badge) { badge.classList.remove('active'); badge.classList.add('completed'); badge.textContent = 'Completed'; }
-                                                tab.classList.remove('active'); tab.classList.add('completed');
-                                            }
-                                        } catch(e){}
-                                        // Fire the server request; server response will reconcile UI if it fails.
-                                        try { requestToggleStage(sn, projectId).then(()=>{/* auto-complete attempted */}).catch(()=>{}); } catch(e){}
-                                    } catch(e){}
-                                }
-                                // If requirements are met but server already marked completed, ensure label updated (renderStageStatusLabel handled in response)
-                            }
-                        } catch(e) { /* ignore auto-complete errors */ }
-                        // If requirements were previously satisfied but now not, uncomplete the stage on the server
-                        try {
-                            let stageNum2 = stageCard.getAttribute('data-stage-number') || stageCard.getAttribute('data-stage-index') || (btn ? btn.getAttribute('data-stage-number') : null);
-                            const sn2 = stageNum2 ? parseInt(stageNum2, 10) : NaN;
-                            const currentlyMarkedCompleted = stageCard.classList.contains('completed');
-                            if (!finalOk && currentlyMarkedCompleted && !isNaN(sn2)) {
-                                try {
-                                    // Optimistic UI: mark stage as current/uncompleted immediately while we send the server request
-                                    try {
-                                        stageCard.classList.remove('completed');
-                                        stageCard.classList.add('current');
-                                        const tab2 = document.querySelector('.stage-tab[data-stage-index="' + (parseInt(stageCard.getAttribute('data-stage-index')||sn2,10)) + '"]') || document.querySelector('.stage-tab[data-stage-number="' + sn2 + '"]');
-                                        if (tab2) {
-                                            const badge2 = tab2.querySelector('.tab-badge');
-                                            if (badge2) { badge2.classList.remove('completed'); badge2.classList.add('active'); badge2.textContent = 'Current'; }
-                                            tab2.classList.remove('completed'); tab2.classList.add('active');
-                                        }
-                                    } catch(e){}
-                                    try { requestToggleStage(sn2, projectId, { force_uncomplete: 1 }).then(()=>{/* auto-uncomplete attempted */}).catch(()=>{}); } catch(e){}
-                                } catch(e){}
-                            }
-                        } catch(e) { /* ignore */ }
-                    }
-                } catch (innerErr) { /* Error computing state for materialsNode (silenced) */ }
-            });
-
-    } catch(e){ /* refreshMaterialCollectionReqState failed (silenced) */ }
-    }
-
-    // Check helpers used by debug and the materialPhotoChanged handler
-    function getActiveMaterialsNode(){
-        // prefer the currently visible or current stage
-        let stage = document.querySelector('.workflow-stage.active') || document.querySelector('.stage-card.current') || document.querySelector('.workflow-stage.current');
-        if (stage) {
-            const m = stage.querySelector('.stage-materials');
-            if (m) return m;
-        }
-        // fallback to first materials list on page
-        return document.querySelector('.stage-materials');
-    }
-
-    function checkAllMaterialsObtained(){
-        const materialsNode = getActiveMaterialsNode();
-        if (!materialsNode) return false;
-        const items = Array.from(materialsNode.querySelectorAll('.material-item'));
-        if (items.length === 0) return true; // nothing to satisfy
-        return items.every(li => !!li.querySelector('.badge.obtained'));
-    }
-
-    function checkAllPhotosUploaded(){
-        const materialsNode = getActiveMaterialsNode();
-        if (!materialsNode) return false;
-        const items = Array.from(materialsNode.querySelectorAll('.material-item'));
-        if (items.length === 0) return true;
-        return items.every(li => {
-            const photos = li.querySelector('.material-photos');
-            return !!(photos && photos.querySelector('.material-photo:not(.placeholder)'));
-        });
-    }
-
-    // Listen for material photo changes and update the first complete-stage button in the active stage
-    document.addEventListener('materialPhotoChanged', () => {
-        try {
-                const btn = document.querySelector('.workflow-stage.active .complete-stage-btn, .stage-card.current .complete-stage-btn, .complete-stage-btn');
-                if (!btn) return;
-                // scoped checks for active stage
-                const materialsNode = getActiveMaterialsNode();
-                let scopedAllObtained = true;
-                let scopedAllPhotos = true;
-                let items = [];
-                if (materialsNode) {
-                    items = Array.from(materialsNode.querySelectorAll('.material-item'));
-                    items.forEach(li => {
-                        if (!li.querySelector('.badge.obtained')) scopedAllObtained = false;
-                        const photos = li.querySelector('.material-photos');
-                        if (!(photos && photos.querySelector('.material-photo:not(.placeholder)'))) scopedAllPhotos = false;
-                    });
-                }
-                const ok = (items && items.length === 0) ? true : (scopedAllObtained && scopedAllPhotos);
-                if (!ok) {
-                    try { btn.setAttribute('aria-disabled', 'true'); } catch(e){}
-                    try { btn.classList.add('is-disabled'); } catch(e){}
-                    try { btn.dataset.reqOk = '0'; } catch(e){}
-                } else {
-                    try { btn.removeAttribute('aria-disabled'); } catch(e){}
-                    try { btn.classList.remove('is-disabled'); } catch(e){}
-                    try { btn.dataset.reqOk = '1'; } catch(e){}
-                }
-    } catch(e) { /* materialPhotoChanged handler failed (silenced) */ }
-    });
-
-    document.addEventListener('click', function(e){
-        const btn = e.target.closest('.upload-material-photo');
-        if (!btn) return;
-        const mid = btn.dataset.materialId;
-        if (!mid) return;
-        // Determine whether we're in the Preparation stage. Only Preparation should ask Before/After.
-        let inPreparation = false;
-        try {
-            const stageEl = btn.closest('.workflow-stage, .stage-card') || document.querySelector('.workflow-stage.active') || document.querySelector('.stage-card.current');
-            if (stageEl) {
-                const sname = (stageEl.getAttribute('data-stage-name') || (stageEl.querySelector('.stage-title') && stageEl.querySelector('.stage-title').textContent) || '').toLowerCase();
-                if (/prepar/.test(sname)) inPreparation = true;
-            }
-        } catch(e) { inPreparation = false; }
-
-        const cleanUp = () => { /* noop for non-modal flow */ };
-
-        if (inPreparation) {
-            // show a small chooser to pick Before or After then open file picker
-            const chooser = document.createElement('div');
-            chooser.className = 'photo-type-chooser';
-            chooser.style.position = 'fixed'; chooser.style.zIndex = 99999; chooser.style.left = '50%'; chooser.style.top = '50%'; chooser.style.transform = 'translate(-50%,-50%)'; chooser.style.background = '#fff'; chooser.style.padding = '12px'; chooser.style.boxShadow = '0 8px 24px rgba(0,0,0,0.2)'; chooser.style.borderRadius = '8px';
-            chooser.innerHTML = `<div style="margin-bottom:8px;font-weight:600">Upload photo as</div>`;
-            const beforeBtn = document.createElement('button'); beforeBtn.className='btn'; beforeBtn.textContent = 'Before';
-            const afterBtn = document.createElement('button'); afterBtn.className='btn'; afterBtn.style.marginLeft='8px'; afterBtn.textContent = 'After';
-            const cancelBtn = document.createElement('button'); cancelBtn.className='btn'; cancelBtn.style.marginLeft='8px'; cancelBtn.textContent = 'Cancel';
-            chooser.appendChild(beforeBtn); chooser.appendChild(afterBtn); chooser.appendChild(cancelBtn);
-            document.body.appendChild(chooser);
-
-            const chooserClean = () => { try{ chooser.remove(); } catch(e){} };
-            beforeBtn.addEventListener('click', function(){ chooserClean(); pickAndUpload('before'); });
-            afterBtn.addEventListener('click', function(){ chooserClean(); pickAndUpload('after'); });
-            cancelBtn.addEventListener('click', function(){ chooserClean(); });
-        } else {
-            // For Material Collection and other stages, skip Before/After and upload as 'before'
-            pickAndUpload('before');
-        }
-
-        async function pickAndUpload(photoType){
-            cleanUp();
-            const input = document.createElement('input');
-            input.type = 'file'; input.accept = 'image/*';
-            input.onchange = async function(ev){
-                const file = ev.target.files[0];
-                if (!file) return;
-                const fd = new FormData();
-                fd.append('material_id', mid);
-                fd.append('photo', file);
-                fd.append('photo_type', photoType);
-                try {
-                    const res = await fetch('upload_material_photo.php', { method: 'POST', body: fd });
-                    const txt = await res.text();
-                    let json = null;
-                    try { json = txt ? JSON.parse(txt) : null; } catch(e){ showToast('Upload failed', 'error'); return; }
-                    if (json && json.success) {
-                        showToast('Photo uploaded');
-                        try {
-                            let photos = document.querySelector('.material-photos[data-material-id="' + mid + '"]');
-                            if (!photos) {
-                                const item = document.querySelector('.material-item[data-material-id="' + mid + '"]');
-                                if (item) {
-                                    photos = document.createElement('div');
-                                    photos.className = 'material-photos';
-                                    photos.setAttribute('data-material-id', mid);
-                                    const main = item.querySelector('.material-main');
-                                    if (main && main.parentNode) main.parentNode.insertBefore(photos, main.nextSibling);
-                                    else item.appendChild(photos);
-                                }
-                            }
-                                if (photos) {
-                                // create a thumbnail entry without removing others (allow multiple)
-                                const div = document.createElement('div');
-                                div.className = 'material-photo';
-                                div.dataset.photoId = json.id || '';
-                                div.dataset.photoType = photoType;
-                                const src = json.path && json.path.indexOf('assets/') === 0 ? json.path : ('assets/uploads/materials/' + json.path);
-                                // Only show the small "Before/After" badge when we're in the Preparation stage
-                                const badgeHtml = (typeof inPreparation !== 'undefined' && inPreparation) ? `<div class="photo-type-badge">${photoType}</div>` : '';
-                                div.innerHTML = `<img src="${src}" alt="Material photo"><button type="button" class="material-photo-delete" title="Delete photo" onclick="(function(el){try{el.style.boxShadow='0 0 0 6px rgba(220,53,69,0.95)'; setTimeout(function(){try{el.style.boxShadow='';}catch(e){}},800);}catch(e){}; try{processMaterialPhotoDelete(el);}catch(e){}; })(this); return false;" onpointerdown="try{this.style.boxShadow='0 0 0 6px rgba(220,53,69,0.95)';}catch(e){}" onmousedown="try{this.style.boxShadow='0 0 0 6px rgba(220,53,69,0.95)';}catch(e){}" ontouchstart="try{this.style.boxShadow='0 0 0 6px rgba(220,53,69,0.95)';}catch(e){}"><i class="fas fa-trash"></i></button>${badgeHtml}`;
-                                const img = div.querySelector('img'); if (img) img.addEventListener('click', ()=> openImageViewer(src));
-                                photos.insertBefore(div, photos.firstChild);
-                                // Hide the per-material upload button now that a real (non-placeholder) photo exists
-                                try {
-                                    const parentMat = photos.closest('.material-item');
-                                    if (parentMat) {
-                                        const meta = parentMat.querySelector('.mat-meta');
-                                        const upBtn = meta && meta.querySelector('.upload-material-photo');
-                                        if (upBtn) upBtn.remove();
-                                    }
-                                } catch(e) { /* ignore removal errors */ }
-                            }
-                        } catch (e) { /* failed to insert thumbnail (silenced) */ }
-                        try { refreshMaterialCollectionReqState(); } catch(e){}
-                        try { document.dispatchEvent(new Event('materialPhotoChanged')); } catch(e) {}
-
-                        // If after this upload all requirements are satisfied, try to auto-complete the stage
-                        try {
-                            const dbg = /(?:\?|&|#)debug=1\b/.test((location && (location.search || '') + (location.hash || '')) || '');
-                            // Determine the stage-element and its materials container for this uploaded photo
-                            let stageEl = null;
-                            try {
-                                if (photos) stageEl = photos.closest('.workflow-stage, .stage-card');
-                                if (!stageEl && btn) stageEl = btn.closest('.workflow-stage, .stage-card');
-                            } catch(e) { stageEl = null; }
-
-                            // Scoped checks: operate on the materials list inside this stage if available
-                            let scopedAllObtained = true;
-                            let scopedAllPhotos = true;
-                            let materialsNode = null;
-                            if (stageEl) materialsNode = stageEl.querySelector('.stage-materials');
-                            if (!materialsNode) materialsNode = document.querySelector('.stage-materials'); // fallback
-
-                            if (materialsNode) {
-                                const itemsScoped = Array.from(materialsNode.querySelectorAll('.material-item'));
-                                if (itemsScoped.length === 0) {
-                                    // nothing to satisfy -> treat as ok
-                                    scopedAllObtained = true; scopedAllPhotos = true;
-                                } else {
-                                    itemsScoped.forEach(li => {
-                                        if (!li.querySelector('.badge.obtained')) scopedAllObtained = false;
-                                        const ph = li.querySelector('.material-photos');
-                                        if (!(ph && ph.querySelector('.material-photo:not(.placeholder)'))) scopedAllPhotos = false;
-                                    });
-                                }
-                            } else {
-                                // fallback to global helpers
-                                try { scopedAllObtained = checkAllMaterialsObtained(); } catch(e) { scopedAllObtained = false; }
-                                try { scopedAllPhotos = checkAllPhotosUploaded(); } catch(e) { scopedAllPhotos = false; }
-                            }
-
-                            /* debug: auto-complete scoped checks (silenced) */
-
-                            if (scopedAllObtained && scopedAllPhotos) {
-                                // try to determine the template stage number
-                                let stageNum = null;
-                                try {
-                                    if (stageEl) {
-                                        stageNum = stageEl.getAttribute('data-stage-number') || stageEl.getAttribute('data-stage-index') || null;
-                                    }
-                                    if (!stageNum) {
-                                        const completeBtn = stageEl ? (stageEl.querySelector('.stage-actions button[data-stage-number]') || stageEl.querySelector('button.complete-stage-btn[data-stage-number]')) : null;
-                                        if (completeBtn && completeBtn.dataset && completeBtn.dataset.stageNumber) stageNum = completeBtn.dataset.stageNumber;
-                                    }
-                                    if (!stageNum) {
-                                        // final fallback: pick first stage-tab matching name
-                                        const tab = document.querySelector('.stage-tab.active, .stage-tab.current');
-                                        if (tab) stageNum = tab.getAttribute('data-stage-number') || tab.getAttribute('data-stage-index');
-                                    }
-                                } catch(e) { stageNum = null; }
-
-                                if (stageNum) {
-                                    const sn = parseInt(stageNum, 10);
-                                    if (!isNaN(sn)) {
-                                        try {
-                                            requestToggleStage(sn, projectId).then(r => { /* auto-complete response (silenced) */ }).catch(err => { /* auto-complete request failed (silenced) */ });
-                                        } catch(e) { if (dbg) console.debug('[auto-complete] request threw', e); }
-                                    } else if (dbg) console.debug('[auto-complete] stageNum parsed NaN', stageNum);
-                                } else if (dbg) console.debug('[auto-complete] stageNum not found');
-                            }
-                                        } catch(e) { /* auto-complete after upload failed (silenced) */ }
-                    } else {
-                        showToast(json && json.message ? json.message : 'Upload failed', 'error');
-                    }
-                } catch (err) { showToast('Upload failed', 'error'); }
-            };
-            input.click();
-        }
-    });
-
-    // Fallback helper: POST FormData using XHR when fetch() is unavailable or blocked
-    async function xhrPostForm(url, formData){
-        return new Promise(function(resolve){
-            try{
-                var xhr = new XMLHttpRequest();
-                xhr.open('POST', url, true);
-                xhr.onreadystatechange = function(){
-                    if (xhr.readyState !== 4) return;
-                    var txt = xhr.responseText || '';
-                    try { var j = txt ? JSON.parse(txt) : null; resolve(j); } catch(e){ resolve(null); }
-                };
-                xhr.onerror = function(){ resolve(null); };
-                xhr.send(formData);
-            } catch(e){ resolve(null); }
-        });
-    }
-
-    // Final-resort fallback: submit a hidden form to an invisible iframe and read the response
-    function formPostFallback(url, formData){
-        return new Promise(function(resolve){
-            try {
-                let iframe = document.getElementById('ecw-delete-iframe');
-                if (!iframe) {
-                    iframe = document.createElement('iframe');
-                    iframe.id = 'ecw-delete-iframe';
-                    iframe.name = 'ecw-delete-iframe';
-                    iframe.style.display = 'none';
-                    document.body.appendChild(iframe);
-                }
-
-                const form = document.createElement('form');
-                form.style.display = 'none';
-                form.method = 'POST';
-                form.action = url;
-                form.target = iframe.name;
-
-                // Copy entries from FormData into hidden inputs
-                try {
-                    for (const pair of formData.entries()) {
-                        const input = document.createElement('input');
-                        input.type = 'hidden';
-                        input.name = pair[0];
-                        input.value = pair[1];
-                        form.appendChild(input);
-                    }
-                } catch(e) { /* ignore */ }
-
-                document.body.appendChild(form);
-
-                const cleanup = function(){ try { form.remove(); } catch(e){} };
-
-                // Wait for iframe load and attempt to parse response body as JSON
-                iframe.onload = function(){
-                    try {
-                        const doc = iframe.contentDocument || iframe.contentWindow && iframe.contentWindow.document;
-                        const txt = doc && doc.body ? (doc.body.textContent || doc.body.innerText || '') : '';
-                        try { const j = txt ? JSON.parse(txt) : null; resolve(j); } catch(e) { resolve(null); }
-                    } catch(e) { resolve(null); }
-                    setTimeout(cleanup, 60);
-                };
-
-                // Submit the form to the hidden iframe
-                try { form.submit(); } catch(e) { cleanup(); resolve(null); }
-            } catch(e) { try{ resolve(null); } catch(err){} }
-        });
-    }
-
-    // Centralized processor for deleting a material photo. We expose this so both delegated
-    // and direct element listeners can call the same logic. The function guards against
-    // double-processing by using a data attribute on the delete button element.
-    async function processMaterialPhotoDelete(del){
-        if (!del || del.dataset._processing === '1') return;
-        del.dataset._processing = '1';
-        // small UI debug helper (visible on-page) when ?debug=1 or window.__ECOWASTE_DEBUG__
-        const _isDbg = (window.__ECOWASTE_DEBUG__ || /(?:\?|&|#)debug=1\b/.test((location && (location.search || '') + (location.hash || '')) || ''));
-        // Always show a short visual indicator so the user has immediate feedback that
-        // the delete handler executed — this helps when console/network logs are hidden.
-        try {
-            (function showTransientIndicator(){
-                try {
-                    const wrapper = del && del.closest ? del.closest('.material-photo') : null;
-                    // Create a small floating badge near the clicked thumbnail
-                    const badge = document.createElement('div');
-                    badge.className = 'ecw-delete-indicator';
-                    badge.textContent = 'Deleting...';
-                    badge.style.position = 'fixed';
-                    badge.style.zIndex = '2147483646';
-                    badge.style.padding = '8px 12px';
-                    badge.style.borderRadius = '6px';
-                    badge.style.background = 'rgba(220,53,69,0.95)';
-                    badge.style.color = '#fff';
-                    badge.style.fontWeight = '700';
-                    badge.style.fontSize = '13px';
-                    // position near wrapper if possible, otherwise top-right
-                    if (wrapper) {
-                        try {
-                            const r = wrapper.getBoundingClientRect();
-                            badge.style.top = Math.max(8, (window.scrollY + r.top) - 6) + 'px';
-                            badge.style.left = Math.max(8, (window.scrollX + r.left) - 6) + 'px';
-                            badge.style.position = 'absolute';
-                        } catch(e) { badge.style.top = '12px'; badge.style.right = '12px'; badge.style.position = 'fixed'; }
-                    } else {
-                        badge.style.top = '12px'; badge.style.right = '12px'; badge.style.position = 'fixed';
-                    }
-                    document.body.appendChild(badge);
-                    // also flash the wrapper using boxShadow for better visibility than outline
-                    try {
-                        if (wrapper) {
-                            const oldBS = wrapper.style.boxShadow || '';
-                            wrapper.style.boxShadow = '0 0 0 4px rgba(220,53,69,0.95)';
-                            wrapper.style.transition = 'box-shadow .22s ease, transform .18s ease, background-color .18s ease';
-                            setTimeout(()=>{ try { wrapper.style.boxShadow = oldBS; } catch(e){} }, 700);
-                        }
-                    } catch(e){}
-                    setTimeout(()=>{ try{ badge.remove(); } catch(e){} }, 900);
-                } catch(e){}
-            })();
-        } catch(e){}
-        function dbgUI(msg){
-            try {
-                if (!_isDbg) return;
-                let el = document.getElementById('ecw-debug');
-                if (!el) { el = document.createElement('div'); el.id = 'ecw-debug'; el.style.position='fixed'; el.style.right='12px'; el.style.top='12px'; el.style.zIndex='999999'; el.style.background='rgba(0,0,0,0.85)'; el.style.color='#fff'; el.style.padding='8px 10px'; el.style.borderRadius='6px'; el.style.fontSize='12px'; el.style.maxWidth='320px'; el.style.maxHeight='60vh'; el.style.overflow='auto'; document.body.appendChild(el); }
-                const line = document.createElement('div'); line.textContent = (new Date()).toLocaleTimeString() + ' - ' + String(msg);
-                el.insertBefore(line, el.firstChild);
-                // keep it short
-                while (el.childNodes.length > 8) el.removeChild(el.lastChild);
-            } catch(e){}
-        }
-        try {
-            try { const dbg = _isDbg; if (dbg) { try { console.debug('[material-photo-delete] processing', del); } catch(e){} } } catch(e){}
-            const wrapper = del.closest('.material-photo');
-            dbgUI('found wrapper: ' + (!!wrapper));
-            if (!wrapper) return;
-            // brief visual flash so user can see handler fired even if network is hidden
-            try {
-                const prevOutline = wrapper.style.outline || '';
-                wrapper.style.outline = '3px solid rgba(220,53,69,0.95)';
-                setTimeout(() => { try { wrapper.style.outline = prevOutline; } catch(e){} }, 1200);
-            } catch(e) {}
-            // Visual quick indicator so users can see the handler fired even if network/console is silent
-            try {
-                try { wrapper.__ecw_old_outline = wrapper.style.outline || ''; } catch(e){}
-                try { wrapper.style.outline = '3px solid rgba(220,53,69,0.18)'; } catch(e){}
-            } catch(e){}
-            const photoId = wrapper.dataset.photoId || null;
-            dbgUI('photoId: ' + String(photoId));
-            if (!photoId) {
-                // client-only photo element (no server id) — remove and restore upload control
-                const parentMat = wrapper.closest('.material-item');
-                wrapper.remove();
-                try {
-                    if (parentMat) {
-                        const meta = parentMat.querySelector('.mat-meta');
-                        const hasPhoto = parentMat.querySelector('.material-photos .material-photo');
-                        if (meta && !hasPhoto && !meta.querySelector('.upload-material-photo')) {
-                            const btn = document.createElement('button');
-                            btn.type = 'button';
-                            btn.className = 'btn small upload-material-photo';
-                            btn.setAttribute('data-material-id', parentMat.dataset.materialId || '');
-                            btn.title = 'Upload photo';
-                            btn.setAttribute('aria-label', 'Upload material photo');
-                            btn.innerHTML = '<i class="fas fa-camera"></i>';
-                            meta.appendChild(btn);
-                        }
-                    }
-                } catch(e){ /* restore upload button failed (silenced) */ }
-                try { refreshMaterialCollectionReqState(); } catch(e){}
-                try { document.dispatchEvent(new Event('materialPhotoChanged')); } catch(e) {}
-                dbgUI('removed client-only thumbnail');
-                return;
-            }
-            dbgUI('will confirm delete');
-            if (!confirm('Remove this photo?')) { dbgUI('user cancelled delete'); return; }
-            dbgUI('user confirmed delete');
-            try {
-                const fd = new FormData(); fd.append('photo_id', photoId);
-                dbgUI('sending delete POST: ' + photoId);
-                let txt = null;
-                try {
-                    // Visible transport indicator for debugging in case fetch/XHR are blocked
-                    try { showToast('Deleting… (attempting fetch)', 'success', true); } catch(e){}
-                    const res = await fetch('delete_material_photo.php', { method: 'POST', body: fd });
-                    txt = await res.text();
-                } catch (fetchErr) {
-                    dbgUI('fetch failed, attempting XHR fallback');
-                    try { showToast('Deleting… (fetch failed — using XHR fallback)', 'error', true); } catch(e){}
-                    const j = await xhrPostForm('delete_material_photo.php', fd);
-                    if (j === null) { alert('Delete failed'); return; }
-                    // emulate text response so downstream parser works
-                    txt = typeof j === 'string' ? j : JSON.stringify(j);
-                }
-                let json = null; try { json = txt ? JSON.parse(txt) : null; } catch(e){ alert('Delete failed'); return; }
-                dbgUI('delete response parsed: ' + (json && json.success ? 'success' : 'fail'));
-                if (json && json.success) {
-                    // Find the parent material row BEFORE removing the wrapper so we can restore controls reliably
-                    const mat = document.querySelector('.material-item[data-material-id="' + (json.material_id || '') + '"]');
-                    // use wrapper.closest since it points at the element to remove; fallback to del.closest
-                    const parentMat = mat || (wrapper && wrapper.closest ? wrapper.closest('.material-item') : null) || (del && del.closest ? del.closest('.material-item') : null);
-                    wrapper.remove();
-                    showToast('Photo removed');
-                    dbgUI('removed server photo element and showed toast');
-                    // After removing photo, restore camera button beside Obtained badge if present
-                    try {
-                        if (parentMat) {
-                            const photos = parentMat.querySelector('.material-photos');
-                            const meta = parentMat.querySelector('.mat-meta');
-                            const hasPhoto = photos && photos.querySelector('.material-photo:not(.placeholder)');
-                            if (meta && !hasPhoto && !meta.querySelector('.upload-material-photo')) {
-                                const btn = document.createElement('button');
-                                btn.type = 'button';
-                                btn.className = 'btn small upload-material-photo';
-                                btn.setAttribute('data-material-id', parentMat.dataset.materialId || '');
-                                btn.title = 'Upload photo';
-                                btn.setAttribute('aria-label', 'Upload material photo');
-                                btn.innerHTML = '<i class="fas fa-camera"></i>';
-                                meta.appendChild(btn);
-                                // focus but do not auto-open file picker — allow user control
-                                try { btn.focus(); } catch(e){}
-                            }
-                        }
-                    } catch(e) { /* Failed to restore camera button (silenced) */ }
-                    // refresh stage completion state after delete and notify listeners
-                    try { refreshMaterialCollectionReqState(); } catch(e){}
-                    try { document.dispatchEvent(new Event('materialPhotoChanged')); } catch(e) {}
-                } else {
-                    alert(json && json.message ? json.message : 'Delete failed');
-                }
-            } catch (err) { alert('Delete failed'); }
-        } finally {
-            try { delete del.dataset._processing; } catch(e){}
-            try { if (del && del.closest) { const w = del.closest('.material-photo'); if (w) { try { w.style.outline = w.__ecw_old_outline || ''; } catch(e){} } } } catch(e){}
-        }
-    }
-
-    // Expose to global scope so inline onclick="processMaterialPhotoDelete(this)" works
-    try { window.processMaterialPhotoDelete = processMaterialPhotoDelete; } catch(e) {}
-    // Delegated handler: still listen on document for clicks as a fallback.
-    document.addEventListener('click', function(ev){
-        try {
-            const del = ev.target.closest && ev.target.closest('.material-photo-delete');
-            if (!del) return;
-            if (del.dataset._processing === '1') return;
-            // Small log to help debug when clicks reach the delegated handler
-            try { if (window.__ECOWASTE_DEBUG__ || /(?:\?|&|#)debug=1\b/.test((location && (location.search || '') + (location.hash || '')) || '')) console.debug('[delegated] material-photo-delete clicked', del); } catch(e){}
-            // Let the centralized processor handle it
-            processMaterialPhotoDelete(del);
-        } catch(e){
-            try { console.error('Error in delegated material-photo-delete handler', e); } catch(err){}
-        }
-    });
-
-    // As a last-resort capture-phase listener to ensure clicks reach us even when
-    // other overlays stop propagation, listen for pointerdown in the capture phase.
-    // This helps when a CSS overlay or layering prevents normal click handlers.
-    try {
-        document.addEventListener('pointerdown', function(ev){
-            try {
-                const del = ev.target && ev.target.closest ? ev.target.closest('.material-photo-delete') : null;
-                if (!del) return;
-                // If it's already processing, ignore
-                if (del.dataset && del.dataset._processing === '1') return;
-                // Prevent other handlers from interfering for this event
-                try { ev.stopPropagation(); ev.preventDefault(); } catch(e){}
-                // Call centralized processor
-                processMaterialPhotoDelete(del);
-            } catch(e){
-                try { if (window.__ECOWASTE_DEBUG__) console.error('[capture] material-photo-delete handler error', e); } catch(ignore){}
-            }
-        }, { capture: true, passive: false });
-    } catch(e) {}
-
-    // Extra capture-phase handlers (mousedown / touchstart) to catch environments where pointer events
-    // are unavailable or blocked. These call the same centralized processor but avoid preventing default
-    // so normal behavior remains for non-delete clicks.
-    try {
-        document.addEventListener('mousedown', function(ev){
-            try {
-                const del = ev.target && ev.target.closest ? ev.target.closest('.material-photo-delete') : null;
-                if (!del) return;
-                if (del.dataset && del.dataset._processing === '1') return;
-                // do not stop propagation here; just ensure handler runs
-                try { processMaterialPhotoDelete(del); } catch(e) { dbgUI && dbgUI('[mousedown capture] error'); }
-            } catch(e){}
-        }, { capture: true, passive: true });
-    } catch(e){}
-
-    try {
-        document.addEventListener('touchstart', function(ev){
-            try {
-                const del = ev.target && ev.target.closest ? ev.target.closest('.material-photo-delete') : null;
-                if (!del) return;
-                if (del.dataset && del.dataset._processing === '1') return;
-                try { processMaterialPhotoDelete(del); } catch(e) { dbgUI && dbgUI('[touchstart capture] error'); }
-            } catch(e){}
-        }, { capture: true, passive: true });
-    } catch(e){}
-
-    // Also bind direct listeners to existing elements on load so clicks aren't blocked by overlay layers
-    function bindExistingMaterialPhotoDeletes(){
-        try {
-            document.querySelectorAll('.material-photo-delete').forEach(function(d){
-                try {
-                    if (d.dataset._directBound === '1') return;
-                    // attach several fallbacks: click listener, onclick attr, and touchstart for mobile
-                    d.addEventListener('click', function(ev){ ev.stopPropagation(); if (d.dataset._processing === '1') return; processMaterialPhotoDelete(d); });
-                    try { d.onclick = function(ev){ try{ ev && ev.preventDefault(); if (d.dataset._processing === '1') return; processMaterialPhotoDelete(d); } catch(e){} }; } catch(e){}
-                    try { d.setAttribute('onclick', 'processMaterialPhotoDelete(this); return false;'); } catch(e){}
-                    d.addEventListener('touchstart', function(ev){ try{ ev.stopPropagation(); if (d.dataset._processing === '1') return; processMaterialPhotoDelete(d); } catch(e){} }, { passive: true });
-                    d.dataset._directBound = '1';
-                } catch(e){}
-            });
-        } catch(e){}
-    }
-
-    document.addEventListener('DOMContentLoaded', function(){
-        try {
-            bindExistingMaterialPhotoDeletes();
-            // Simple observer to attach to newly inserted thumbnails
-            const phObserver = new MutationObserver(function(muts){
-                for (const m of muts) {
-                    if (!m.addedNodes) continue;
-                    for (const n of m.addedNodes) {
-                        try {
-                            if (n.nodeType !== 1) continue;
-                            if (n.matches && n.matches('.material-photo') ) {
-                                const d = n.querySelector('.material-photo-delete');
-                                if (d && d.dataset._directBound !== '1') {
-                                    d.addEventListener('click', function(ev){ ev.stopPropagation(); if (d.dataset._processing === '1') return; processMaterialPhotoDelete(d); });
-                                    d.dataset._directBound = '1';
-                                }
-                            } else if (n.querySelectorAll) {
-                                const nodes = n.querySelectorAll('.material-photo-delete');
-                                nodes && nodes.forEach(function(dd){ if (dd && dd.dataset._directBound !== '1') { dd.addEventListener('click', function(ev){ ev.stopPropagation(); if (dd.dataset._processing === '1') return; processMaterialPhotoDelete(dd); }); dd.dataset._directBound = '1'; } });
-                            }
-                        } catch(e){}
-                    }
-                }
-            });
-            try { phObserver.observe(document.body, { childList: true, subtree: true }); } catch(e){}
-        } catch(e){}
-    });
-    // If DOM has already loaded by the time this script ran, bind immediately
-    try { if (document.readyState && document.readyState !== 'loading') bindExistingMaterialPhotoDeletes(); } catch(e) {}
-
-    // expose modal opener globally so inline onclick="showAddMaterialModal()" works
-    window.showAddMaterialModal = showAddMaterialModal;
-
-    // Material debug UI logic (visible only when ?debug=1)
-    (function(){
-        try {
-            const dbgPanel = document.getElementById('matDebugPanel');
-            if (!dbgPanel) return;
-            const summary = document.getElementById('matDebugSummary');
-            const recompute = document.getElementById('matDebugRecompute');
-            const copyBtn = document.getElementById('matDebugCopy');
-
-            function buildReport(){
-                const items = Array.from(document.querySelectorAll('.materials-list-stage .material-item'));
-                const total = items.length;
-                const okItems = [];
-                const missing = [];
-                items.forEach(li=>{
-                    const name = (li.querySelector('.mat-name') && li.querySelector('.mat-name').textContent.trim()) || ('#' + (li.dataset.materialId || ''));
-                    const badge = !!li.querySelector('.badge.obtained');
-                    const photo = !!li.querySelector('.material-photos .material-photo');
-                    if (badge || photo) okItems.push(name); else missing.push(name);
-                });
-                const report = [];
-                report.push('Total materials: ' + total);
-                report.push('Satisfied (obtained or photo): ' + okItems.length);
-                report.push('Missing: ' + missing.length + (missing.length ? '\n - ' + missing.join('\n - ') : ''));
-                return { text: report.join('\n'), total, ok: okItems.length, missing };
-            }
-
-            function refreshDebug(){
-                try {
-                    const r = buildReport();
-                    if (summary) summary.textContent = r.text;
-                    // also ensure the stage button state is recomputed
-                    refreshMaterialCollectionReqState();
-                } catch(e){ /* silenced */ }
-            }
-
-            recompute && recompute.addEventListener('click', function(){ refreshDebug(); });
-            copyBtn && copyBtn.addEventListener('click', function(){ const r = buildReport(); navigator.clipboard && navigator.clipboard.writeText(r.text).then(()=>{ copyBtn.textContent='Copied'; setTimeout(()=> copyBtn.textContent='Copy',800); }).catch(()=>{ alert('Copy failed'); }); });
-
-            // initial run
-            refreshDebug();
-    } catch(e) { /* mat debug init failed (silenced) */ }
-    })();
-
-    // Reconcile donations feature removed from UI.
-
-})();
-</script>
-
-<script>
-// Fallback MutationObserver: if a new material-item is inserted into a stage that is currently marked completed,
-// attempt to auto-uncomplete that stage (force_uncomplete). This helps when DOM timing prevents other flows
-// from discovering the insertion in time.
-(function(){
-    try {
-        const projectId = <?= json_encode($project_id) ?>;
-        const recent = {}; // stageNum -> timestamp (ms) of last attempt
-        const MIN_RETRY_MS = 2000;
-
-        const observer = new MutationObserver(function(mutations){
-            try {
-                for (const m of mutations) {
-                    if (!m.addedNodes || m.addedNodes.length === 0) continue;
-                    for (const n of m.addedNodes) {
-                        try {
-                            const el = (n.nodeType === 1) ? n : null;
-                            if (!el) continue;
-                            // ignore nodes we marked ourselves
-                            if (el.hasAttribute && el.hasAttribute('data-observer-ignore')) continue;
-                            // if a wrapper added contains material-item children, also handle
-                            let material = null;
-                            if (el.classList && el.classList.contains('material-item')) material = el;
-                            else {
-                                material = el.querySelector && el.querySelector('.material-item');
-                            }
-                            if (!material) continue;
-
-                            const stageEl = material.closest('.workflow-stage, .stage-card');
-                            if (!stageEl) continue;
-
-                            // if this stage is not currently completed, nothing to do
-                            if (!stageEl.classList.contains('completed')) continue;
-
-                            // determine stage number
-                            let stageNum = null;
-                            try {
-                                stageNum = stageEl.getAttribute('data-stage-number') || stageEl.getAttribute('data-stage-index') || null;
-                                if (!stageNum) {
-                                    const lbl = stageEl.querySelector('.stage-status-label[data-stage-number]');
-                                    if (lbl) stageNum = lbl.getAttribute('data-stage-number');
-                                }
-                                if (!stageNum) {
-                                    const btn = stageEl.querySelector('.complete-stage-btn[data-stage-number], button[data-stage-number]');
-                                    if (btn && btn.dataset && btn.dataset.stageNumber) stageNum = btn.dataset.stageNumber;
-                                }
-                                if (!stageNum) {
-                                    const tab = document.querySelector('.stage-tab.active, .stage-tab.current');
-                                    if (tab) stageNum = tab.getAttribute('data-stage-number') || tab.getAttribute('data-stage-index');
-                                }
-                            } catch(e) { stageNum = null; }
-
-                            if (!stageNum) continue;
-                            const sn = parseInt(stageNum, 10);
-                            if (isNaN(sn)) continue;
-
-                            const now = Date.now();
-                            if (recent[sn] && (now - recent[sn]) < MIN_RETRY_MS) continue;
-                            recent[sn] = now;
-
-                            try { /* mut-observer: new material inserted (silenced) */ } catch(e){}
-
-                            // Request uncomplete but mark any UI changes we make to avoid re-triggering observers
-                            try {
-                                // set a short-lived flag on the stage to indicate our change
-                                if (stageEl.setAttribute) stageEl.setAttribute('data-observer-ignore', '1');
-                                requestToggleStage(sn, projectId, { force_uncomplete: 1 }).then(r=>{
-                                    try { /* mut-observer uncomplete response (silenced) */ } catch(e){}
-                                }).catch(()=>{}).finally(()=>{
-                                    try { if (stageEl.removeAttribute) setTimeout(()=> stageEl.removeAttribute('data-observer-ignore'), 250); } catch(e){}
-                                });
-                            } catch(e){}
-
-                        } catch(e) { /* per-node ignore */ }
-                    }
-                }
-            } catch(e) { /* ignore mutation loop errors */ }
-        });
-
-        // Prefer observing the materials container when present to limit mutation volume
-        try {
-            const materialsRoot = document.querySelector('.materials-list-stage') || document.querySelector('.materials-list') || document.body;
-            observer.observe(materialsRoot, { childList: true, subtree: true });
-        } catch(e) { /* ignore if observe fails */ }
-    } catch(e) { /* ignore observer init errors */ }
-})();
-</script>
-
-<script>
-// Close any open debug panels when clicking outside or pressing Escape
-document.addEventListener('click', function(e){
-    if (!e.target.closest || !e.target.closest('.why-disabled-btn') && !e.target.closest('.why-disabled-panel')) {
-        document.querySelectorAll('.why-disabled-panel').forEach(n=>n.remove());
-    }
-});
-document.addEventListener('keydown', function(e){ if (e.key === 'Escape') document.querySelectorAll('.why-disabled-panel').forEach(n=>n.remove()); });
-</script>
-
-<!-- Styles moved to assets/css/project-stages.css -->
-
-<script>
-document.addEventListener('DOMContentLoaded', function(){
-    const tabs = document.querySelectorAll('.stage-tab');
-    const stages = document.querySelectorAll('.workflow-stage');
-
-    function showStageByIndex(idx){
-        // Toggle active classes on tabs and stages
-        tabs.forEach(t => t.classList.toggle('active', parseInt(t.dataset.stageIndex,10) === idx));
-        stages.forEach(s => s.classList.toggle('active', parseInt(s.getAttribute('data-stage-index'),10) === idx));
-        // update URL hash for shareable link
-        try {
-            const hash = '#step-' + idx;
-            if (history && history.replaceState) history.replaceState(null, '', hash);
-            else location.hash = hash;
-        } catch (e) {}
-    }
-
-    // add click handlers and keyboard support
-    tabs.forEach((t, ti) => {
-        t.setAttribute('tabindex', '0');
-        t.dataset.stageIndex = t.dataset.stageIndex || ti;
-        t.addEventListener('click', function(){
-            const idx = parseInt(this.dataset.stageIndex,10);
-            if (isNaN(idx)) return;
-            // always activate the tab (this updates the URL hash via showStageByIndex)
-            showStageByIndex(idx);
-            // scroll the selected stage into view for clarity
-            const s = document.querySelector('.workflow-stage[data-stage-index="' + idx + '"]');
-            if (s) s.scrollIntoView({behavior:'smooth', block:'start'});
-        });
-        // keyboard nav: left/right to move, enter/space to activate
-        t.addEventListener('keydown', function(ev){
-            if (ev.key === 'ArrowRight' || ev.key === 'ArrowDown') {
-                ev.preventDefault();
-                const next = tabs[(ti + 1) % tabs.length];
-                if (next) next.focus();
-            } else if (ev.key === 'ArrowLeft' || ev.key === 'ArrowUp') {
-                ev.preventDefault();
-                const prev = tabs[(ti - 1 + tabs.length) % tabs.length];
-                if (prev) prev.focus();
-            } else if (ev.key === 'Enter' || ev.key === ' ') {
-                ev.preventDefault();
-                this.click();
-            }
-        });
-    });
-
-    // on load, check URL hash like #step-2 and open that step if present
-    try {
-        const m = (location.hash || '').match(/#step-(\d+)/i);
-        if (m && m[1]) {
-            const idx = parseInt(m[1], 10);
-            if (!isNaN(idx)) showStageByIndex(idx);
-        }
-    } catch (e) {}
-    // always show only the current stage by default (no 'show all' control)
-    // initialize to current active tab or index 0
-    (function(){
-        const active = document.querySelector('.stage-tab.active');
-        const idx = active ? parseInt(active.dataset.stageIndex,10) : 0;
-        showStageByIndex(idx);
-    })();
-
-    // JS fallback: ensure locked tabs show a consistent forbidden cursor on hover
-    try {
-        const svgCursor = `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32'><circle cx='16' cy='16' r='12' stroke='black' stroke-width='2' fill='white'/><line x1='6' y1='26' x2='26' y2='6' stroke='black' stroke-width='3' stroke-linecap='round'/></svg>") 16 16, not-allowed`;
-        document.querySelectorAll('.stage-tab.locked').forEach(el => {
-            el.addEventListener('mouseenter', function(){ el.style.cursor = svgCursor; el.style.pointerEvents = 'auto'; });
-            el.addEventListener('mouseleave', function(){ el.style.cursor = ''; });
-        });
-    } catch (e) { /* ignore */ }
-    // (explicit uncomplete button removed — completion toggles now happen automatically when materials change)
-});
-</script>
-
-            <!-- materials are shown inside the Material Collection stage now -->
-
-            <!-- Workflow & Documentation preserved from original -->
-            <section class="project-workflow">
-                <!-- ...existing workflow markup remains unchanged... -->
-                <?php /* keep the workflow and documentation blocks below as-is */ ?>
-            </section>
-            <!-- Project Progress -->
-            <section class="workflow-section card">
-                <h2 class="section-title"><i class="fas fa-tasks"></i> Project Workflow</h2>
-                
-                <?php
-                // Load workflow stage templates from DB (fall back to sensible defaults)
-                $workflow_stages = [];
-                try {
-                    $tpl_stmt = $conn->prepare("SELECT stage_number, stage_name, description FROM stage_templates ORDER BY stage_number");
-                    if ($tpl_stmt) {
-                        $tpl_stmt->execute();
-                        $tpl_res = $tpl_stmt->get_result();
-                        while ($row = $tpl_res->fetch_assoc()) {
-                            // preserve the original template stage_number as 'template_number'
-                            $workflow_stages[] = [
-                                'name' => $row['stage_name'],
-                                'description' => $row['description'],
-                                'number' => (int)$row['stage_number'], // will be renumbered later
-                                'template_number' => (int)$row['stage_number']
-                            ];
-                        }
-                    }
-                } catch (Exception $e) {
-                    $workflow_stages = [];
-                }
-
-                    // Defensive deduplication: ensure unique stage names (preserve original order)
-                    if (!empty($workflow_stages)) {
-                        $seen = [];
-                        $filtered = [];
-                        foreach ($workflow_stages as $st) {
-                            $name = trim(strtolower($st['name'] ?? ''));
-
-                    // Replace the last stage name with "Share" (was Documentation)
-                    if (!empty($workflow_stages) && is_array($workflow_stages)) {
-                        $lastIndex = count($workflow_stages) - 1;
-                        if ($lastIndex >= 0) {
-                            // normalize keys which templates might use
-                            if (isset($workflow_stages[$lastIndex]['stage_name'])) $workflow_stages[$lastIndex]['stage_name'] = 'Share';
-                            if (isset($workflow_stages[$lastIndex]['name'])) $workflow_stages[$lastIndex]['name'] = 'Share';
-                            // also ensure description (optional)
-                            if (isset($workflow_stages[$lastIndex]['description'])) $workflow_stages[$lastIndex]['description'] = 'Share your project with others.';
-                        }
-                    }
-                            if ($name === '') continue;
-                            if (isset($seen[$name])) continue; // skip duplicates
-                            $seen[$name] = true;
-                            $filtered[] = $st;
-                        }
-                        // renumber sequentially starting at 1 for UI ordering, but keep original template_number
-                        foreach ($filtered as $i => &$fs) { $fs['number'] = $i + 1; if (!isset($fs['template_number'])) $fs['template_number'] = $fs['number']; }
-                        unset($fs);
-                        $workflow_stages = array_values($filtered);
-
-                        // Normalize to canonical 3-stage workflow when templates are incomplete
-                        $canonical = [
-                            ['name' => 'Preparation', 'description' => 'Collect materials, clean and sort materials, prepare workspace'],
-                            ['name' => 'Construction', 'description' => 'Build your project, follow safety guidelines, document progress'],
-                            ['name' => 'Share', 'description' => 'Share your project with others.']
-                        ];
-                        // Map existing by lowercase name
-                        $existingMap = [];
-                        foreach ($workflow_stages as $ws) { $existingMap[strtolower(trim($ws['name'] ?? $ws['stage_name'] ?? ''))] = $ws; }
-                        $merged = [];
-                        $nextNum = 1;
-                        foreach ($canonical as $can) {
-                            $lname = strtolower($can['name']);
-                            if (isset($existingMap[$lname])) {
-                                $entry = $existingMap[$lname];
-                                $entry['number'] = $nextNum;
-                                if (!isset($entry['description']) || trim($entry['description']) === '') $entry['description'] = $can['description'];
-                                $merged[] = $entry;
-                                unset($existingMap[$lname]);
-                            } else {
-                                $merged[] = ['name' => $can['name'], 'description' => $can['description'], 'number' => $nextNum];
-                            }
-                            $nextNum++;
-                        }
-                        // Append any non-canonical stages that existed after canonical ones
-                        foreach ($existingMap as $rem) { $rem['number'] = $nextNum++; $merged[] = $rem; }
-                        $workflow_stages = $merged;
-
-                        // NOTE: removed automatic injection of a "Material Collection" stage here.
-                        // Historically we inserted a lightweight Material Collection stage when
-                        // templates did not define one but project materials existed. That caused
-                        // inconsistent workflows between projects. Workflows are now driven by
-                        // `stage_templates` / `project_stages` only. Use the migration tool in
-                        // `tools/normalize_workflows.php` to add canonical stages where desired.
-                    }
-
-                if (empty($workflow_stages)) {
-                    $workflow_stages = [
-                        ['name' => 'Preparation', 'description' => 'Collect materials, clean and sort materials, prepare workspace', 'number' => 1],
-                        ['name' => 'Construction', 'description' => 'Build your project, follow safety guidelines, document progress', 'number' => 2],
-                        ['name' => 'Share', 'description' => 'Share your project with others.', 'number' => 3],
-                    ];
-                }
-
-                // Icon map by stage_number (fallback)
-                $stage_icons = [1 => 'fa-lightbulb', 2 => 'fa-box', 3 => 'fa-hammer', 4 => 'fa-paint-roller', 5 => 'fa-star', 6 => 'fa-camera'];
-
-                // Get completed stages from database
-                $completed_stages = 0;
-        $total_stages = count($workflow_stages);
-
-                // Build a completed-stage map from the DB (use GROUP BY to coalesce duplicates)
-                // Map database stage_number values to the current workflow_stages indices so progress
-                // remains correct even if template numbering changed.
-                $completed_stage_map = [];
-                try {
-                    // Build a mapping of template stage_number => index in $workflow_stages
-                    $numToIndex = [];
-                    foreach ($workflow_stages as $i => $st) {
-                        // Use the original template number if present; fall back to UI number
-                        $num = isset($st['template_number']) ? (int)$st['template_number'] : (isset($st['number']) ? (int)$st['number'] : ($i + 1));
-                        $numToIndex[$num] = $i;
-                    }
-
-                    $stage_stmt = $conn->prepare(
-                        "SELECT stage_number, MAX(completed_at) AS completed_at FROM project_stages WHERE project_id = ? GROUP BY stage_number"
-                    );
-                    if ($stage_stmt) {
-                        $stage_stmt->bind_param("i", $project_id);
-                        $stage_stmt->execute();
-                        $stage_result = $stage_stmt->get_result();
-                        while ($s = $stage_result->fetch_assoc()) {
-                            $raw_num = (int)$s['stage_number'];
-                            // Only map completed entries when the stage_number corresponds to one
-                            // of the current workflow stages. Avoid a numeric fallback which can
-                            // accidentally mark unrelated stages as completed.
-                            if (!is_null($s['completed_at']) && isset($numToIndex[$raw_num])) {
-                                $idx = $numToIndex[$raw_num];
-                                $completed_stage_map[$idx] = $s['completed_at'];
-                            } else {
-                                // Unexpected stage_number for this project's workflow; skip it.
-                                // Uncomment for debugging: error_log("Ignoring stage_number={$raw_num} for project={$project_id}");
-                            }
-                        }
-                    }
-                } catch (Exception $e) {
-                    // leave map empty on error
-                    $completed_stage_map = [];
-                }
-
-                // Count completed stages only among the defined workflow stages
-                $completed_stages = 0;
-                if ($total_stages > 0) {
-                    for ($i = 0; $i < $total_stages; $i++) {
-                        if (array_key_exists($i, $completed_stage_map)) $completed_stages++;
-                    }
-                }
-
-                // Clamp completed_stages to the range [0, total_stages]
-                $completed_stages = max(0, min($completed_stages, $total_stages));
-
-                // Calculate progress based on stages (each stage = equal weight)
-                $progress_percent = $total_stages > 0 ? (int) round(($completed_stages / $total_stages) * 100) : 0;
-
-                // Determine current stage index (first incomplete stage, or last if all complete)
-                if ($total_stages === 0) {
-                    $current_stage_index = 0;
-                } elseif ($completed_stages >= $total_stages) {
-                    $current_stage_index = max(0, $total_stages - 1);
-                } else {
-                    $current_stage_index = $completed_stages;
-                }
-                ?>
-
-                <?php
-                // Debug panel: visible when ?debug=1 in the URL. Shows computed values used for progress.
-                $is_debug = isset($_GET['debug']) && $_GET['debug'] === '1';
-                // Ensure numToIndex exists for debug output
-                $numToIndex = isset($numToIndex) ? $numToIndex : [];
-                if ($is_debug):
-                    $debug_payload = [
-                        'total_stages' => $total_stages,
-                        'completed_stages' => $completed_stages,
-                        'current_stage_index' => $current_stage_index,
-                        'completed_stage_map' => $completed_stage_map,
-                        'numToIndex' => $numToIndex,
-                        'workflow_stages' => $workflow_stages,
-                    ];
-                ?>
-                <div id="devDebugPanel" style="position:fixed;right:12px;bottom:12px;z-index:2000;max-width:420px;max-height:60vh;overflow:auto;background:#fff;border:1px solid #ddd;padding:10px;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.08);font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:13px;color:#111;">
-                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-                        <strong style="font-size:0.95rem;">DEBUG: progress values</strong>
-                        <div style="display:flex;gap:6px;align-items:center;">
-                            <button id="devDebugClose" style="background:#f3f4f6;border:1px solid #e6e6e6;border-radius:6px;padding:4px 8px;cursor:pointer">Close</button>
-                            <button id="devDebugCopy" style="background:#2e8b57;color:#fff;border:none;border-radius:6px;padding:4px 8px;cursor:pointer">Copy</button>
-                        </div>
-                    </div>
-                    <pre id="devDebugPre" style="white-space:pre-wrap;margin:0;"><?php echo htmlspecialchars(json_encode($debug_payload, JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES)); ?></pre>
-                </div>
-                <script>
-                (function(){
-                    const closeBtn = document.getElementById('devDebugClose');
-                    const copyBtn = document.getElementById('devDebugCopy');
-                    const pre = document.getElementById('devDebugPre');
-                    if (closeBtn) closeBtn.addEventListener('click', function(){ document.getElementById('devDebugPanel').style.display = 'none'; });
-                    if (copyBtn && pre) copyBtn.addEventListener('click', function(){ navigator.clipboard && navigator.clipboard.writeText(pre.textContent).then(()=>{ copyBtn.textContent='Copied'; setTimeout(()=> copyBtn.textContent='Copy',800); }).catch(()=>{ alert('Copy failed'); }); });
-                })();
-                </script>
-                <?php endif; ?>
-
-                <div class="progress-indicator">
-                    <strong><?= $progress_percent ?>%</strong>
-                    <?php if ($progress_percent === 100): ?>
-                        of stages completed.
-                    <?php else: ?>
-                        of stages completed. (<?= $completed_stages ?> of <?= $total_stages ?>)
-                    <?php endif; ?>
-                </div>
-                <div class="progress-bar">
-                    <div class="progress-fill" style="width: <?= $progress_percent ?>%;"></div>
-                </div>
-
-                <!-- Tabs: show step titles and highlight current -->
-                <div class="stage-tabs">
-                    <?php foreach ($workflow_stages as $i => $st): 
-                        $tn = isset($st['template_number']) ? (int)$st['template_number'] : (int)($st['stage_number'] ?? $st['number'] ?? $i + 1);
-                        // determine badge class
-                        $is_completed = array_key_exists($i, $completed_stage_map);
-                        // If this is a Material Collection stage and DB shows completed, re-validate server-side
-                        $stage_name_lower = strtolower($st['stage_name'] ?? $st['name'] ?? '');
-                        if ($is_completed && stripos($stage_name_lower, 'material') !== false) {
-                            try {
-                                $cstmt = $conn->prepare("SELECT COUNT(*) AS not_obtained FROM project_materials WHERE project_id = ? AND (status IS NULL OR LOWER(status) <> 'obtained')");
-                                $cstmt->bind_param('i', $project_id);
-                                $cstmt->execute();
-                                $cres = $cstmt->get_result()->fetch_assoc();
-                                $not_obtained = $cres ? (int)$cres['not_obtained'] : 0;
-                                if ($not_obtained > 0) {
-                                    // some materials still missing — treat as not completed for rendering
-                                    $is_completed = false;
-                                }
-                            } catch (Exception $e) { /* ignore validation errors */ }
-                        }
-                        $is_current = !$is_completed && ($i === $current_stage_index);
-                        $is_locked = !$is_completed && ($i > $current_stage_index);
-                        $badgeClass = $is_completed ? 'completed' : ($is_current ? 'current' : ($is_locked ? 'locked' : 'incomplete'));
-
-                        // determine small thumbnail: prefer stage_photos, fallback to material photo for material collection
-                        $thumb = '';
-                        try {
-                            // stage photos
-                            $tp = $conn->prepare("SELECT photo_path FROM stage_photos WHERE project_id = ? AND stage_number = ? ORDER BY created_at DESC LIMIT 1");
-                            $tp->bind_param('ii', $project_id, $tn);
-                            $tp->execute();
-                            $tres = $tp->get_result()->fetch_assoc();
-                            if ($tres && !empty($tres['photo_path'])) $thumb = 'assets/uploads/' . $tres['photo_path'];
-                        } catch (Exception $e) { /* ignore */ }
-                        if (empty($thumb) && stripos($st['stage_name'] ?? $st['name'] ?? '', 'material') !== false) {
-                            try {
-                                $mp = $conn->prepare("SELECT photo_path FROM material_photos WHERE project_id = ? AND material_id IN (SELECT material_id FROM project_materials WHERE project_id = ?) ORDER BY created_at DESC LIMIT 1");
-                                $mp->bind_param('ii', $project_id, $project_id);
-                                $mp->execute();
-                                $mres = $mp->get_result()->fetch_assoc();
-                                if ($mres && !empty($mres['photo_path'])) $thumb = 'assets/uploads/' . $mres['photo_path'];
-                            } catch (Exception $e) { /* ignore */ }
-                        }
-                    ?>
-                        <?php
-                            $stage_name_lower = strtolower($st['stage_name'] ?? $st['name'] ?? '');
-                            $iconClass = 'fas fa-circle';
-                            if (stripos($stage_name_lower, 'material') !== false) $iconClass = 'fas fa-box-open';
-                            else if (stripos($stage_name_lower, 'prepar') !== false) $iconClass = 'fas fa-tools';
-                            else if (stripos($stage_name_lower, 'construct') !== false) $iconClass = 'fas fa-hard-hat';
-                            else if (stripos($stage_name_lower, 'finish') !== false) $iconClass = 'fas fa-paint-roller';
-                            else if (stripos($stage_name_lower, 'share') !== false) $iconClass = 'fas fa-share-alt';
-                            // Use !important on inline style to override any stylesheet rules that may use !important
-                            $inlineStyle = $is_locked ? 'style="cursor: not-allowed !important;"' : '';
-                        ?>
-                        <button <?= $inlineStyle ?> class="stage-tab <?php echo ($i === $current_stage_index) ? 'active' : ''; ?> <?php echo $is_locked ? 'locked' : ''; ?>" data-stage-index="<?= $i ?>" data-stage-number="<?= $tn ?>" aria-label="<?= htmlspecialchars($st['stage_name'] ?? $st['name'] ?? 'Step') ?>">
-                            <span class="tab-icon"><i class="<?= $iconClass ?>" aria-hidden="true"></i></span>
-                            <span class="tab-meta">
-                                <span class="tab-title"><?= htmlspecialchars($st['stage_name'] ?? $st['name'] ?? ('Step ' . ($i+1))) ?></span>
-                                <span class="tab-badge <?= $badgeClass ?>"><?php echo $is_completed ? 'Completed' : ($is_current ? 'Current' : ($is_locked ? 'Locked' : 'Incomplete')) ?></span>
-                            </span>
-                        </button>
-                    <?php endforeach; ?>
-                    <div style="margin-left:auto;font-size:13px;color:#666;">
-                        <!-- removed 'Show all steps' control for simplified UI -->
-                    </div>
-                </div>
-
-                <div class="workflow-stages-container stages-timeline">
-                    <?php
-                    // $completed_stage_map was built above. Use it to render stages.
-                    foreach ($workflow_stages as $index => $stage): 
-                        $is_completed = array_key_exists($index, $completed_stage_map);
-                        // re-validate Material Collection completed state to avoid false positives
-                        $stage_name_lower = strtolower($stage['name'] ?? $stage['stage_name'] ?? '');
-                        if ($is_completed && stripos($stage_name_lower, 'material') !== false) {
-                            try {
-                                $cstmt2 = $conn->prepare("SELECT COUNT(*) AS not_obtained FROM project_materials WHERE project_id = ? AND (status IS NULL OR LOWER(status) <> 'obtained')");
-                                $cstmt2->bind_param('i', $project_id);
-                                $cstmt2->execute();
-                                $cres2 = $cstmt2->get_result()->fetch_assoc();
-                                $not_obtained2 = $cres2 ? (int)$cres2['not_obtained'] : 0;
-                                if ($not_obtained2 > 0) {
-                                    $is_completed = false;
-                                }
-                            } catch (Exception $e) { /* ignore */ }
-                        }
-                        // current stage is the first incomplete stage (index == completed count)
-                        $is_current = !$is_completed && ($index === $current_stage_index);
-                        // locked if it's after the current stage and not completed
-                        $is_locked = !$is_completed && ($index > $current_stage_index);
-                        if ($is_completed) {
-                            $stage_class = 'completed';
-                        } elseif ($is_current) {
-                            $stage_class = 'current';
-                        } elseif ($index > $current_stage_index) {
-                            $stage_class = 'locked';
-                        } else {
-                            // earlier incomplete stages are shown as inactive (not locked)
-                            $stage_class = 'inactive';
-                        }
-                    ?>
-                        <?php $activeClass = $is_current ? 'active' : ''; ?>
-                        <div class="workflow-stage stage-card <?= $stage_class ?> <?= $activeClass ?>" data-stage-index="<?= $index ?>">
-                                <?php $icon = $stage_icons[$stage['number']] ?? 'fa-circle'; ?>
-                                <i class="fas <?= $icon ?> stage-icon" aria-hidden="true"></i>
-                                <div class="stage-content">
-                                    <div class="stage-header">
-                                        <div class="stage-info">
-                                            <h3 class="stage-title">
-                                                <?= htmlspecialchars($stage['name']) ?>
-                                                <?php if ($is_completed): ?>
-                                                    <i class="fas fa-check-circle stage-check" title="Completed"></i>
-                                                <?php endif; ?>
-                                            </h3>
-                                            <?php if ($is_completed && isset($completed_stage_map[$index])): ?>
-                                                <div class="stage-completed-at">Completed: <?= date('M d, Y', strtotime($completed_stage_map[$index])) ?></div>
-                                            <?php endif; ?>
-                                            <div class="stage-desc"><?= nl2br(htmlspecialchars($stage['description'] ?? '')) ?></div>
-                                        </div>
-                                    </div>
-                            
-                            <?php
-                            // Get photos for this stage (count + preview)
-                            $photos_stmt = $conn->prepare("SELECT photo_path FROM stage_photos WHERE project_id = ? AND stage_number = ?");
-                            $photos_stmt->bind_param("ii", $project_id, $stage['number']);
-                            $photos_stmt->execute();
-                            $photos_result = $photos_stmt->get_result();
-                            $stage_photos = $photos_result->fetch_all(MYSQLI_ASSOC);
-                            $photo_count = count($stage_photos);
-                            
-                            if ($photo_count > 0): ?>
-                            <div class="stage-photos">
-                                <?php foreach ($stage_photos as $photo): ?>
-                                    <img src="assets/uploads/<?= htmlspecialchars($photo['photo_path']) ?>" 
-                                         alt="Stage photo" 
-                                         onclick="openImageViewer('assets/uploads/<?= htmlspecialchars($photo['photo_path']) ?>')"
-                                         class="stage-photo">
-                                <?php endforeach; ?>
-                                <div class="photo-count"><?= $photo_count ?> photo<?= $photo_count>1 ? 's' : '' ?></div>
-                            </div>
-                            <?php endif; ?>
-
-                            <?php // Inject materials list into Material Collection stage (read-only) ?>
-                            <?php 
-                                $stage_name_l = strtolower(trim($stage['name'] ?? $stage['stage_name'] ?? ''));
-                                $show_material_list = (strpos($stage_name_l, 'material') !== false) || (strpos($stage_name_l, 'prepar') !== false) || ($index === 0);
-                            ?>
-                            <?php if ($show_material_list): ?>
-    <div class="stage-materials">
-        <h4>Materials Needed</h4>
-        <?php if (isset($is_debug) && $is_debug): ?>
-        <div id="matDebugPanel" style="border:1px dashed #bfe6c9;padding:10px;margin:8px 0;border-radius:8px;background:#f7fbf7;color:#0f5132;">
-            <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
-                <strong style="flex:1;">Material Collection Debug</strong>
-                <button id="matDebugRecompute" class="btn small" style="background:#fff;color:#1b543d;border:1px solid rgba(0,0,0,0.06);">Recompute</button>
-                <button id="matDebugCopy" class="btn small" style="background:#fff;color:#1b543d;border:1px solid rgba(0,0,0,0.06);">Copy</button>
-            </div>
-            <div id="matDebugSummary" style="font-size:13px;white-space:pre-wrap;max-height:160px;overflow:auto;background:transparent;padding:6px 4px;">Computing...</div>
-        </div>
-        <?php endif; ?>
-        <?php if (empty($materials)): ?>
-            <p class="empty-state">No materials listed.</p>
-        <?php else: ?>
-            <ul class="materials-list-stage">
-                <?php foreach ($materials as $m): ?>
-                    <?php $mid = (int)($m['material_id'] ?? $m['id'] ?? 0); ?>
-                    <?php 
-                        $currentQty = isset($m['quantity']) ? (int)$m['quantity'] : 0;
-                        $currentStatus = strtolower($m['status'] ?? '');
-                        // If quantity is zero or less, treat as obtained even if DB status wasn't updated yet
-                        if ($currentQty <= 0) { $currentStatus = 'obtained'; }
-                        if ($currentStatus === '') $currentStatus = 'needed';
-
-                        // Pre-check for an existing photo (only need the most recent)
-                        $hasPhoto = false; $firstPhotoRel = null; $firstPhotoId = null;
-                        try {
-                            $pp = $conn->prepare("SELECT id, photo_path FROM material_photos WHERE material_id = ? ORDER BY uploaded_at DESC LIMIT 1");
-                            if ($pp) {
-                                $pp->bind_param('i', $mid);
-                                $pp->execute();
-                                $pres = $pp->get_result();
-                                if ($prow = $pres->fetch_assoc()) {
-                                    $hasPhoto = true;
-                                    $firstPhotoRel = htmlspecialchars($prow['photo_path']);
-                                    $firstPhotoId = (int)$prow['id'];
-                                }
-                            }
-                        } catch (Exception $e) { /* ignore */ }
-                    ?>
-                    <li class="material-item<?= ($currentStatus !== 'needed') ? ' material-obtained' : '' ?>" data-material-id="<?= $mid ?>">
-                        <div class="material-main">
-                            <span class="mat-name"><?= htmlspecialchars($m['material_name'] ?? $m['name'] ?? '') ?></span>
-                            <div class="mat-meta">
-                                <?php if ($currentQty > 0): ?>
-                                    <span class="mat-qty"><?= htmlspecialchars($currentQty) ?></span>
-                                <?php endif; ?>
-                                <?php if ($currentStatus !== 'needed' && $currentStatus !== ''): ?>
-                                    <span class="badge obtained" aria-hidden="true"><i class="fas fa-check-circle"></i> Obtained</span>
-                                    <?php if (!$hasPhoto): ?>
-                                        <button type="button" class="btn small upload-material-photo" data-material-id="<?= $mid ?>" title="Upload photo"><i class="fas fa-camera"></i></button>
-                                    <?php endif; ?>
-                                <?php endif; ?>
-                            </div>
-                        </div>
-                        <!-- Photos for obtained materials will be shown here (thumbnails go below the row) -->
-                        <?php if ($currentStatus !== 'needed' && $currentStatus !== ''): ?>
-                            <div class="material-photos" data-material-id="<?= $mid ?>">
-                                <?php
-                                    if ($hasPhoto) {
-                                        echo '<div class="material-photo" data-photo-id="' . $firstPhotoId . '"><img src="' . $firstPhotoRel . '" alt="Material photo" onclick="openImageViewer(\'' . $firstPhotoRel . '\')"><button type="button" class="material-photo-delete" title="Delete photo" onclick="(function(el){try{el.style.boxShadow=\'0 0 0 6px rgba(220,53,69,0.95)\'; setTimeout(function(){try{el.style.boxShadow=\\\'\\\';}catch(e){}},800);}catch(e){}; try{processMaterialPhotoDelete(el);}catch(e){}; })(this); return false;" onpointerdown="try{this.style.boxShadow=\'0 0 0 6px rgba(220,53,69,0.95)\';}catch(e){}" onmousedown="try{this.style.boxShadow=\'0 0 0 6px rgba(220,53,69,0.95)\';}catch(e){}" ontouchstart="try{this.style.boxShadow=\'0 0 0 6px rgba(220,53,69,0.95)\';}catch(e){}"><i class="fas fa-trash"></i></button></div>';
-                                    } else {
-                                        // For obtained materials without a photo, render a small placeholder
-                                        echo '<div class="material-photo placeholder" aria-hidden="true">No photo</div>';
-                                    }
-                                ?>
-                            </div>
-                        <?php endif; ?>
-                        <div class="material-actions">
-                            <?php if ($currentStatus === 'needed' || $currentStatus === ''): ?>
-                                <!-- Find Donations (no icon) -->
-                                <a class="btn small find-donations-btn" href="browse.php?query=<?= urlencode($m['material_name'] ?? $m['name'] ?? '') ?>&from_project=<?= $project_id ?>" title="Find donations for this material">
-                                    Find Donations
-                                </a>
-                                <form method="POST" class="inline-form" data-obtain-modal="1" style="display:inline-flex;align-items:center;">
-                                    <input type="hidden" name="material_id" value="<?= $mid ?>">
-                                    <input type="hidden" name="status" value="obtained">
-                                    <button type="submit" name="update_material_status" class="btn small obtain-btn" title="Mark obtained" aria-label="Mark material obtained">
-                                        <i class="fas fa-check" aria-hidden="true"></i>
-                                    </button>
-                                </form>
-                                <!-- Remove material form (trash icon only) -->
-                                <form method="POST" class="inline-form" data-confirm="Are you sure you want to remove this material?">
-                                    <input type="hidden" name="material_id" value="<?= $mid ?>">
-                                    <button type="submit" name="remove_material" class="btn small danger" title="Delete">
-                                        <i class="fas fa-trash" aria-hidden="true"></i>
-                                    </button>
-                                </form>
-                            <?php else: ?>
-                                <!-- Obtained: actions removed; upload rendered below in .material-photos -->
-                            <?php endif; ?>
-                        </div>
-                    </li>
-                <?php endforeach; ?>
-            </ul>
-        <?php endif; ?>
-    </div>
-<?php endif; ?>
-
-                                            <?php if (!$is_locked): ?>
-                                            <div class="stage-actions">
-                                                <?php 
-                                                    $stage_name_l = strtolower(trim($stage['name'] ?? $stage['stage_name'] ?? ''));
-                                                    $show_add_material_btn = (strpos($stage_name_l, 'material') !== false) || (strpos($stage_name_l, 'prepar') !== false) || ($index === 0);
-                                                ?>
-                                                <?php if ($show_add_material_btn): ?>
-                                                        <button type="button" class="btn add-material-btn" onclick="showAddMaterialModal()">
-                                                            <i class="fas fa-plus"></i> Add Material
-                                                        </button>
-                                                <?php endif; ?>
-                                                
-                                                <!-- Complete stage button (show for current/incomplete stages, hidden for locked or completed) -->
-                                                <?php 
-                                                    $template_num = isset($stage['template_number']) ? (int)$stage['template_number'] : (int)($stage['number'] ?? 0);
-                                                ?>
-                                                <?php if (!$is_completed): ?>
-                                                    <button type="button" class="btn btn-primary complete-stage-btn" data-stage-number="<?= $template_num ?>" onclick="(async function(){ try { await requestToggleStage(<?= $template_num ?>, <?= json_encode($project_id) ?>); } catch(e) { showToast('Error completing stage: ' + (e.message || 'Unknown'), 'error'); } })(); return false;">
-                                                        <i class="fas fa-check"></i> Check
-                                                    </button>
-                                                <?php endif; ?>
-                            </div>
-                            <?php else: ?>
-                                <div class="stage-locked-note" title="This stage is locked until previous stages are completed.">🔒 Stage locked — complete previous stage to unlock.</div>
-                            <?php endif; ?>
-                        </div> <!-- /.stage-content -->
-                        </div> <!-- /.workflow-stage / .stage-card -->
-                    <?php endforeach; ?>
-                </div>
-            </section>
-
-            
-        </div>
-    </div>
-
-        <script>
-        // Simplified header-notifications handling: update header badge and provide a small dropdown panel.
-        let _lastUnreadCount = 0;
-
-        async function updateNotifications() {
-            try {
-                const res = await fetch('notification_updates.php?action=get_recent');
-                let data = null;
-                try { data = await res.json(); } catch (err) { return; }
-                if (data && data.error) return;
-
-                const headerBadge = document.getElementById('headerUnreadCount');
-                const headerIcon = document.getElementById('headerNotifications');
-                const panel = document.getElementById('headerNotificationsPanel');
-
-                // Update header badge
-                if (headerBadge) headerBadge.textContent = data.unread_count > 0 ? data.unread_count : '';
-                if (headerIcon) {
-                    if (data.unread_count > 0) headerIcon.classList.add('has-unread');
-                    else headerIcon.classList.remove('has-unread');
-                }
-
-                // Pulse animation when new notifications arrive
-                if (data.unread_count > _lastUnreadCount && data.unread_count > 0) {
-                    if (headerBadge) {
-                        headerBadge.classList.add('pulse');
-                        setTimeout(() => headerBadge.classList.remove('pulse'), 1200);
-                    }
-                }
-                _lastUnreadCount = data.unread_count || 0;
-
-                // Populate header panel with up to 6 notifications (simple list)
-                if (panel) {
-                    panel.innerHTML = data.notifications && data.notifications.length ? data.notifications.slice(0,6).map(n=>`
-                        <div class="header-notif ${n.is_read ? 'read' : 'unread'}" data-id="${n.notification_id}">
-                            <div class="hn-title">${n.title}</div>
-                            <div class="hn-msg">${n.message}</div>
-                            <div class="hn-time">${new Date(n.created_at).toLocaleString()}</div>
-                        </div>
-                    `).join('') : '<div class="header-notif empty">No notifications</div>';
-                }
-            } catch (err) { /* Error fetching notifications (silenced) */ }
-        }
-
-        document.addEventListener('DOMContentLoaded', function() {
-            // Initial fetch
-            updateNotifications();
-            setInterval(updateNotifications, 30000);
-
-            // Toggle header notifications panel
-            const headerNotifications = document.getElementById('headerNotifications');
-            const panel = document.getElementById('headerNotificationsPanel');
-            if (headerNotifications && panel) {
-                headerNotifications.addEventListener('click', function(e) {
-                    e.stopPropagation();
-                    panel.classList.toggle('open');
-                });
-                // Close when clicking outside
-                document.addEventListener('click', function() {
-                    panel.classList.remove('open');
-                });
-                panel.addEventListener('click', function(e){ e.stopPropagation(); });
-            }
-        });
-        </script>
-    </div>
-    
-    <!-- Edit Project Modal will be created dynamically -->
-    <script>
-    function createEditProjectModal() {
-        // Append the modal directly to body so it's outside any transformed parents
-        if (document.getElementById('editProjectModal')) return document.getElementById('editProjectModal');
-
-        const projectName = <?= json_encode($project['project_name']) ?>;
-        const projectDesc = <?= json_encode($project['description']) ?>;
-
-        const modal = document.createElement('div');
-        modal.className = 'modal';
-        modal.id = 'editProjectModal';
-        modal.dataset.persistent = '0';
-        modal.innerHTML = `
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h3 class="modal-title">Edit Project</h3>
-                    <button type="button" class="close-modal" data-action="close-edit">&times;</button>
-                </div>
-                <form method="POST">
-                    <div class="form-group">
-                        <label for="project_name">Project Name</label>
-                        <input type="text" id="project_name" name="project_name" value="${projectName}" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="project_description">Description</label>
-                        <textarea id="project_description" name="project_description" required>${projectDesc}</textarea>
-                    </div>
-
-                    <div class="modal-actions">
-                        <button type="button" class="action-btn" data-action="close-edit">Cancel</button>
-                        <button type="submit" name="update_project" class="action-btn check-btn">Save Changes</button>
-                    </div>
-                </form>
-            </div>
-        `;
-        document.body.appendChild(modal);
-
-        // Wire up close buttons to toggle the active class
-        modal.querySelectorAll('[data-action="close-edit"]').forEach(btn => {
-            btn.addEventListener('click', function(ev) {
-                ev.preventDefault();
-                modal.classList.remove('active');
-                document.body.style.overflow = '';
-            });
-        });
-
-        // Close when clicking overlay (unless persistent)
-        modal.addEventListener('click', function(e){
-            if (e.target === modal && modal.dataset.persistent !== '1') {
-                modal.classList.remove('active');
-                document.body.style.overflow = '';
-            }
-        });
-
-        return modal;
-    }
-    </script>
-    
-    <!-- Add Material modal will be created dynamically to avoid accidental auto-open -->
-    <script>
-        function createAddMaterialModal(){
-            if (document.getElementById('addMaterialModal')) return document.getElementById('addMaterialModal');
-            const modal = document.createElement('div');
-            modal.className = 'modal';
-            modal.id = 'addMaterialModal';
-            modal.dataset.persistent = '0';
-            modal.innerHTML = `
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h3 class="modal-title">Add Material</h3>
-                        <button type="button" class="close-modal" data-action="close-add">&times;</button>
-                    </div>
-                    <form method="POST">
-                        <div class="form-group">
-                            <label for="material_name">Material Name</label>
-                            <input type="text" id="material_name" name="material_name" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="quantity">Quantity</label>
-                            <input type="number" id="quantity" name="quantity" min="1" required>
-                        </div>
-                        <div class="modal-actions">
-                            <button type="button" class="action-btn" data-action="close-add">Cancel</button>
-                            <button type="submit" name="add_material" class="action-btn check-btn">Add Material</button>
-                        </div>
-                    </form>
-                </div>
-            `;
-            document.body.appendChild(modal);
-            // attach close handlers
-            modal.querySelectorAll('[data-action="close-add"]').forEach(btn=>{
-                btn.addEventListener('click', function(ev){ ev.preventDefault(); modal.classList.remove('active'); document.body.style.overflow = ''; });
-            });
-            // overlay click
-            modal.addEventListener('click', function(e){ if (e.target === modal && modal.dataset.persistent !== '1'){ modal.classList.remove('active'); document.body.style.overflow = ''; } });
-            return modal;
-        }
-    </script>
-    <script>
-    // helper to close any open modal to avoid stacked modals
-    function closeAllModals(){
-        document.querySelectorAll('.modal.active').forEach(m=>{ m.classList.remove('active'); });
-        document.body.style.overflow = '';
-    }
-
-    // initialize shared modal with server data (only if share button exists)
-    (function(){
-        const shareBtn = document.getElementById('shareBtn');
-        if (!shareBtn) return;
-        // prepare materials & steps arrays for summary
-        const materialsData = <?= json_encode(array_map(function($m){
-            return [
-                'id' => (int)($m['material_id'] ?? $m['id'] ?? 0),
-                'name' => $m['name'] ?? $m['material_name'] ?? ''
-            ];
-        }, $materials)); ?>;
-        const stepsData = <?= json_encode(array_map(function($s){ return ['title'=>$s['title'] ?? '']; }, $steps)); ?>;
-
-        // initialize and override shareBtn click to close other modals first
-        (function initSharedModal(attemptsLeft){
-            attemptsLeft = typeof attemptsLeft === 'number' ? attemptsLeft : 20; // ~2s total (20 * 100ms)
-            if (window.sharedModalAPI && typeof window.sharedModalAPI.init === 'function') {
-                try {
-                    window.sharedModalAPI.init({ projectId: <?= $project_id ?>, materials: materialsData, steps: stepsData });
-                } catch (e) {
-                    /* sharedModalAPI.init() threw (silenced) */
-                }
-                // attach click handler that safely opens the modal if available
-                shareBtn.addEventListener('click', function(){
-                    closeAllModals();
-                    if (window.sharedModalAPI && typeof window.sharedModalAPI.open === 'function') {
-                        window.sharedModalAPI.open();
-                    }
-                });
-            } else if (attemptsLeft > 0) {
-                // try again shortly in case the library is still loading
-                setTimeout(function(){ initSharedModal(attemptsLeft - 1); }, 100);
-            } else {
-                // give up after retries; attach a safe click handler so UX isn't broken
-                shareBtn.addEventListener('click', function(){ closeAllModals(); });
-            }
-        })();
-    })();
-    </script>
-    
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const userProfile = document.getElementById('userProfile');
-    const profileDropdown = userProfile ? userProfile.querySelector('.profile-dropdown') : null;
-
-    if (userProfile) {
-        userProfile.addEventListener('click', function(e) {
-            e.preventDefault();
-            userProfile.classList.toggle('active');
-        });
-
-        // Close dropdown when clicking outside
-        document.addEventListener('click', function(e) {
-            if (!userProfile.contains(e.target)) {
-                userProfile.classList.remove('active');
-            }
-        });
-    }
-});
-</script>
-<script>
-// JS to toggle project step completion and update the UI
-async function toggleStep(stepId, projectId, btn) {
-    try {
-        btn.disabled = true;
-        const icon = btn.querySelector('i');
-        // Determine current state from icon class
-        const currentlyDone = icon.classList.contains('fa-check-circle');
-        const newDone = currentlyDone ? 0 : 1;
-
-        const form = new FormData();
-        form.append('action', 'toggle_step');
-        form.append('project_id', projectId);
-        form.append('step_id', stepId);
-        form.append('done', newDone);
-
-        const res = await fetch('update_project.php', {
-            method: 'POST',
-            body: form
-        });
-        const json = await res.json();
-        if (json.success) {
-            // Toggle icon
-            if (newDone) {
-                icon.classList.remove('fa-circle');
-                icon.classList.add('fa-check-circle');
-                btn.title = 'Mark incomplete';
-                btn.closest('.step-card').classList.add('step-done');
-            } else {
-                icon.classList.remove('fa-check-circle');
-                icon.classList.add('fa-circle');
-                btn.title = 'Mark complete';
-                btn.closest('.step-card').classList.remove('step-done');
-            }
-        } else {
-            if (typeof showToast === 'function') showToast(json.message || 'Could not update step status', 'error');
-            else alert(json.message || 'Could not update step status');
-        }
-    } catch (error) {
-        console.error('Error:', error);
-        if (typeof showToast === 'function') showToast('Network error while updating step', 'error');
-        else alert('Network error while updating step');
-    } finally {
-        btn.disabled = false;
-    }
-}
-
-// Optional: add click handler for delegation if needed
-document.addEventListener('click', function (e) {
-    const btn = e.target.closest('.step-actions .check-btn');
-    if (btn && btn.dataset.bound !== '1') {
-        // Bound via inline onclick in markup; no-op here
-        btn.dataset.bound = '1';
-    }
-});
-
-</script>
-<!-- project-stages.css already linked in head -->
-
-<script>
-// ...existing code continues (keeps the later, improved completeStage implementation)
-
-// Image viewer functionality
-function openImageViewer(src) {
-    let viewer = document.querySelector('.image-viewer');
-    if (!viewer) {
-        viewer = document.createElement('div');
-        viewer.className = 'image-viewer';
-        viewer.onclick = () => viewer.style.display = 'none';
-        document.body.appendChild(viewer);
-    }
-    
-    viewer.innerHTML = `<img src="${src}" alt="Full size image">`;
-    viewer.style.display = 'flex';
-}
-
-// Close image viewer on Escape key as well
-document.addEventListener('keydown', function(ev){
-    if (ev.key === 'Escape') {
-        const v = document.querySelector('.image-viewer');
-        if (v && v.style && v.style.display === 'flex') v.style.display = 'none';
-    }
-});
-
-// Initialize modal controls only when needed
-(function(){
-    // Create modal when edit button is clicked
-    const editBtn = document.querySelector('[data-action="edit-project"]');
-    if (editBtn) {
-        editBtn.addEventListener('click', function(ev) {
-            ev.preventDefault();
-            ev.stopPropagation();
-            
-            // Create modal if it doesn't exist yet
-            const modal = createEditProjectModal();
-            if (modal) {
-                modal.classList.add('active');
-                document.body.style.overflow = 'hidden';
-            }
-        });
-    }
-    
-    // Global click handler to ensure modals can be closed by explicit controls only
-    document.addEventListener('click', function(e) {
-        // If clicked on overlay (element with class 'modal'), only close if it's not the confirm modal
-        const target = e.target;
-        if (target.classList && target.classList.contains('modal')) {
-            // keep persistent modals (like confirm) open until user explicit action
-            if (target.dataset && target.dataset.persistent === '1') return;
-            target.classList.remove('active');
-            document.body.style.overflow = '';
-        }
-    });
-    
-    // Ensure any existing modal is hidden on load
-    document.addEventListener('DOMContentLoaded', function() {
-        const existingModal = document.getElementById('editProjectModal');
-        if (existingModal) {
-            existingModal.style.display = 'none';
-        }
-    });
-})();
-</script>
-<script>
-document.addEventListener('DOMContentLoaded', function(){
-    try {
-        const searchAndHash = String((location && (location.search || '') + (location.hash || '')) || '');
-        const isDebug = /(?:\?|&|#)debug=1\b/.test(searchAndHash) || searchAndHash.indexOf('debug=1') !== -1;
-        if (!isDebug) return;
-        // Create overlay skeleton if not present
-        if (!document.getElementById('matDebugOverlay')) {
-            const dbg = document.createElement('div'); dbg.id = 'matDebugOverlay';
-            dbg.style.position = 'fixed'; dbg.style.right = '12px'; dbg.style.bottom = '12px'; dbg.style.width = '360px'; dbg.style.maxHeight = '60vh'; dbg.style.overflow = 'auto'; dbg.style.background = 'rgba(0,0,0,0.85)'; dbg.style.color = '#fff'; dbg.style.zIndex = '99999'; dbg.style.padding = '10px'; dbg.style.fontSize = '13px'; dbg.style.borderRadius = '8px'; dbg.style.boxShadow = '0 8px 24px rgba(0,0,0,0.4)';
-            const hdr = document.createElement('div'); hdr.style.display = 'flex'; hdr.style.justifyContent = 'space-between'; hdr.style.alignItems = 'center'; hdr.style.marginBottom = '8px';
-            const hTitle = document.createElement('div'); hTitle.textContent = 'Material Debug'; hTitle.style.fontWeight = '700'; hTitle.style.fontSize = '13px';
-            const runBtn = document.createElement('button'); runBtn.textContent = 'Run check'; runBtn.style.fontSize = '12px'; runBtn.style.padding = '4px 8px'; runBtn.style.borderRadius = '6px'; runBtn.style.cursor = 'pointer'; runBtn.style.border = 'none'; runBtn.style.background = '#2E8B57'; runBtn.style.color = '#fff'; runBtn.addEventListener('click', function(){ try{ window.runMaterialStageCheck && window.runMaterialStageCheck(); }catch(e){} });
-            hdr.appendChild(hTitle); hdr.appendChild(runBtn);
-            dbg.appendChild(hdr);
-            const content = document.createElement('div'); content.id = 'matDebugContent'; content.textContent = 'Waiting for data...'; dbg.appendChild(content);
-            document.body.appendChild(dbg);
-        }
-        // Force a check so entries populate
-        try { if (typeof refreshMaterialCollectionReqState === 'function') refreshMaterialCollectionReqState(); } catch(e) { console.error('Initial debug refresh failed', e); }
-        // define a detailed run function for debugging
-        try {
-            window.runMaterialStageCheck = function(){
-                try {
-                    const stages = Array.from(document.querySelectorAll('.stage-materials'));
-                    const report = [];
-                    stages.forEach((materialsNode, si) => {
-                        const stageCard = materialsNode.closest('.stage-card') || materialsNode.closest('.workflow-stage') || materialsNode.parentElement;
-                        const stageIdx = stageCard ? (stageCard.getAttribute('data-stage-index') || 'unknown') : 'unknown';
-                        const btn = stageCard ? (stageCard.querySelector('.stage-actions button[data-stage-number]') || stageCard.querySelector('button.complete-stage-btn[data-stage-number]')) : null;
-                        const items = Array.from(materialsNode.querySelectorAll('.material-item'));
-                        const per = items.map(li => {
-                            const nameEl = li.querySelector('.mat-name');
-                            const name = nameEl ? nameEl.textContent.trim() : ('#' + (li.dataset.materialId || ''));
-                            const qtyEl = li.querySelector('.mat-qty');
-                            const qty = qtyEl ? qtyEl.textContent.trim() : null;
-                            const badge = !!li.querySelector('.badge.obtained');
-                            const photos = li.querySelector('.material-photos');
-                            const photo = !!(photos && photos.querySelector('.material-photo:not(.placeholder)'));
-                            return { name, qty, badge, photo };
-                        });
-                        const total = per.length;
-                        const have = per.filter(x => x.badge || x.photo).length;
-                        const reqOk = total === 0 ? true : (have >= total);
-                        /* debug: stage check (silenced) */
-                        const content = document.getElementById('matDebugContent');
-                        if (content) {
-                            if (!content._entries) content._entries = [];
-                            content._entries[stageIdx] = `<div style="margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,0.08)"><strong>Stage ${stageIdx}</strong><br>materials: ${total}<br>satisfied: ${have}<br>reqOk: ${reqOk}</div>`;
-                            content.innerHTML = Object.keys(content._entries).sort().map(k => content._entries[k]).join('');
-                        }
-                        if (btn) {
-                            btn.dataset.reqOk = reqOk ? '1' : '0';
-                            if (reqOk) btn.removeAttribute('disabled'); else if (!btn.dataset.forceEnabled) btn.setAttribute('disabled','');
-                        }
-                        report.push({ stageIdx, total, have, reqOk, button: !!btn });
-                    });
-                    // debug logging removed
-                    return report;
-                } catch(err) { /* runMaterialStageCheck failed (silenced) */ return null; }
-            };
-        } catch(e) { /* failed to define runMaterialStageCheck (silenced) */ }
-    } catch(e) { /* debug init failed (silenced) */ }
-});
-</script>
-<script>
-// NOTE: removed previous unconditional hide of .toast-success so dynamic toasts
-// created by showToast() aren't hidden prematurely.
-
-// Auto-hide any server-rendered toasts after 3s but leave dynamic toasts to showToast handler
-document.addEventListener('DOMContentLoaded', function(){
-    // Clean up URL if it has success parameter
-    if (window.history && window.history.replaceState) {
-        const url = new URL(window.location.href);
-        if (url.searchParams.has('success')) {
-            url.searchParams.delete('success');
-            window.history.replaceState({}, '', url.toString());
-        }
-    }
-
-    // Move any server-rendered toasts into the top-center container used by showToast()
-    let toastContainer = document.getElementById('toastContainer');
-    if (!toastContainer) {
-        toastContainer = document.createElement('div');
-        toastContainer.id = 'toastContainer';
-        toastContainer.style.position = 'fixed';
-        toastContainer.style.top = '18px';
-        toastContainer.style.left = '50%';
-        toastContainer.style.transform = 'translateX(-50%)';
-        toastContainer.style.zIndex = '9999';
-        toastContainer.style.display = 'flex';
-        toastContainer.style.flexDirection = 'column';
-        toastContainer.style.alignItems = 'center';
-        toastContainer.style.gap = '8px';
-        toastContainer.style.pointerEvents = 'none';
-        document.body.appendChild(toastContainer);
-    }
-
-    document.querySelectorAll('.toast[data-server-toast]').forEach(function(node){
-        // move node into container
-        node.style.pointerEvents = 'auto';
-        toastContainer.appendChild(node);
-        // auto-hide after 3s
-        setTimeout(function(){
-            node.classList.remove('show');
-            node.classList.add('hide');
-            setTimeout(()=>{ try{ node.remove(); }catch(e){} }, 420);
-        }, 3000);
-        // ensure server toasts show immediately
-        requestAnimationFrame(()=> node.classList.add('show'));
-    });
-});
-
-// Function to handle photo upload
-function uploadStagePhoto(stageNumber){
-    // Open the modal allowing selecting before/after and the file
-    showStagePhotoModal(stageNumber, null, projectId);
-}
-
-// Create and show a modal that allows uploading specific stage photo types
-function showStagePhotoModal(stageNumber, missingTypes, projectId){
-    // missingTypes: null or array like ['before','after']
-    let modal = document.getElementById('stagePhotoModal');
-    if (modal) modal.remove();
-
-    modal = document.createElement('div');
-    modal.className = 'modal';
-    modal.id = 'stagePhotoModal';
-    modal.dataset.persistent = '0';
-
-    const types = Array.isArray(missingTypes) && missingTypes.length ? missingTypes : ['before','after','other'];
-
-    modal.innerHTML = `
-        <div class="modal-content" style="max-width:520px;padding:18px;">
-            <h3 style="margin-top:0;">Upload stage photo</h3>
-            <p>Please upload the required photo(s) for this stage.</p>
-            <div id="stagePhotoButtons" style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0"></div>
-            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;">
-                <button data-action="close-stage-photo" class="btn">Close</button>
-                <button data-action="try-complete" class="btn btn-primary">Try to complete stage</button>
-            </div>
-        </div>
-    `;
-
-    document.body.appendChild(modal);
-    document.body.style.overflow = 'hidden';
-    requestAnimationFrame(()=> modal.classList.add('active'));
-
-    const container = modal.querySelector('#stagePhotoButtons');
-
-    function createUploader(type){
-        const wrapper = document.createElement('div');
-        wrapper.style.display = 'flex';
-        wrapper.style.flexDirection = 'column';
-        wrapper.style.alignItems = 'stretch';
-        wrapper.style.minWidth = '160px';
-
-        const label = document.createElement('div');
-        label.textContent = type.toUpperCase();
-        label.style.fontWeight = '600';
-        label.style.marginBottom = '6px';
-
-        const btn = document.createElement('button');
-        btn.className = 'btn';
-        btn.textContent = 'Upload ' + type;
-
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = 'image/*';
-        input.style.display = 'none';
-
-        btn.addEventListener('click', ()=> input.click());
-
-        input.addEventListener('change', async function(e){
-            const file = input.files[0];
-            if (!file) return;
-            if (file.size > 5 * 1024 * 1024) { showToast('File must be <5MB', 'error'); return; }
-            const fd = new FormData();
-            fd.append('photo', file);
-            fd.append('photo_type', type);
-            fd.append('stage_number', stageNumber);
-            fd.append('project_id', projectId);
-
-            try {
-                btn.disabled = true;
-                btn.textContent = 'Uploading…';
-                const res = await fetch('upload_stage_photo.php', { method: 'POST', body: fd });
-                const j = await res.json();
-                if (j && j.success) {
-                    showToast(type + ' uploaded', 'success');
-                    // remove this uploader if it was a missing requirement
-                    if (Array.isArray(missingTypes)) {
-                        wrapper.remove();
-                        // if none left, enable Try button so user can attempt completion
-                        try {
-                            const tryBtn = modal.querySelector('[data-action="try-complete"]');
-                            const remaining = modal.querySelectorAll('#stagePhotoButtons > div');
-                            if (tryBtn && (!remaining || remaining.length === 0)) {
-                                tryBtn.disabled = false;
-                            }
-                        } catch (e) { /* ignore */ }
-                    } else {
-                        // leave as-is but show thumbnail? (omitted)
-                    }
-                    // tell the page to recompute requirement state (enables the main complete button)
-                    try { if (typeof refreshMaterialCollectionReqState === 'function') refreshMaterialCollectionReqState(); } catch(e){}
-                } else {
-                    showToast(j && j.message ? j.message : 'Upload failed', 'error');
-                    btn.disabled = false;
-                    btn.textContent = 'Upload ' + type;
-                }
-            } catch (err) {
-                console.error(err);
-                showToast('Network error', 'error');
-                btn.disabled = false;
-                btn.textContent = 'Upload ' + type;
-            }
-        });
-
-        wrapper.appendChild(label);
-        wrapper.appendChild(btn);
-        wrapper.appendChild(input);
-        return wrapper;
-    }
-
-    types.forEach(t => container.appendChild(createUploader(t)));
-
-    // If modal was opened specifically for missing types, disable the Try button until uploads complete
-    try {
-        const tryBtn = modal.querySelector('[data-action="try-complete"]');
-        if (tryBtn && Array.isArray(missingTypes) && missingTypes.length) tryBtn.disabled = true;
-    } catch(e) {}
-
-    // Close handlers
-    modal.querySelector('[data-action="close-stage-photo"]').addEventListener('click', function(){ modal.classList.remove('active'); setTimeout(()=>{ try{ modal.remove(); document.body.style.overflow = ''; }catch(e){} }, 220); });
-
-    modal.querySelector('[data-action="try-complete"]').addEventListener('click', function(){
-        // attempt to complete the stage now (re-use existing completeStage)
-        modal.classList.remove('active');
-        setTimeout(()=>{ try{ modal.remove(); document.body.style.overflow = ''; } catch(e){} }, 220);
-        // call completeStage programmatically without an event
-        completeStage(null, stageNumber, projectId);
-    });
-
-    // close if clicking overlay
-    modal.addEventListener('click', function(e){ if (e.target === modal) { modal.classList.remove('active'); setTimeout(()=>{ try{ modal.remove(); document.body.style.overflow = ''; }catch(e){} }, 220); } });
-}
-    // Define completeStage function and resolve the button element from event or by stageNumber
-    async function completeStage(event, stageNumber, projectId) {
-    // Resolve the button element from event or by stageNumber
-    let btn = event && event.currentTarget ? event.currentTarget : (event && event.target ? event.target : null);
-    if (btn && btn.tagName && btn.tagName.toLowerCase() === 'i') btn = btn.closest('button');
-    if (!btn) btn = document.querySelector('.complete-stage-btn[data-stage-number="' + stageNumber + '"]');
-
-    try {
-        // If requirements are not satisfied, open the photo modal instead of posting
-        if (btn && btn.dataset && btn.dataset.reqOk === '0') {
-                showStagePhotoModal(stageNumber, null, projectId);
-                return;
-        }
-        // If button is disabled/aria-disabled and not a Completed state, ignore click (but allow toggling when it shows Completed)
-        if (btn) {
-            const ariaDisabled = btn.getAttribute && btn.getAttribute('aria-disabled') === 'true';
-            if ((btn.disabled || ariaDisabled) && !(btn.textContent || '').toLowerCase().includes('completed')) {
-                // debug removed
-                return;
-            }
-        }
-
-        // Provide immediate UI feedback
-        if (btn) {
-            btn.disabled = true;
-            btn.dataset._origHtml = btn.innerHTML;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Working...';
-        }
-
-        // POST to server with proper headers
-        const response = await fetch('complete_stage.php', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'X-Requested-With': 'XMLHttpRequest'
-            },
-            body: 'stage_number=' + encodeURIComponent(stageNumber) + '&project_id=' + encodeURIComponent(projectId)
-        });
-
-        const data = await response.json().catch(() => null);
-        if (data && data.success) {
-            // Update DOM: mark this stage completed and advance to the next stage
-            try {
-                const stageEl = btn ? btn.closest('.workflow-stage') : null;
-                if (stageEl) {
-                    stageEl.classList.remove('current');
-                    stageEl.classList.add('completed');
-
-                    // mark matching tab as completed
-                    const idx = parseInt(stageEl.getAttribute('data-stage-index'), 10);
-                    const tab = document.querySelector('.stage-tab[data-stage-index="' + idx + '"]');
-                    if (tab) { tab.classList.remove('active'); tab.classList.add('completed'); }
-
-                    // move to next stage (if any)
-                    let next = stageEl.nextElementSibling;
-                    while (next && !next.classList.contains('workflow-stage')) next = next.nextElementSibling;
-                    if (next) {
-                        next.classList.remove('locked');
-                        next.classList.add('current');
-                        const nextIdx = parseInt(next.getAttribute('data-stage-index'), 10);
-                        // switch visible content and active tab
-                        if (typeof showStageByIndex === 'function') showStageByIndex(nextIdx);
-                    } else {
-                        // If there is no next stage, refresh to show final state
-                        setTimeout(() => window.location.reload(), 700);
-                    }
-                }
-            } catch (err) { console.error('DOM update after completeStage failed', err); }
-
-            // Update progress bar text & fill
-            try {
-                const total = document.querySelectorAll('.workflow-stage').length;
-                const completed = document.querySelectorAll('.workflow-stage.completed').length;
-                const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
-                const fill = document.querySelector('.progress-fill');
-                const strong = document.querySelector('.progress-indicator strong');
-                if (fill) fill.style.width = percent + '%';
-                if (strong) strong.textContent = percent + '%';
-            } catch (err) { /* non-fatal */ }
-
-            // restore button state (if still present)
-            if (btn) { btn.disabled = false; btn.innerHTML = btn.dataset._origHtml || '<i class="fas fa-check"></i> Completed'; }
-            if (typeof showToast === 'function') showToast(data.message || 'Stage completed', 'success');
-
-        } else {
-            // Server indicated failure
-            if (data && data.reason === 'missing_stage_photos') {
-                // open photo modal with missing types suggested by server
-                showStagePhotoModal(stageNumber, data.missing || null, projectId);
-                if (typeof showToast === 'function') showToast('Please upload photos for every materials', 'error');
-            } else {
-                if (typeof showToast === 'function') showToast((data && data.message) ? data.message : 'Could not complete stage', 'error');
-            }
-            if (btn) { btn.disabled = false; btn.innerHTML = btn.dataset._origHtml || '<i class="fas fa-check"></i> Mark as Complete'; }
-        }
-
-    } catch (error) {
-        if (typeof showToast === 'function') showToast('Network error while completing stage', 'error');
-        if (btn) { btn.disabled = false; btn.innerHTML = btn.dataset._origHtml || '<i class="fas fa-check"></i> Mark as Complete'; }
-    }
-    }
-// End of completeStage function
 
     // ===== DELETE PROJECT HANDLERS =====
     function confirmDeleteProject(projectId) {

@@ -139,6 +139,21 @@ try {
             background: #6b8d43;
         }
 
+        .delete-project {
+            padding: 8px 16px;
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+        }
+
+        .delete-project:hover { background: #c82333; }
+
         .materials-section {
             background: #f9f9f9;
             border-radius: 8px;
@@ -279,6 +294,7 @@ try {
                         <i class="fas fa-edit"></i>
                         Edit Project
                     </button>
+                    <button class="delete-project" onclick="confirmDeleteProject(<?= (int)$project_id ?>)"><i class="fas fa-trash"></i> Delete Project</button>
                 </div>
             </div>
 
@@ -328,6 +344,20 @@ try {
 
         function showAddMaterialForm() {
             // Implementation for adding materials
+        }
+
+        function confirmDeleteProject(pid) {
+            if (!pid) return;
+            if (!confirm('Delete this project? This action cannot be undone.')) return;
+            const fd = new URLSearchParams(); fd.append('project_id', pid);
+            fetch('delete_project.php', { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(r => r.json()).then(data => {
+                if (data && data.success) {
+                    window.location = 'projects.php';
+                } else {
+                    alert(data && data.message ? data.message : 'Failed to delete project');
+                }
+            }).catch(()=>{ alert('Network error deleting project'); });
         }
     </script>
 </body>

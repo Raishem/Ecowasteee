@@ -378,12 +378,16 @@ body .stage-tabs .stage-tab.locked * {
 
 /* Tabs styling */
 .stage-tabs { 
-    display: flex; 
-    gap: 8px; 
-    align-items: center; 
-    margin-bottom: 20px;
-    padding: 4px;
-    justify-content: center;
+    display: flex !important; 
+    flex-direction: row !important; /* always lay tabs left-to-right */
+    gap: 12px !important; 
+    align-items: center !important; 
+    margin-bottom: 20px !important;
+    padding: 8px 12px !important;
+    justify-content: center !important; /* center tabs in the parent container */
+    width: 100% !important; /* ensure tabs take full width so they do not collapse into a column */
+    box-sizing: border-box !important;
+    flex-wrap: nowrap !important; /* keep tabs on the same row; allow scrolling instead of wrapping */
 }
 
 .stage-tab { 
@@ -400,7 +404,13 @@ body .stage-tabs .stage-tab.locked * {
     margin: 0 8px;
     min-width: 140px; /* give more room so title + badge fit comfortably */
     box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+    flex: 0 0 auto; /* prevent tabs from stretching to full width */
 }
+
+/* Make sure the stage-tabs container remains a horizontal bar when other layout
+   CSS tries to position it into a vertical column (some pages use a two-column
+   timeline layout). The above rules force a left-to-right layout and will keep
+   tabs centered across all project pages. */
 
 .stage-tab:hover {
     transform: translateY(-3px);
