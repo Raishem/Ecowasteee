@@ -194,41 +194,89 @@ try {
                 <div class="progress-indicator"><strong>0%</strong> of stages completed. (0 of 3)</div>
                 <div class="progress-bar"><div class="progress-fill" style="width:0%"></div></div>
 
+                <?php
+                // Server-driven workflow: force three stages (Preparation, Construction, Share)
+                $desired = [
+                    ['key' => 'preparation', 'label' => 'Preparation', 'description' => 'Collect materials required for this project'],
+                    ['key' => 'construction', 'label' => 'Construction', 'description' => 'Build your project'],
+                    ['key' => 'share', 'label' => 'Share', 'description' => 'Share your project with the community']
+                ];
+
+                $available_templates = [];
+                try {
+                    $tpl_stmt = $conn->prepare("SELECT stage_number, stage_name, description FROM stage_templates");
+                    if ($tpl_stmt) { $tpl_stmt->execute(); $tres = $tpl_stmt->get_result(); while ($r = $tres->fetch_assoc()) { $available_templates[] = $r; } }
+                } catch (Exception $e) { /* ignore */ }
+
+                $workflow_stages = [];
+                foreach ($desired as $i => $d) {
+                    $foundTemplate = null;
+                    foreach ($available_templates as $t) {
+                        $name = strtolower($t['stage_name'] ?? '');
+                        if ($d['key'] === 'preparation' && (stripos($name, 'prepar') !== false || stripos($name, 'material') !== false)) { $foundTemplate = $t; break; }
+                        if ($d['key'] === 'construction' && stripos($name, 'construct') !== false) { $foundTemplate = $t; break; }
+                        if ($d['key'] === 'share' && stripos($name, 'share') !== false) { $foundTemplate = $t; break; }
+                    }
+                    $tplNum = null; $desc = $d['description'];
+                    if ($foundTemplate) { $tplNum = (int)$foundTemplate['stage_number']; if (!empty($foundTemplate['description'])) $desc = $foundTemplate['description']; }
+                    $workflow_stages[] = ['name' => $d['label'], 'description' => $desc, 'number' => $i + 1, 'template_number' => $tplNum];
+                }
+
+                // Map template_number => index
+                $numToIndex = [];
+                foreach ($workflow_stages as $i => $st) { $num = isset($st['template_number']) ? (int)$st['template_number'] : (int)($st['number'] ?? ($i+1)); $numToIndex[$num] = $i; }
+
+                // Get completed stages for this project
+                $completed_stage_map = [];
+                try {
+                    $stage_stmt = $conn->prepare("SELECT stage_number, MAX(completed_at) AS completed_at FROM project_stages WHERE project_id = ? GROUP BY stage_number");
+                    if ($stage_stmt) { $stage_stmt->bind_param('i', $project_id); $stage_stmt->execute(); $stage_result = $stage_stmt->get_result(); while ($s = $stage_result->fetch_assoc()) { $raw_num = (int)$s['stage_number']; if (!is_null($s['completed_at']) && isset($numToIndex[$raw_num])) { $idx = $numToIndex[$raw_num]; $completed_stage_map[$idx] = $s['completed_at']; } } }
+                } catch (Exception $e) { $completed_stage_map = []; }
+
+                $total_stages = count($workflow_stages);
+                $completed_stages = 0;
+                for ($i = 0; $i < $total_stages; $i++) { if (array_key_exists($i, $completed_stage_map)) $completed_stages++; }
+                $completed_stages = max(0, min($completed_stages, $total_stages));
+                $progress_percent = $total_stages > 0 ? (int) round(($completed_stages / $total_stages) * 100) : 0;
+                if ($total_stages === 0) $current_stage_index = 0; elseif ($completed_stages >= $total_stages) $current_stage_index = max(0, $total_stages - 1); else $current_stage_index = $completed_stages;
+                ?>
+
                 <div class="stage-tabs">
-                    <button class="stage-tab active" data-stage-index="0" data-stage-number="1">
-                        <span class="tab-icon"><i class="fas fa-box-open"></i></span>
-                        <span class="tab-meta"><span class="tab-title">Preparation</span><span class="tab-badge current">Current</span></span>
+                    <?php foreach ($workflow_stages as $i => $st):
+                        $tn = isset($st['template_number']) ? (int)$st['template_number'] : (int)($st['number'] ?? $i + 1);
+                        $is_completed = array_key_exists($i, $completed_stage_map);
+                        $is_current = !$is_completed && ($i === $current_stage_index);
+                        $is_locked = !$is_completed && ($i > $current_stage_index);
+                        $badgeClass = $is_completed ? 'completed' : ($is_current ? 'current' : ($is_locked ? 'locked' : 'incomplete'));
+                        $stage_name_lower = strtolower($st['name'] ?? '');
+                        $iconClass = 'fas fa-circle'; if (stripos($stage_name_lower, 'material') !== false) $iconClass = 'fas fa-box-open'; elseif (stripos($stage_name_lower, 'prepar') !== false) $iconClass = 'fas fa-tools'; elseif (stripos($stage_name_lower, 'construct') !== false) $iconClass = 'fas fa-hard-hat'; elseif (stripos($stage_name_lower, 'share') !== false) $iconClass = 'fas fa-share-alt';
+                    ?>
+                    <button class="stage-tab <?= ($i === $current_stage_index) ? 'active' : '' ?> <?= $is_locked ? 'locked' : '' ?>" data-stage-index="<?= $i ?>" data-stage-number="<?= $tn ?>">
+                        <span class="tab-icon"><i class="<?= $iconClass ?>"></i></span>
+                        <span class="tab-meta"><span class="tab-title"><?= htmlspecialchars($st['name']) ?></span><span class="tab-badge <?= $badgeClass ?>"><?php echo $is_completed ? 'Completed' : ($is_current ? 'Current' : ($is_locked ? 'Locked' : 'Incomplete')) ?></span></span>
                     </button>
-                    <button class="stage-tab locked" data-stage-index="1" data-stage-number="2">
-                        <span class="tab-icon"><i class="fas fa-hard-hat"></i></span>
-                        <span class="tab-meta"><span class="tab-title">Construction</span><span class="tab-badge locked">Locked</span></span>
-                    </button>
-                    <button class="stage-tab locked" data-stage-index="2" data-stage-number="3">
-                        <span class="tab-icon"><i class="fas fa-share-alt"></i></span>
-                        <span class="tab-meta"><span class="tab-title">Share</span><span class="tab-badge locked">Locked</span></span>
-                    </button>
+                    <?php endforeach; ?>
                 </div>
 
                 <div class="workflow-stages-container stages-timeline">
-                    <div class="workflow-stage stage-card active current" data-stage-index="0">
+                    <?php foreach ($workflow_stages as $index => $stage):
+                        $is_completed = array_key_exists($index, $completed_stage_map);
+                        $is_current = !$is_completed && ($index === $current_stage_index);
+                        $is_locked = !$is_completed && ($index > $current_stage_index);
+                        $stage_class = $is_completed ? 'completed' : ($is_current ? 'current' : ($is_locked ? 'locked' : 'inactive'));
+                    ?>
+                    <div class="workflow-stage stage-card <?= $stage_class ?> <?= $is_current ? 'active' : '' ?>" data-stage-index="<?= $index ?>">
                         <i class="fas fa-circle stage-icon" aria-hidden="true"></i>
                         <div class="stage-content">
                             <div class="stage-header">
-                                <div class="stage-info"><h3 class="stage-title">Preparation</h3>
-                                    <div class="stage-desc">Collect materials required for this project</div>
+                                <div class="stage-info">
+                                    <h3 class="stage-title"><?= htmlspecialchars($stage['name']) ?> <?php if ($is_completed): ?><i class="fas fa-check-circle stage-check" title="Completed"></i><?php endif; ?></h3>
+                                    <div class="stage-desc"><?= nl2br(htmlspecialchars($stage['description'] ?? '')) ?></div>
                                 </div>
                             </div>
-                            <!-- Materials list (existing content below will follow) -->
                         </div>
                     </div>
-                    <div class="workflow-stage stage-card locked" data-stage-index="1">
-                        <i class="fas fa-circle stage-icon" aria-hidden="true"></i>
-                        <div class="stage-content"><div class="stage-header"><div class="stage-info"><h3 class="stage-title">Construction</h3><div class="stage-desc">Build your project</div></div></div></div>
-                    </div>
-                    <div class="workflow-stage stage-card locked" data-stage-index="2">
-                        <i class="fas fa-circle stage-icon" aria-hidden="true"></i>
-                        <div class="stage-content"><div class="stage-header"><div class="stage-info"><h3 class="stage-title">Share</h3><div class="stage-desc">Share your finished project</div></div></div></div>
-                    </div>
+                    <?php endforeach; ?>
                 </div>
             </section>
 
