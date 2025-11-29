@@ -690,7 +690,7 @@ if ($action === 'update_delivery_status' && $_SERVER['REQUEST_METHOD'] === 'POST
 }
 
 
-// Confirm delivery receipt (Requester action)
+// Confirm delivery receipt (Requester action) - FIXED VERSION
 if ($action === 'confirm_delivery' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Content-Type: application/json');
     if (!isset($_SESSION['user_id'])) {
@@ -706,7 +706,7 @@ if ($action === 'confirm_delivery' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Verify requester ownership
     $stmt = $conn->prepare("
-        SELECT dr.request_id, dr.user_id, dr.delivery_status
+        SELECT dr.request_id, dr.user_id, dr.delivery_status, dr.donation_id
         FROM donation_requests dr
         WHERE dr.request_id = ?
     ");
@@ -725,20 +725,40 @@ if ($action === 'confirm_delivery' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
-    // Only allow confirmation if status is "On the Way"
-    if (strtolower($request['delivery_status']) !== 'on the way') {
+    // Allow confirmation if status is "On the Way" or "Delivered" (to prevent double confirmation)
+    $current_status = strtolower($request['delivery_status'] ?? '');
+    if ($current_status !== 'on the way' && $current_status !== 'delivered') {
         echo json_encode(["status" => "error", "message" => "Can only confirm delivery when item is 'On the Way'"]);
         exit;
     }
 
-    // Update to delivered status
+    // Update to delivered status and set delivery_end to current date
     $stmt = $conn->prepare("
         UPDATE donation_requests 
-        SET delivery_status = 'Delivered', delivery_start = COALESCE(delivery_start, CURDATE()), delivery_end = CURDATE()
+        SET delivery_status = 'Delivered', 
+            delivered_date = CURDATE(),
+            delivery_end = CURDATE()
         WHERE request_id = ?
     ");
+    $stmt->bind_param("i", $request_id);
     
     if ($stmt->execute()) {
+        // Also update the main donation status if this was the last item
+        $stmt = $conn->prepare("
+            UPDATE donations d
+            SET status = 'Completed',
+                delivered_at = CURDATE()
+            WHERE d.donation_id = ? 
+            AND NOT EXISTS (
+                SELECT 1 FROM donation_requests dr2 
+                WHERE dr2.donation_id = d.donation_id 
+                AND dr2.delivery_status != 'Delivered'
+                AND dr2.delivery_status != 'Cancelled'
+            )
+        ");
+        $stmt->bind_param("i", $request['donation_id']);
+        $stmt->execute();
+        
         echo json_encode(["status" => "success", "message" => "Delivery confirmed successfully!"]);
     } else {
         echo json_encode(["status" => "error", "message" => "Failed to confirm delivery"]);

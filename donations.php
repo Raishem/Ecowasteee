@@ -98,7 +98,7 @@ $result = $stmt->get_result();
 while ($row = $result->fetch_assoc()) $requestsForMe[] = $row;
 
 
-// Fetch My Requested Donations (requests I made to others)
+// Fetch My Requested Donations (requests I made to others) - EXCLUDE DELIVERED
 $myRequests = [];
 $stmt = $conn->prepare("
     SELECT 
@@ -111,6 +111,7 @@ $stmt = $conn->prepare("
         d.subcategory,
         d.category, 
         d.total_quantity,
+        d.item_name,
         u.first_name AS donor_first_name,
         u.last_name AS donor_last_name,
         p.project_name
@@ -119,13 +120,10 @@ $stmt = $conn->prepare("
     JOIN users u ON d.donor_id = u.user_id
     LEFT JOIN projects p ON dr.project_id = p.project_id
     WHERE dr.user_id = ?
+    AND dr.delivery_status != 'Delivered' 
     ORDER BY dr.requested_at DESC
 ");
-
-
-// ✅ Bind the user_id parameter before executing
 $stmt->bind_param("i", $user_id);
-
 $stmt->execute();
 $result = $stmt->get_result();
 while ($row = $result->fetch_assoc()) {
@@ -134,15 +132,41 @@ while ($row = $result->fetch_assoc()) {
 $stmt->close();
 
 
-// Fetch My Received Donations
+// Fetch My Received Donations (approved requests that have been delivered) - FIXED
 $receivedDonations = [];
-$stmt = $conn->prepare("SELECT *, subcategory FROM donations WHERE receiver_id = ?");
+$stmt = $conn->prepare("
+    SELECT 
+        dr.request_id,
+        dr.delivered_date,
+        dr.quantity_claim,
+        dr.urgency_level,
+        dr.requested_at,  
+        d.donation_id,
+        d.item_name,
+        d.description,
+        d.category,
+        d.subcategory,
+        d.image_path,
+        d.total_quantity,
+        donor.first_name AS donor_first_name,
+        donor.last_name AS donor_last_name,
+        p.project_name
+    FROM donation_requests dr
+    JOIN donations d ON dr.donation_id = d.donation_id
+    JOIN users donor ON d.donor_id = donor.user_id
+    LEFT JOIN projects p ON dr.project_id = p.project_id
+    WHERE dr.user_id = ? 
+    AND dr.status = 'approved'
+    AND dr.delivery_status = 'Delivered'
+    ORDER BY dr.delivered_date DESC
+");
 $stmt->bind_param("i", $user_id);
 $stmt->execute();
 $result = $stmt->get_result();
 while ($row = $result->fetch_assoc()) {
     $receivedDonations[] = $row;
 }
+$stmt->close();
 
 ?>
 <!DOCTYPE html>
@@ -359,7 +383,7 @@ while ($row = $result->fetch_assoc()) {
                                         <?php elseif ($status === 'approved'): ?>
                                             <!-- Requester actions for approved requests -->
                                             <?php if (strtolower($rq['delivery_status'] ?? 'pending') === 'on the way'): ?>
-                                                <button class="confirm-delivery-btn" data-id="<?= htmlspecialchars($rq['request_id']); ?>">Confirm Receipt</button>
+                                                <button class="confirm-delivery-btn" data-id="<?= htmlspecialchars($rq['request_id']); ?>">Item Received</button>
                                             <?php endif; ?>
                                             <button class="view-details-btn" data-id="<?= htmlspecialchars($rq['request_id']); ?>">View Details</button>
                                         <?php else: ?>
@@ -693,25 +717,38 @@ while ($row = $result->fetch_assoc()) {
                     <!-- Received Donations Tab -->
                     <div id="received-donations" class="tab-content">
                         <?php if (!empty($receivedDonations)): ?>
-                            <?php foreach ($receivedDonations as $rec): ?>
-                                <div class="donation-card">
-                                    <div class="donation-header">
-                                        <span class="donation-title"><?= htmlspecialchars($rec['subcategory']) ?></span>
-                                        <span class="donation-status status-completed">Received</span>
+                            <div class="donations-grid">
+                                <?php foreach ($receivedDonations as $rec): ?>
+                                    <div class="donation-card received-card" data-request-id="<?= htmlspecialchars($rec['request_id']); ?>">
+                                        <div class="donation-header">
+                                            <span class="donation-title"><?= htmlspecialchars($rec['item_name'] ?? $rec['subcategory'] ?? 'Received Donation') ?></span>
+                                            <span class="donation-status status-completed">Delivered</span>
+                                        </div>
+
+                                        <div class="donation-details">
+                                            <p><strong>Donation By:</strong> <?= htmlspecialchars($rec['donor_first_name'] . ' ' . $rec['donor_last_name']) ?></p>
+                          
+                                            <p><strong>Request Date:</strong> 
+                                                <?= !empty($rec['requested_at']) ? date("M d, Y H:i", strtotime($rec['requested_at'])) : '—' ?>
+                                            </p>
+                                            <p><strong>Received On:</strong> 
+                                                <?= !empty($rec['delivered_date']) ? date("M d, Y", strtotime($rec['delivered_date'])) : '—' ?>
+                                            </p>
+                                        </div>
+
+                                        <div class="card-actions">
+                                            <button class="view-receipt-btn" data-request-id="<?= $rec['request_id'] ?>">
+                                                View Receipt
+                                            </button>
+                                        </div>
                                     </div>
-                                    <div class="donation-details">
-                                        <p class="donation-detail"><strong>Donor:</strong> <?= $rec['donor_name'] ?? '—' ?></p>
-                                        <p class="donation-detail"><strong>Delivered At:</strong>
-                                            <?= $rec['received_at'] ? date("M d, Y", strtotime($rec['received_at'])) : '—' ?>
-                                        </p>
-                                    </div>
-                                </div>
-                            <?php endforeach; ?>
+                                <?php endforeach; ?>
+                            </div>
                         <?php else: ?>
                             <div class="empty-state">
                                 <i class="fas fa-gift"></i>
                                 <h3>No donations received yet</h3>
-                                <p>You haven't received any donations yet.</p>
+                                <p>You haven't received any completed donations yet. Once your approved requests are delivered, they will appear here.</p>
                             </div>
                         <?php endif; ?>
                     </div>
@@ -1085,6 +1122,9 @@ $(document).on('click', '.view-details-btn', function() {
                     });
 
                 // ==================== ESTIMATED DELIVERY DATE DISPLAY ====================
+                // Clear any existing estimated delivery items first to prevent duplication
+                $('.info-item:contains("Estimated Delivery")').remove();
+
                 // Add estimated delivery date to the request information section
                 let estimatedDeliveryHtml = '';
                 if (d.delivery_start && d.delivery_end) {
@@ -2065,13 +2105,14 @@ function resetStatusModalState() {
 }
 
 
-// ==================== CONFIRM DELIVERY (REQUESTER ACTION) ====================
+// ==================== CONFIRM DELIVERY (ITEM RECEIVED) WITH AUTO-MOVE ====================
 $(document).on('click', '.confirm-delivery-btn', function() {
     const requestId = $(this).data('id');
+    const cardElement = $(this).closest('.donation-card');
     
     Swal.fire({
-        title: 'Confirm Delivery?',
-        text: 'Please confirm that you have received the donation items.',
+        title: 'Confirm Item Received?',
+        text: 'Please confirm that you have received the donation items. This will move the item to your Received Donations.',
         icon: 'question',
         showCancelButton: true,
         confirmButtonText: 'Yes, I Received It',
@@ -2079,6 +2120,10 @@ $(document).on('click', '.confirm-delivery-btn', function() {
         reverseButtons: true
     }).then((result) => {
         if (result.isConfirmed) {
+            // Show loading state on the button
+            const button = $(this);
+            button.prop('disabled', true).text('Confirming...');
+            
             $.post('donate_process.php', {
                 action: 'confirm_delivery',
                 request_id: requestId
@@ -2089,20 +2134,22 @@ $(document).on('click', '.confirm-delivery-btn', function() {
                     if (res.status === 'success') {
                         Swal.fire({
                             icon: 'success',
-                            title: 'Delivery Confirmed!',
-                            text: res.message || 'Thank you for confirming receipt!',
+                            title: 'Item Received!',
+                            text: res.message || 'Thank you for confirming receipt! The item has been moved to Received Donations.',
                             timer: 2000,
                             showConfirmButton: false
                         });
                         
-                        // Refresh the tab to show updated status
-                        $("#my-requests").load(location.href + " #my-requests > *");
+                        // Move the card from "My Requests" to "Received Donations"
+                        moveCardToReceived(cardElement, requestId);
+                        
                     } else {
                         Swal.fire({
                             icon: 'error',
                             title: 'Error',
                             text: res.message || 'Failed to confirm delivery'
                         });
+                        button.prop('disabled', false).text('Item Received');
                     }
                 } catch (e) {
                     Swal.fire({
@@ -2110,11 +2157,129 @@ $(document).on('click', '.confirm-delivery-btn', function() {
                         title: 'Error',
                         text: 'Failed to confirm delivery'
                     });
+                    button.prop('disabled', false).text('Item Received');
                 }
+            }).fail(function() {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Network Error',
+                    text: 'Failed to confirm delivery. Please check your connection.'
+                });
+                button.prop('disabled', false).text('Item Received');
             });
         }
     });
 });
+
+// Function to move card from "My Requests" to "Received Donations" with same layout
+function moveCardToReceived(cardElement, requestId) {
+    // Clone the card
+    const receivedCard = cardElement.clone();
+    
+    // Update status to "Delivered" in top-right corner
+    receivedCard.find('.donation-status')
+        .removeClass('status-pending status-approved status-received')
+        .addClass('status-completed')
+        .text('Delivered');
+    
+    // Update delivery badge to "Delivered"
+    receivedCard.find('.delivery-badge')
+        .removeClass('ds-ready ds-sorting ds-transit ds-pending ds-cancelled')
+        .addClass('ds-delivered')
+        .text('Delivered');
+    
+    // Add "Received On" date
+    const receivedDate = new Date().toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'short', 
+        day: 'numeric' 
+    });
+    
+    // Insert "Received On" date after "Request Date"
+    const requestDateElement = receivedCard.find('strong:contains("Request Date")').parent();
+    if (requestDateElement.length && !receivedCard.find('strong:contains("Received On")').length) {
+        requestDateElement.after('<p><strong>Received On:</strong> ' + receivedDate + '</p>');
+    }
+    
+    // Replace action buttons with "View Receipt"
+    receivedCard.find('.card-actions').html(`
+        <button class="view-receipt-btn" data-request-id="${requestId}">
+            View Receipt
+        </button>
+    `);
+    
+    // Add received card styling
+    receivedCard.addClass('received-card');
+    
+    // Add smooth transition effects
+    cardElement.css('transition', 'all 0.5s ease');
+    cardElement.animate({
+        opacity: 0,
+        height: 0,
+        paddingTop: 0,
+        paddingBottom: 0,
+        marginBottom: 0
+    }, 500, function() {
+        // Remove the original card after animation
+        cardElement.remove();
+        
+        // Add to received donations tab with animation
+        const receivedContainer = $('#received-donations .donations-grid');
+        
+        // If received container doesn't exist or is empty, create it
+        if (receivedContainer.length === 0 || receivedContainer.children().length === 0) {
+            $('#received-donations').html(`
+                <div class="donations-grid">
+                    ${receivedCard.prop('outerHTML')}
+                </div>
+            `);
+        } else {
+            receivedCard.css({
+                opacity: 0,
+                height: 0,
+                paddingTop: 0,
+                paddingBottom: 0,
+                marginBottom: 0
+            });
+            
+            receivedContainer.prepend(receivedCard);
+            
+            receivedCard.animate({
+                opacity: 1,
+                height: 'auto',
+                paddingTop: '20px',
+                paddingBottom: '20px',
+                marginBottom: '20px'
+            }, 500);
+        }
+        
+        // Update empty state if needed
+        updateEmptyStates();
+    });
+}
+
+// Function to update empty states after moving cards
+function updateEmptyStates() {
+    const myRequestsContainer = $('#my-requests .donations-grid');
+    const receivedContainer = $('#received-donations .donations-grid');
+    
+    // Check if "My Requests" is now empty
+    if (myRequestsContainer.children('.donation-card').length === 0) {
+        myRequestsContainer.html(`
+            <div class="empty-state">
+                <i class="fas fa-hand-paper"></i>
+                <h3>No donation requests</h3>
+                <p>You haven't requested any donations yet.</p>
+            </div>
+        `);
+    }
+    
+    // Remove empty state from "Received Donations" if we just added a card
+    const receivedEmptyState = $('#received-donations .empty-state');
+    if (receivedEmptyState.length > 0 && receivedContainer.children('.donation-card').length > 0) {
+        receivedEmptyState.remove();
+    }
+}
 
 // ==================== AUTO UPDATE CANCELLED STATUS ====================
 // This would be called when requester cancels a request
@@ -2193,6 +2358,318 @@ $(document).on("click", ".cancel-request-btn", function() {
         }
     });
 });
+
+// ==================== VIEW RECEIPT DETAILS ====================
+$(document).on('click', '.view-receipt-btn', function() {
+    const requestId = $(this).data('request-id');
+    
+    // Fetch receipt details
+    $.get('donate_process.php', { 
+        action: 'get_request_details', 
+        request_id: requestId 
+    }, function(response) {
+        try {
+            const res = typeof response === 'object' ? response : JSON.parse(response);
+            
+            if (res.status === 'success' && res.data) {
+                const data = res.data;
+                
+                // Create receipt modal content
+                const receiptContent = `
+                    <div class="receipt-modal-content">
+                        <div class="receipt-header">
+                            <div class="receipt-logo">
+                                
+                                <span>EcoWaste</span>
+                            </div>
+                            <div class="receipt-title-section">
+                                <h3>Donation Receipt</h3>
+                                <div class="receipt-badge status-completed">
+                                    <i class="fas fa-check-circle"></i>
+                                    Completed
+                                </div>
+                            </div>
+                            <div class="receipt-meta">
+                                <div class="receipt-id">Receipt #: ${data.request_id || 'N/A'}</div>
+                                <div class="receipt-date">${new Date().toLocaleDateString('en-US', { 
+                                    year: 'numeric', 
+                                    month: 'long', 
+                                    day: 'numeric' 
+                                })}</div>
+                            </div>
+                        </div>
+                        
+                        <div class="receipt-scrollable-content">
+                            <div class="receipt-info-grid">
+                                <div class="receipt-section">
+                                    <div class="section-header">
+                                        <i class="fas fa-box-open"></i>
+                                        <h4>Donation Details</h4>
+                                    </div>
+                                    <div class="info-grid">
+                                        <div class="info-pair">
+                                            <div class="info-label">
+                                                <i class="fas fa-tag"></i>
+                                                <strong>Item Name</strong>
+                                            </div>
+                                            <div class="info-value">${data.item_name || data.subcategory || 'Donation Item'}</div>
+                                        </div>
+                                        <div class="info-pair">
+                                            <div class="info-label">
+                                                <i class="fas fa-layer-group"></i>
+                                                <strong>Category</strong>
+                                            </div>
+                                            <div class="info-value">${data.category || '—'}</div>
+                                        </div>
+                                        ${data.subcategory ? `
+                                        <div class="info-pair">
+                                            <div class="info-label">
+                                                <i class="fas fa-sitemap"></i>
+                                                <strong>Subcategory</strong>
+                                            </div>
+                                            <div class="info-value">${data.subcategory}</div>
+                                        </div>
+                                        ` : ''}
+                                        <div class="info-pair">
+                                            <div class="info-label">
+                                                <i class="fas fa-cubes"></i>
+                                                <strong>Quantity Received</strong>
+                                            </div>
+                                            <div class="info-value highlight">${data.quantity_claim || 1} unit(s)</div>
+                                        </div>
+                                        ${data.description ? `
+                                        <div class="info-pair full-width">
+                                            <div class="info-label">
+                                                <i class="fas fa-align-left"></i>
+                                                <strong>Description</strong>
+                                            </div>
+                                            <div class="info-value description-text">${data.description}</div>
+                                        </div>
+                                        ` : ''}
+                                    </div>
+                                </div>
+                                
+                                <div class="receipt-section">
+                                    <div class="section-header">
+                                        <i class="fas fa-shipping-fast"></i>
+                                        <h4>Delivery Information</h4>
+                                    </div>
+                                    <div class="info-grid">
+                                        <div class="info-pair">
+                                            <div class="info-label">
+                                                <i class="fas fa-user-circle"></i>
+                                                <strong>From Donor</strong>
+                                            </div>
+                                            <div class="info-value donor-name">${data.first_name} ${data.last_name}</div>
+                                        </div>
+                                        ${data.project_name ? `
+                                        <div class="info-pair">
+                                            <div class="info-label">
+                                                <i class="fas fa-project-diagram"></i>
+                                                <strong>Project</strong>
+                                            </div>
+                                            <div class="info-value">${data.project_name}</div>
+                                        </div>
+                                        ` : ''}
+                                        <div class="info-pair">
+                                            <div class="info-label">
+                                                <i class="fas fa-calendar-plus"></i>
+                                                <strong>Requested On</strong>
+                                            </div>
+                                            <div class="info-value">${data.requested_at ? new Date(data.requested_at).toLocaleDateString('en-US', { 
+                                                year: 'numeric', 
+                                                month: 'long', 
+                                                day: 'numeric',
+                                                hour: '2-digit',
+                                                minute: '2-digit'
+                                            }) : '—'}</div>
+                                        </div>
+                                        <div class="info-pair">
+                                            <div class="info-label">
+                                                <i class="fas fa-calendar-check"></i>
+                                                <strong>Delivered On</strong>
+                                            </div>
+                                            <div class="info-value highlight">${data.delivered_date ? new Date(data.delivered_date).toLocaleDateString('en-US', { 
+                                                year: 'numeric', 
+                                                month: 'long', 
+                                                day: 'numeric' 
+                                            }) : '—'}</div>
+                                        </div>
+                                        <div class="info-pair">
+                                            <div class="info-label">
+                                                <i class="fas fa-bolt"></i>
+                                                <strong>Urgency Level</strong>
+                                            </div>
+                                            <div class="info-value urgency-${(data.urgency_level || 'normal').toLowerCase()}">
+                                                ${data.urgency_level || 'Normal'}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            ${data.image_path ? `
+                            <div class="receipt-section">
+                                <div class="section-header">
+                                    <i class="fas fa-images"></i>
+                                    <h4>Donation Images</h4>
+                                </div>
+                                <div class="receipt-images">
+                                    <div class="receipt-images-grid">
+                                        ${getReceiptImages(data.image_path)}
+                                    </div>
+                                </div>
+                            </div>
+                            ` : ''}
+                            
+                            <div class="receipt-timeline">
+                                <div class="section-header">
+                                    <i class="fas fa-history"></i>
+                                    <h4>Delivery Timeline</h4>
+                                </div>
+                                <div class="timeline-steps">
+                                    <div class="timeline-step completed">
+                                        <div class="step-marker">
+                                            <i class="fas fa-check"></i>
+                                        </div>
+                                        <div class="step-content">
+                                            <strong>Request Submitted</strong>
+                                            <span>${data.requested_at ? new Date(data.requested_at).toLocaleDateString('en-US', { 
+                                                month: 'short', 
+                                                day: 'numeric' 
+                                            }) : ''}</span>
+                                        </div>
+                                    </div>
+                                    <div class="timeline-step completed">
+                                        <div class="step-marker">
+                                            <i class="fas fa-check"></i>
+                                        </div>
+                                        <div class="step-content">
+                                            <strong>Approved by Donor</strong>
+                                            <span>Request approved</span>
+                                        </div>
+                                    </div>
+                                    <div class="timeline-step completed">
+                                        <div class="step-marker">
+                                            <i class="fas fa-check"></i>
+                                        </div>
+                                        <div class="step-content">
+                                            <strong>Delivery Process</strong>
+                                            <span>Item shipped and delivered</span>
+                                        </div>
+                                    </div>
+                                    <div class="timeline-step completed">
+                                        <div class="step-marker">
+                                            <i class="fas fa-check"></i>
+                                        </div>
+                                        <div class="step-content">
+                                            <strong>Item Received</strong>
+                                            <span>Successfully completed</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="receipt-footer">
+                            <div class="receipt-actions">
+                                <button class="print-receipt-btn" onclick="window.print()">
+                                    <i class="fas fa-print"></i> Print Receipt
+                                </button>
+                                <button class="close-receipt-btn" onclick="Swal.close()">
+                                    <i class="fas fa-times"></i> Close
+                                </button>
+                            </div>
+                            <div class="receipt-thankyou">
+                                <div class="thankyou-content">
+                                    <i class="fas fa-heart"></i>
+                                    <div>
+                                        <strong>Thank you for using EcoWaste!</strong>
+                                        <p>Your contribution helps make our planet greener and cleaner.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                // Show receipt in modal
+                Swal.fire({
+                    title: '',
+                    html: receiptContent,
+                    width: '800px',
+                    heightAuto: false,
+                    showConfirmButton: false,
+                    customClass: {
+                        popup: 'receipt-popup',
+                        container: 'receipt-container',
+                        closeButton: 'receipt-close-btn'
+                    },
+                    didOpen: () => {
+                        // Add smooth scroll behavior
+                        const scrollable = document.querySelector('.receipt-scrollable-content');
+                        if (scrollable) {
+                            scrollable.scrollTop = 0;
+
+                            // Check if content is scrollable
+                            if (scrollable.scrollHeight > scrollable.clientHeight) {
+                                scrollable.classList.add('scrollable');
+                            }
+                        }
+                        
+                        
+                        // Force modal to respect max-height
+                        const modal = document.querySelector('.receipt-popup');
+                        if (modal) {
+                            modal.style.maxHeight = '90vh';
+                            modal.style.overflow = 'hidden';
+                        }
+                    }
+                });
+                
+            } else {
+                Swal.fire({ icon: 'error', title: 'Error', text: 'Unable to load receipt details.' });
+            }
+        } catch (e) {
+            console.error('Error parsing receipt data:', e);
+            Swal.fire({ icon: 'error', title: 'Error', text: 'Failed to load receipt.' });
+        }
+    });
+});
+
+// Helper function to generate receipt images HTML
+function getReceiptImages(imagePath) {
+    try {
+        const images = JSON.parse(imagePath);
+        if (Array.isArray(images) && images.length > 0) {
+            return images.map(img => `
+                <div class="receipt-image-item">
+                    <img src="${img}" alt="Donation image" onclick="openImageModal('${img}')">
+                </div>
+            `).join('');
+        }
+    } catch (e) {
+        // If not JSON, treat as single image
+        return `
+            <div class="receipt-image-item">
+                <img src="${imagePath}" alt="Donation image" onclick="openImageModal('${imagePath}')">
+            </div>
+        `;
+    }
+    return '<p>No images available</p>';
+}
+
+// Function to open image in modal
+function openImageModal(src) {
+    Swal.fire({
+        imageUrl: src,
+        imageAlt: 'Donation Image',
+        showCloseButton: true,
+        showConfirmButton: false,
+        width: '80%',
+        padding: '0'
+    });
+}
 
     // ==================== FEEDBACK MODAL SYSTEM ====================
     $(document).ready(function() {
