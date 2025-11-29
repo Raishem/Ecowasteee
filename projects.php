@@ -160,6 +160,7 @@ if (!$user) {
                                 </div>
                                 <div class="project-actions">
                                         <a href="project_details.php?id=<?php echo $project['project_id']; ?>" class="action-btn view-details" data-project-id="<?php echo $project['project_id']; ?>"><i class="fas fa-eye"></i> View Details</a>
+                                        <button type="button" class="action-btn delete-project" onclick="confirmDeleteProject(<?= $project['project_id'] ?>)" title="Delete project"><i class="fas fa-trash"></i></button>
                                     </div>
                             </div>
                             <?php
@@ -1115,6 +1116,79 @@ document.addEventListener('DOMContentLoaded', function() {
         spinner.style.display = 'none';
     }
 
+});
+</script>
+<script>
+// Delete project modal + AJAX flow (ported from Projectv3 - keeps copymain3 CSS)
+function confirmDeleteProject(projectId) {
+    if (!projectId) return;
+    // Create modal overlay
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-exclamation-triangle" style="color: #dc3545; margin-right: 10px;"></i>Delete Project</h2>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete this project?</p>
+                <p style="color: #999; font-size: 13px; margin-top: 10px;">This action cannot be undone. All project data, materials, and photos will be permanently removed.</p>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn secondary" onclick="this.closest('.modal-overlay').remove();">Cancel</button>
+                <button class="modal-btn danger" id="confirmDeleteBtn">Delete Project</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) overlay.remove();
+    });
+
+    document.getElementById('confirmDeleteBtn').addEventListener('click', function(){
+        performDeleteProject(projectId, overlay);
+    });
+}
+
+function performDeleteProject(projectId, overlay) {
+    const btn = document.getElementById('confirmDeleteBtn');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting...'; }
+
+    const fd = new FormData(); fd.append('project_id', projectId);
+    fetch('delete_project.php', { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+    .then(res => res.json().catch(()=>null))
+    .then(data => {
+        if (overlay) overlay.remove();
+        if (data && data.success) {
+            // success toast then reload
+            try { showToast('Project deleted successfully', 'success'); } catch(e){}
+            setTimeout(()=> window.location.reload(), 850);
+        } else {
+            try { showToast((data && data.message) ? data.message : 'Failed to delete project', 'error'); } catch(e){}
+        }
+    }).catch(()=>{
+        if (overlay) overlay.remove();
+        try { showToast('Network error - please try again', 'error'); } catch(e){}
+    });
+}
+
+// Wire-up delete buttons on page load (in case server side rendered buttons exist)
+document.addEventListener('DOMContentLoaded', function(){
+    try {
+        const delBtns = document.querySelectorAll('button.delete-project');
+        delBtns.forEach(b => {
+            b.addEventListener('click', function(e){
+                e.preventDefault();
+                const pid = this.getAttribute && this.getAttribute('data-project-id');
+                // fallback to inline onclick handler's param
+                const inlinePid = this.onclick && this.onclick.toString().match(/confirmDeleteProject\((\d+)\)/);
+                const id = pid || (inlinePid ? inlinePid[1] : null);
+                if (id) confirmDeleteProject(parseInt(id, 10));
+            });
+        });
+    } catch(e){}
 });
 </script>
 </body>

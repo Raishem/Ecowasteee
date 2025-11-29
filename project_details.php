@@ -523,6 +523,7 @@ try {
             <section class="project-header card">
     <div class="project-actions">
         <button class="edit-project edit-btn" data-action="edit-project"><i class="fas fa-edit"></i> Edit Project</button>
+        <button class="delete-project delete-btn" title="Delete project" onclick="confirmDeleteProject(<?= (int)$project_id ?>)"><i class="fas fa-trash"></i></button>
         <?php // Share button removed because project sharing is handled as a separate workflow step ?>
     </div>
     <div class="project-title-section">
@@ -4129,3 +4130,50 @@ function showStagePhotoModal(stageNumber, missingTypes, projectId){
 echo '<script>window.ECW_DATA = window.ECW_DATA || {}; window.ECW_DATA.projectId = ' . json_encode($project_id) . ';</script>' . "\n";
 echo '<script src="assets/js/project-details-materials.js"></script>' . "\n";
 ?>
+<script>
+// Delete project UI (confirmation modal + AJAX) — keep copymain3 styling
+function confirmDeleteProject(projectId) {
+    if (!projectId) return;
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+        <div class="modal-content">
+            <div class="modal-header"><h2><i class="fas fa-exclamation-triangle" style="color:#dc3545;margin-right:10px"></i>Delete Project</h2></div>
+            <div class="modal-body"><p>Are you sure you want to delete this project? This action cannot be undone.</p></div>
+            <div class="modal-footer"><button class="modal-btn secondary" onclick="this.closest('.modal-overlay').remove();">Cancel</button><button class="modal-btn danger" id="confirmDeleteBtn">Delete Project</button></div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+    overlay.querySelector('#confirmDeleteBtn').addEventListener('click', function(){ performDeleteProject(projectId, overlay); });
+}
+
+function performDeleteProject(projectId, overlay) {
+    const btn = overlay && overlay.querySelector('#confirmDeleteBtn');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting...'; }
+    const fd = new FormData(); fd.append('project_id', projectId);
+    fetch('delete_project.php', { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+    .then(res => res.json().catch(()=>null))
+    .then(data => {
+        if (overlay) overlay.remove();
+        if (data && data.success) {
+            try { showToast('Project deleted — redirecting', 'success'); } catch(e){}
+            setTimeout(()=> window.location = 'projects.php', 900);
+        } else {
+            try { showToast((data && data.message) ? data.message : 'Failed to delete project', 'error'); } catch(e){}
+        }
+    }).catch(()=>{ if (overlay) overlay.remove(); try { showToast('Network error', 'error'); } catch(e){} });
+}
+
+// Wire up delete button on page load (defensive, in case markup lacks inline onclick)
+document.addEventListener('DOMContentLoaded', function() {
+    const deleteBtn = document.querySelector('.delete-project');
+    if (deleteBtn) {
+        deleteBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const pid = <?= (int)$project_id ?>;
+            if (typeof confirmDeleteProject === 'function') confirmDeleteProject(pid);
+        });
+    }
+});
+</script>
