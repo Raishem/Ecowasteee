@@ -59,6 +59,7 @@ try {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="assets/css/header.css">
     <link rel="stylesheet" href="assets/css/projects.css">
+    <link rel="stylesheet" href="assets/css/project-stages.css">
     <style>
         .project-details {
             background: white;
@@ -281,6 +282,39 @@ try {
                     </button>
                 </div>
             </div>
+
+            <!-- Workflow & Materials Section: unified tabs so all projects show the same flow -->
+            <section class="workflow-section card">
+                <h2 class="section-title"><i class="fas fa-tasks"></i> Project Workflow</h2>
+                <div class="progress-indicator"><strong>0%</strong> of stages completed. (0 of 3)</div>
+                <div class="progress-bar"><div class="progress-fill" style="width:0%"></div></div>
+
+                <div class="stage-tabs">
+                    <button class="stage-tab active" data-stage-index="0" data-stage-number="1">
+                        <span class="tab-icon"><i class="fas fa-tools"></i></span>
+                        <span class="tab-meta"><span class="tab-title">Preparation</span><span class="tab-badge current">Current</span></span>
+                    </button>
+                    <button class="stage-tab locked" data-stage-index="1" data-stage-number="2">
+                        <span class="tab-icon"><i class="fas fa-hard-hat"></i></span>
+                        <span class="tab-meta"><span class="tab-title">Construction</span><span class="tab-badge locked">Locked</span></span>
+                    </button>
+                    <button class="stage-tab locked" data-stage-index="2" data-stage-number="3">
+                        <span class="tab-icon"><i class="fas fa-share-alt"></i></span>
+                        <span class="tab-meta"><span class="tab-title">Share</span><span class="tab-badge locked">Locked</span></span>
+                    </button>
+                </div>
+
+                <div class="workflow-stages-container stages-timeline">
+                    <div class="workflow-stage stage-card active current" data-stage-index="0">
+                        <i class="fas fa-circle stage-icon" aria-hidden="true"></i>
+                        <div class="stage-content"><div class="stage-header"><div class="stage-info"><h3 class="stage-title">Preparation</h3><div class="stage-desc">Collect materials, clean and sort materials, prepare workspace</div></div></div>
+                        <!-- Materials list will follow -->
+                        </div>
+                    </div>
+                    <div class="workflow-stage stage-card locked" data-stage-index="1"><i class="fas fa-circle stage-icon" aria-hidden="true"></i><div class="stage-content"><div class="stage-header"><div class="stage-info"><h3 class="stage-title">Construction</h3><div class="stage-desc">Build or transform materials into the finished item</div></div></div></div></div>
+                    <div class="workflow-stage stage-card locked" data-stage-index="2"><i class="fas fa-circle stage-icon" aria-hidden="true"></i><div class="stage-content"><div class="stage-header"><div class="stage-info"><h3 class="stage-title">Share</h3><div class="stage-desc">Share your project with the community</div></div></div></div></div>
+                </div>
+            </section>
 
             <div class="materials-section">
                 <div class="materials-header">
