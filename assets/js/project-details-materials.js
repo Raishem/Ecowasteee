@@ -145,4 +145,97 @@
         } catch(e){}
 
     } catch(e){}
+
+        // ------- Material collection requirement checks and auto-complete -------
+        function getActiveMaterialsNode(){
+            // prefer the currently visible or current stage
+            let stage = document.querySelector('.workflow-stage.active') || document.querySelector('.stage-card.current') || document.querySelector('.workflow-stage.current');
+            if (stage) {
+                const m = stage.querySelector('.stage-materials');
+                if (m) return m;
+            }
+            // fallback to first materials list on page
+            return document.querySelector('.stage-materials');
+        }
+
+        function checkAllMaterialsObtained(){
+            const materialsNode = getActiveMaterialsNode();
+            if (!materialsNode) return false;
+            const items = Array.from(materialsNode.querySelectorAll('.material-item'));
+            if (items.length === 0) return true; // nothing to satisfy
+            return items.every(li => !!li.querySelector('.badge.obtained'));
+        }
+
+        function checkAllPhotosUploaded(){
+            const materialsNode = getActiveMaterialsNode();
+            if (!materialsNode) return false;
+            const items = Array.from(materialsNode.querySelectorAll('.material-item'));
+            if (items.length === 0) return true;
+            return items.every(li => {
+                const photos = li.querySelector('.material-photos');
+                return !!(photos && photos.querySelector('.material-photo:not(.placeholder)'));
+            });
+        }
+
+        // Refresh the Material Collection requirement state and optionally auto-complete stage
+        function refreshMaterialCollectionReqState(autoComplete = true){
+            try {
+                const materialsNode = getActiveMaterialsNode();
+                if (!materialsNode) return false;
+                const btn = document.querySelector('.workflow-stage.active .complete-stage-btn, .stage-card.current .complete-stage-btn, .complete-stage-btn');
+                const allObtained = checkAllMaterialsObtained();
+                const allPhotos = checkAllPhotosUploaded();
+                // set attributes/dataset for the button so other code and CSS can reflect state
+                if (btn) {
+                    if (allObtained && allPhotos) {
+                        btn.removeAttribute('aria-disabled');
+                        btn.classList.remove('is-disabled');
+                        try { btn.dataset.reqOk = '1'; } catch(e){}
+                    } else {
+                        btn.setAttribute('aria-disabled','true');
+                        btn.classList.add('is-disabled');
+                        try { btn.dataset.reqOk = '0'; } catch(e){}
+                    }
+                }
+
+                // If requirements are satisfied and we should auto-complete, attempt it
+                if (autoComplete && allObtained && allPhotos && btn) {
+                    // read stage-number from button or stage container
+                    let tn = btn.getAttribute('data-stage-number') || btn.getAttribute('data-stage-index') || btn.dataset.stageNumber || btn.dataset.stageIndex || null;
+                    if (!tn) {
+                        // try parent stage-card
+                        const sc = btn.closest('.workflow-stage, .stage-card');
+                        if (sc) tn = sc.getAttribute('data-stage-number') || sc.getAttribute('data-stage-index');
+                    }
+                    if (tn) {
+                        // avoid immediate repeated calls; add a short delay
+                        try { setTimeout(function(){ if (typeof completeStage === 'function') completeStage(null, parseInt(tn,10), getProjectId()); }, 300); } catch(e){}
+                    }
+                }
+
+                return (allObtained && allPhotos);
+            } catch(e) { return false; }
+        }
+
+        // Observe material and photo changes to update requirement state
+        (function(){
+            try {
+                const root = document.body;
+                const mo = new MutationObserver(function(muts){
+                    let doCheck = false;
+                    for (const m of muts){
+                        if (m.type === 'childList') {
+                            doCheck = true; break;
+                        }
+                        if (m.type === 'attributes' && ['class','data-photo-id','data-material-id','data-material-id'].includes(m.attributeName)) { doCheck = true; break; }
+                    }
+                    if (doCheck) {
+                        try { refreshMaterialCollectionReqState(true); } catch(e){}
+                    }
+                });
+                mo.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ['class','data-photo-id','data-material-id'] });
+                // initial check on load
+                try { document.addEventListener('DOMContentLoaded', function(){ refreshMaterialCollectionReqState(false); setTimeout(()=> refreshMaterialCollectionReqState(true), 650); }); } catch(e){}
+            } catch(e){}
+        })();
 })();

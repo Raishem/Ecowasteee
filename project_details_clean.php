@@ -358,7 +358,8 @@ try {
                         $is_locked = !$is_completed && ($index > $current_stage_index);
                         $stage_class = $is_completed ? 'completed' : ($is_current ? 'current' : ($is_locked ? 'locked' : 'inactive'));
                     ?>
-                    <div class="workflow-stage stage-card <?= $stage_class ?> <?= $is_current ? 'active' : '' ?>" data-stage-index="<?= $index ?>">
+                    <?php $stageNumAttr = isset($stage['template_number']) && $stage['template_number'] ? (int)$stage['template_number'] : ($stage['number'] ?? ($index+1)); ?>
+                    <div class="workflow-stage stage-card <?= $stage_class ?> <?= $is_current ? 'active' : '' ?>" data-stage-index="<?= $index ?>" data-stage-number="<?= htmlspecialchars($stageNumAttr) ?>">
                         <i class="fas fa-circle stage-icon" aria-hidden="true"></i>
                         <div class="stage-content"><div class="stage-header"><div class="stage-info"><h3 class="stage-title"><?= htmlspecialchars($stage['name']) ?> <?php if ($is_completed): ?><i class="fas fa-check-circle stage-check" title="Completed"></i><?php endif; ?></h3><div class="stage-desc"><?= nl2br(htmlspecialchars($stage['description'] ?? '')) ?></div></div></div></div>
                     </div>
@@ -414,5 +415,8 @@ try {
             // Implementation for adding materials
         }
     </script>
+    <script>window.ECW_DATA = window.ECW_DATA || {}; window.ECW_DATA.projectId = <?= json_encode($project_id) ?>;</script>
+    <script src="assets/js/stage-completion.js"></script>
+    <script src="assets/js/project-details-materials.js"></script>
 </body>
 </html>
