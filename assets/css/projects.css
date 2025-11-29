@@ -80,7 +80,10 @@ body, .container, .main-content, .projects-container, .project-card, .project-de
     background: white;
     border-radius: 8px;
     padding: 20px;
-    padding-bottom: 70px;
+    /* use column flex so the actions can be pushed to the bottom consistently */
+    display: flex;
+    flex-direction: column;
+    padding-bottom: 20px;
     margin-bottom: 20px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     min-height: 200px;
@@ -93,12 +96,28 @@ body, .container, .main-content, .projects-container, .project-card, .project-de
     margin-top: 15px;
 }
 
+.project-stages {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+    align-items: center;
+}
+
+.stage-pill {
+    background: #eef7ee;
+    color: #2e8b57;
+    padding: 6px 10px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 600;
+    border: 1px solid rgba(46,139,87,0.06);
+}
+
 /* View Details button (consolidated) */
 .project-card .view-details,
 .project-card .action-btn.view-details {
-    position: absolute;
-    bottom: 16px;
-    right: 16px;
+    /* Flow with other actions inside .project-actions */
+    position: static;
     background: #4CAF50;
     color: white;
     border: none;
@@ -111,13 +130,7 @@ body, .container, .main-content, .projects-container, .project-card, .project-de
     gap: 8px;
     transition: background-color 0.2s, transform 0.15s;
     white-space: nowrap;
-    writing-mode: horizontal-tb !important;
-    text-orientation: mixed;
-    transform: none !important;
-    width: auto !important;
-    height: auto !important;
     min-width: 110px;
-    z-index: 3;
 }
 
 .project-card .view-details:hover,
@@ -229,7 +242,7 @@ body, .container, .main-content, .projects-container, .project-card, .project-de
     display: flex;
     justify-content: flex-end;
     gap: 10px;
-    margin-top: 8px;
+    margin-top: auto;
 }
 
 .action-btn.view-details {

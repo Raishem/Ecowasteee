@@ -67,7 +67,6 @@ try {
             // Accept either 'name' or 'material_name' to be compatible with the dynamic modal
             $name = _get_str('name');
             if (!$name) $name = _get_str('material_name');
-            $unit = _get_str('unit') ?: ''; // unit is optional in the modal
             $quantity = filter_input(INPUT_POST,'quantity',FILTER_VALIDATE_INT);
             if (!$name) {
                 // Try to recover from alternate POST keys (some clients use material_name)
@@ -77,13 +76,13 @@ try {
                 }
             }
             if (!$name) { echo json_encode(['success'=>false,'message'=>'Missing material data','received_keys'=>array_values(array_keys($_POST))]); exit; }
-            $stmt = $conn->prepare('INSERT INTO project_materials (project_id, material_name, quantity, unit, created_at) VALUES (?, ?, ?, ?, NOW())');
+            $stmt = $conn->prepare('INSERT INTO project_materials (project_id, material_name, quantity) VALUES (?, ?, ?)');
             $qty = is_numeric($quantity) ? (int)$quantity : 0;
-            // types: project_id (i), name (s), qty (i), unit (s)
-            $stmt->bind_param('isis',$project_id,$name,$qty,$unit);
+            // types: project_id (i), name (s), qty (i)
+            $stmt->bind_param('isi',$project_id,$name,$qty);
             $stmt->execute();
             $mid = $conn->insert_id;
-            $f = $conn->prepare('SELECT material_id, material_name, quantity, unit, COALESCE(status,\'needed\') as status FROM project_materials WHERE material_id = ?');
+            $f = $conn->prepare('SELECT material_id, material_name, quantity, COALESCE(status,\'needed\') as status FROM project_materials WHERE material_id = ?');
             $f->bind_param('i',$mid); $f->execute(); $fres = $f->get_result(); $mat = $fres ? $fres->fetch_assoc() : null;
 
             // If a material was added, ensure any Material Collection stage marked completed is unset
@@ -149,17 +148,61 @@ try {
             $up = $conn->prepare("UPDATE projects SET status = ?, completion_date = CASE WHEN ? = 'completed' THEN NOW() ELSE NULL END, updated_at = NOW() WHERE project_id = ?"); $up->bind_param('ssi',$status,$status,$project_id); $up->execute(); echo json_encode(['success'=>true]); exit;
 
         case 'publish_shared_project':
-            // simplified publish: verify completed and copy minimal data
+            // publish: accept optional share_description and privacy, copy project data,
+            // include contributors derived from material_allocations -> donations -> users
+            $share_description = _get_str('share_description');
+            $privacy = _get_str('privacy');
+            $privacy = ($privacy === 'private') ? 'private' : 'public';
+
             $conn->begin_transaction();
             $pstmt = $conn->prepare('SELECT project_name, description, cover_photo, tags, status FROM projects WHERE project_id = ?'); $pstmt->bind_param('i',$project_id); $pstmt->execute(); $pdr = $pstmt->get_result(); $pdata = $pdr ? $pdr->fetch_assoc() : null; if (!$pdata) { throw new Exception('Project not found'); }
             if (!isset($pdata['status']) || $pdata['status'] !== 'completed') { throw new Exception('Only completed projects can be shared'); }
-            $ins = $conn->prepare("INSERT INTO shared_projects (project_id, user_id, title, description, cover_photo, tags, privacy, created_at) VALUES (?, ?, ?, ?, ?, ?, 'public', NOW())"); $ins->bind_param('iissss',$project_id,$_SESSION['user_id'],$pdata['project_name'],$pdata['description'],$pdata['cover_photo'],$pdata['tags']); $ins->execute(); $shared_id = $conn->insert_id;
+
+            // Use supplied share description if present, otherwise fall back to project description
+            $descForShare = $share_description && trim($share_description) !== '' ? $share_description : $pdata['description'];
+
+            $ins = $conn->prepare("INSERT INTO shared_projects (project_id, user_id, title, description, cover_photo, tags, privacy, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())");
+            $ins->bind_param('iisssss',$project_id,$_SESSION['user_id'],$pdata['project_name'],$descForShare,$pdata['cover_photo'],$pdata['tags'],$privacy);
+            $ins->execute(); $shared_id = $conn->insert_id;
+
             // copy materials
-            $mstmt = $conn->prepare('SELECT material_name, quantity, unit, is_found FROM project_materials WHERE project_id = ?'); $mstmt->bind_param('i',$project_id); $mstmt->execute(); $mr = $mstmt->get_result(); while ($m = $mr->fetch_assoc()) { $extra = json_encode(['unit'=>$m['unit'],'is_found'=>(int)$m['is_found']]); $c = $conn->prepare('INSERT INTO shared_materials (shared_id, name, quantity, extra) VALUES (?, ?, ?, ?)'); $c->bind_param('isis',$shared_id,$m['material_name'],$m['quantity'],$extra); $c->execute(); }
-            // copy steps
+            $mstmt = $conn->prepare('SELECT material_id, material_name, quantity, unit, IFNULL(is_found,0) as is_found FROM project_materials WHERE project_id = ?'); $mstmt->bind_param('i',$project_id); $mstmt->execute(); $mr = $mstmt->get_result(); while ($m = $mr->fetch_assoc()) { $extra = json_encode(['unit'=>$m['unit'],'is_found'=> (isset($m['is_found']) ? (int)$m['is_found'] : 0)]); $c = $conn->prepare('INSERT INTO shared_materials (shared_id, name, quantity, extra) VALUES (?, ?, ?, ?)'); $c->bind_param('isis',$shared_id,$m['material_name'],$m['quantity'],$extra); $c->execute(); }
+
+            // copy steps and step photos
             $sstmt = $conn->prepare('SELECT step_id, step_number, title, instructions, IFNULL(is_done,0) as is_done FROM project_steps WHERE project_id = ? ORDER BY step_number'); $sstmt->bind_param('i',$project_id); $sstmt->execute(); $sr = $sstmt->get_result(); while ($srow = $sr->fetch_assoc()) { $insStep = $conn->prepare('INSERT INTO shared_steps (shared_id, step_number, title, instructions, is_done) VALUES (?, ?, ?, ?, ?)'); $insStep->bind_param('iissi',$shared_id,$srow['step_number'],$srow['title'],$srow['instructions'],$srow['is_done']); $insStep->execute(); $new_step_id = $conn->insert_id; $ph = $conn->prepare('SELECT photo_path FROM step_photos WHERE step_id = ?'); $ph->bind_param('i',$srow['step_id']); $ph->execute(); $phr = $ph->get_result(); while ($prow = $phr->fetch_assoc()) { $insP = $conn->prepare('INSERT INTO shared_step_photos (step_id, path) VALUES (?, ?)'); $insP->bind_param('is',$new_step_id,$prow['photo_path']); $insP->execute(); } }
-            $a = $conn->prepare('INSERT INTO shared_activities (shared_id, user_id, activity_type, data, created_at) VALUES (?, ?, ?, ?, NOW())'); $at = 'publish'; $a->bind_param('iiss',$shared_id,$_SESSION['user_id'],$at,json_encode(['project_id'=>$project_id])); $a->execute(); $conn->commit();
-            $share_url = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST'] . '/shared_project.php?id='.$shared_id; echo json_encode(['success'=>true,'shared_id'=>$shared_id,'share_url'=>$share_url]); exit;
+
+            // compile contributors from material_allocations (if donations referenced)
+            $contributors = [];
+            try {
+                $contribStmt = $conn->prepare(
+                    'SELECT d.donor_id AS user_id, u.username, SUM(ma.allocated_quantity) AS total_allocated
+                     FROM material_allocations ma
+                     JOIN donations d ON ma.donation_id = d.donation_id
+                     JOIN users u ON d.donor_id = u.user_id
+                     WHERE ma.project_id = ?
+                     GROUP BY d.donor_id, u.username'
+                );
+                if ($contribStmt) {
+                    $contribStmt->bind_param('i', $project_id);
+                    $contribStmt->execute();
+                    $cres = $contribStmt->get_result();
+                    while ($row = $cres->fetch_assoc()) {
+                        $contributors[] = ['user_id' => (int)$row['user_id'], 'username' => $row['username'], 'quantity' => (int)$row['total_allocated']];
+                    }
+                }
+            } catch (Exception $e) {
+                // non-fatal — if donations or users table missing, contributors remain empty
+            }
+
+            // record publish activity with contributors info
+            $a = $conn->prepare('INSERT INTO shared_activities (shared_id, user_id, activity_type, data, created_at) VALUES (?, ?, ?, ?, NOW())'); $at = 'publish';
+            $activityData = json_encode(['project_id'=>$project_id, 'share_description'=>$share_description ?: null, 'contributors'=>$contributors]);
+            $a->bind_param('iiss',$shared_id,$_SESSION['user_id'],$at,$activityData);
+            $a->execute();
+
+            $conn->commit();
+            $share_url = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST'] . '/shared_project.php?id='.$shared_id;
+            echo json_encode(['success'=>true,'shared_id'=>$shared_id,'share_url'=>$share_url,'contributors'=>$contributors]); exit;
 
         case 'shared_activity':
             $shared_id = filter_input(INPUT_POST,'shared_id',FILTER_VALIDATE_INT); $atype = isset($_POST['activity_type']) ? $_POST['activity_type'] : null; if (!$shared_id || !$atype) { echo json_encode(['success'=>false,'message'=>'Missing parameters']); exit; }

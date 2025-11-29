@@ -59,12 +59,26 @@ try {
             $allowed_ptypes = ['before','after','other'];
             $ptype = in_array(strtolower($photo_type), $allowed_ptypes) ? strtolower($photo_type) : 'other';
 
+            // Enforce max 3 photos per photo_type per stage (allow upto 3 building/before and 3 finished/after)
+            try {
+                $count_stmt = $conn->prepare("SELECT COUNT(*) AS cnt FROM stage_photos WHERE project_id = ? AND stage_number = ? AND photo_type = ?");
+                $count_stmt->bind_param('iis', $project_id, $stage_number, $ptype);
+                $count_stmt->execute();
+                $cnt = (int)$count_stmt->get_result()->fetch_assoc()['cnt'];
+                if ($cnt >= 3) {
+                    echo json_encode(['success' => false, 'message' => 'Maximum of 3 photos of this type already uploaded for this stage']);
+                    exit;
+                }
+            } catch (Exception $e) {
+                // ignore count errors and allow upload to proceed as fallback
+            }
+
             // Insert into stage_photos table (store photo_type)
             $photo_stmt = $conn->prepare("INSERT INTO stage_photos (project_id, stage_number, photo_path, photo_type, uploaded_at) VALUES (?, ?, ?, ?, NOW())");
             $photo_stmt->bind_param("iiss", $project_id, $stage_number, $unique_file_name, $ptype);
             $photo_stmt->execute();
-            
-            echo json_encode(['success' => true, 'photo_type' => $ptype]);
+
+            echo json_encode(['success' => true, 'photo_type' => $ptype, 'path' => $unique_file_name]);
         } else {
             echo json_encode(['success' => false, 'message' => 'Failed to upload image']);
         }
