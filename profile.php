@@ -59,7 +59,7 @@ $create_tables_sql = [
         description TEXT NOT NULL,
         points_earned INT DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        FOREIGN KEY (user_id) REFERENCES (users_id) ON DELETE CASCADE
     ) ENGINE=InnoDB",
     
     "CREATE TABLE IF NOT EXISTS badges (
@@ -82,10 +82,12 @@ $create_tables_sql = [
     "CREATE TABLE IF NOT EXISTS user_stats (
         user_id INT PRIMARY KEY,
         projects_completed INT DEFAULT 0,
+        projects_created INT DEFAULT 0,
         achievements_earned INT DEFAULT 0,
         badges_earned INT DEFAULT 0,
         items_donated INT DEFAULT 0,
         items_recycled INT DEFAULT 0,
+        total_points INT DEFAULT 0,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     ) ENGINE=InnoDB"
 ];
@@ -132,9 +134,21 @@ $check_stats->bind_param("i", $user_id);
 $check_stats->execute();
 $stats_count = $check_stats->get_result()->fetch_assoc()['count'];
 if ($stats_count == 0) {
-    $conn->query("INSERT INTO user_stats (user_id, projects_completed, achievements_earned, badges_earned, items_donated, items_recycled) 
-                  VALUES ($user_id, 0, 0, 0, 0, 0)");
+    $conn->query("INSERT INTO user_stats (user_id, projects_completed, projects_created achievements_earned, badges_earned, items_donated, items_recycled, total_points) 
+                  VALUES ($user_id, 0, 0, 0, 0, 0, 0, 0)");
 }
+
+// Count total projects created by user
+$stmt = $conn->prepare("SELECT COUNT(*) as projects_created FROM projects WHERE user_id = ?");
+$stmt->bind_param("i", $user_id);
+$stmt->execute();
+$res = $stmt->get_result();
+$total_projects_created = (int)($res->fetch_assoc()['projects_created'] ?? 0);
+$stmt->close();
+
+// Update user_stats with actual project count
+$conn->query("UPDATE user_stats SET projects_created = $total_projects_created WHERE user_id = $user_id");
+
 
 // Fetch user data
 $user_query = $conn->prepare("SELECT user_id, email, first_name, middle_name, last_name, contact_number, address, city, zip_code, created_at, points FROM users WHERE user_id = ?");
@@ -142,6 +156,7 @@ $user_query->bind_param("i", $user_id);
 $user_query->execute();
 $user_result = $user_query->get_result();
 $user_data = $user_result->fetch_assoc();
+
 
 // Fetch stats once
 $stats_query = $conn->prepare("
