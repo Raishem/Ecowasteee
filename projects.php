@@ -138,12 +138,13 @@ if (!$user) {
                             $materials = $project['materials'] ? explode(',', $project['materials']) : [];
                             ?>
                             <div class="project-card" data-status="in-progress" data-project-id="<?= $project['project_id'] ?>">
+                            <div class="project-card-content">
                                 <div class="project-header">
                                     <h3><?= htmlspecialchars($project['project_name']) ?></h3>
                                     <span class="project-date">Created: <?= date('M j, Y', strtotime($project['created_at'])) ?></span>
                                 </div>
                                 <div class="project-description">
-                                    <?= htmlspecialchars($project['description']) ?>
+                                    <?= !empty(trim($project['description'])) ? htmlspecialchars($project['description']) : '<span class="no-description">No description added</span>' ?>
                                 </div>
                                 <div class="project-materials">
                                     <h4>Materials (<?= $project['material_count'] ?>):</h4>
@@ -158,10 +159,14 @@ if (!$user) {
                                         <?php endif; ?>
                                     </ul>
                                 </div>
-                                <div class="project-actions">
-                                        <a href="project_details.php?id=<?php echo $project['project_id']; ?>" class="action-btn view-details" data-project-id="<?php echo $project['project_id']; ?>"><i class="fas fa-eye"></i> View Details</a>
-                                    </div>
                             </div>
+                            <div class="project-actions">
+                                <a href="project_details.php?id=<?php echo $project['project_id']; ?>" class="action-btn view-details" data-project-id="<?php echo $project['project_id']; ?>"><i class="fas fa-eye"></i> View Details</a>
+                                <button class="action-btn delete-btn" onclick="deleteProject(<?php echo $project['project_id']; ?>, '<?php echo htmlspecialchars($project['project_name']); ?>')">
+                                    <i class="fas fa-trash"></i> Delete
+                                </button>
+                            </div>
+                        </div>
                             <?php
                         }
                     }
@@ -324,6 +329,33 @@ if (!$user) {
                 </div>
             </div>
         </main>
+    </div>
+
+    <!-- Enhanced Delete Confirmation Modal -->
+    <div id="deleteConfirmModal" class="custom-modal" style="display: none;">
+        <div class="modal-overlay"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-icon">
+                    <i class="fas fa-exclamation-triangle"></i>
+                </div>
+                <h3>Delete Project</h3>
+                <button class="modal-close" onclick="closeDeleteModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete the project <strong id="deleteProjectName"></strong>?</p>
+                <p class="warning-text">This action cannot be undone. All project data, materials, and steps will be permanently lost.</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-cancel" onclick="closeDeleteModal()">Cancel</button>
+                <button class="btn btn-delete" id="confirmDeleteBtn">
+                    <i class="fas fa-trash"></i>
+                    Delete Project
+                </button>
+            </div>
+        </div>
     </div>
 
     <!-- Feedback Button -->
@@ -1006,6 +1038,109 @@ if (!$user) {
             close.addEventListener('click', removeToast);
             setTimeout(removeToast, timeout);
         }
+
+        // Function to delete a project
+        let pendingDeleteProjectId = null;
+
+        // Enhanced delete project function
+        function deleteProject(projectId, projectName) {
+            pendingDeleteProjectId = projectId;
+            
+            // Update modal content
+            document.getElementById('deleteProjectName').textContent = `"${projectName}"`;
+            
+            // Show modal with proper display
+            const modal = document.getElementById('deleteConfirmModal');
+            modal.style.display = 'flex';
+            document.body.classList.add('modal-open');
+            
+            // Reset delete button state
+            const deleteBtn = document.getElementById('confirmDeleteBtn');
+            deleteBtn.disabled = false;
+            deleteBtn.innerHTML = '<i class="fas fa-trash"></i> Delete Project';
+            deleteBtn.classList.remove('btn-loading');
+        }
+
+        function closeDeleteModal() {
+            const modal = document.getElementById('deleteConfirmModal');
+            modal.style.display = 'none';
+            document.body.classList.remove('modal-open');
+            pendingDeleteProjectId = null;
+        }
+
+        function confirmDelete() {
+            if (!pendingDeleteProjectId) return;
+            
+            const deleteBtn = document.getElementById('confirmDeleteBtn');
+            deleteBtn.disabled = true;
+            deleteBtn.classList.add('btn-loading');
+            deleteBtn.innerHTML = 'Deleting...';
+            
+            const formData = new FormData();
+            formData.append('action', 'delete_project');
+            formData.append('project_id', pendingDeleteProjectId);
+
+            fetch('update_project.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Remove the project card from the DOM
+                    const projectCard = document.querySelector(`[data-project-id="${pendingDeleteProjectId}"]`);
+                    if (projectCard) {
+                        projectCard.style.opacity = '0';
+                        projectCard.style.transform = 'translateY(20px)';
+                        setTimeout(() => {
+                            projectCard.remove();
+                            
+                            // Check if no projects remain
+                            const remainingProjects = document.querySelectorAll('.project-card');
+                            if (remainingProjects.length === 0) {
+                                location.reload();
+                            }
+                        }, 300);
+                    }
+                    showToast('Project deleted successfully', 'success');
+                    closeDeleteModal();
+                } else {
+                    showToast('Error deleting project: ' + data.message, 'error');
+                    deleteBtn.disabled = false;
+                    deleteBtn.classList.remove('btn-loading');
+                    deleteBtn.innerHTML = '<i class="fas fa-trash"></i> Delete Project';
+                }
+            })
+            .catch(error => {
+                showToast('Error deleting project', 'error');
+                deleteBtn.disabled = false;
+                deleteBtn.classList.remove('btn-loading');
+                deleteBtn.innerHTML = '<i class="fas fa-trash"></i> Delete Project';
+                console.error('Error:', error);
+            });
+        }
+
+        // Close modal when clicking overlay
+        document.addEventListener('click', function(event) {
+            if (event.target.classList.contains('modal-overlay')) {
+                closeDeleteModal();
+            }
+        });
+
+        // Close modal with Escape key
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                closeDeleteModal();
+            }
+        });
+
+        // Initialize the confirm delete button
+        document.addEventListener('DOMContentLoaded', function() {
+            const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+            if (confirmDeleteBtn) {
+                confirmDeleteBtn.addEventListener('click', confirmDelete);
+            }
+        });
     </script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
