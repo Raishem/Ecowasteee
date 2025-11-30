@@ -292,6 +292,25 @@ try {
 } catch (mysqli_sql_exception $e) {
     $user_data = ['username' => 'User', 'avatar' => ''];
 }
+
+// Get waste categories and subcategories
+$waste_categories = [];
+try {
+    $categories_stmt = $conn->prepare("
+        SELECT wc.category_id, wc.category_name, wc.parent_id, wc.description 
+        FROM waste_categories wc 
+        ORDER BY wc.parent_id IS NULL DESC, wc.category_name
+    ");
+    $categories_stmt->execute();
+    $categories_result = $categories_stmt->get_result();
+    
+    while ($category = $categories_result->fetch_assoc()) {
+        $waste_categories[] = $category;
+    }
+} catch (Exception $e) {
+    // If table doesn't exist, use default categories
+    $waste_categories = [];
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -1552,6 +1571,28 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!form.closest || !form.closest('#addMaterialModal')) return;
         e.preventDefault();
         const fd = new FormData(form);
+
+        // Get the final material name (either from dropdown or custom input)
+        let materialName = fd.get('material_name');
+        const customName = fd.get('custom_material_name');
+
+        if (customName && customName.trim() !== '') {
+            materialName = customName.trim();
+        }
+
+        // Ensure we have a material name
+        if (!materialName || materialName.trim() === '') {
+            showToast('Please select or enter a material name', 'error');
+            return;
+        }
+
+        // Update the form data with the final material name
+        fd.set('material_name', materialName);
+
+        // Remove the custom field as it's not needed by the server
+        fd.delete('custom_material_name');
+        fd.delete('material_category');
+
         // include submitter if present
         let submitter = e.submitter || document.activeElement;
         if (submitter && submitter.form === form && submitter.name) {
@@ -1706,7 +1747,7 @@ document.addEventListener('DOMContentLoaded', function() {
     } catch (err) { showToast('Network error', 'error'); }
     });
 
-    // Intercept add-material modal submission
+    // Fixed add material modal submission handler
     document.addEventListener('click', function(e){
         const btn = e.target.closest('#addMaterialModal button[name="add_material"]');
         if (!btn) return;
@@ -1718,58 +1759,116 @@ document.addEventListener('DOMContentLoaded', function() {
 
         (async function(){
             const fd = new FormData(form);
+
+            // Get the final material name (either from dropdown or custom input)
+            let materialName = fd.get('material_name');
+            const customName = fd.get('custom_material_name');
+
+            if (customName && customName.trim() !== '') {
+                materialName = customName.trim();
+            }
+
+            // Ensure we have a material name
+            if (!materialName || materialName.trim() === '') {
+                showToast('Please select or enter a material name', 'error');
+                return;
+            }
+
+            // Update the form data with the final material name
+            fd.set('material_name', materialName);
+
+            // Remove the custom field as it's not needed by the server
+            fd.delete('custom_material_name');
+            fd.delete('material_category');
+
             // Ensure server sees the action key expected by update_project.php
             if (!fd.has('action')) fd.append('action', 'add_material');
             if (!fd.has('project_id')) fd.append('project_id', projectId);
             const headers = { 'X-Requested-With': 'XMLHttpRequest' };
+            
             try {
                 // Post to the API endpoint which handles material creation and returns JSON
                 const res = await fetch('update_project.php', { method: 'POST', body: fd, headers });
                 const json = await res.json();
-                if (!json || !json.success) { showToast(json.message || 'Could not add material', 'error'); return; }
+                
+                if (!json || !json.success) { 
+                    showToast(json.message || 'Could not add material', 'error'); 
+                    return; 
+                }
 
                 const mat = json.material;
-                // append to list
-                const ul = document.querySelector('.materials-list-stage');
-                    if (ul) {
-                        const li = document.createElement('li');
-                        li.className = 'material-item';
-                        li.setAttribute('data-material-id', mat.material_id);
-                        // Build consistent structure: main, actions, photos
-                        li.innerHTML = `<div class="material-main"><span class="mat-name">${mat.material_name}</span><div class="mat-meta">${mat.quantity ? '<span class="mat-qty">' + mat.quantity + '</span>' : '<span class="mat-qty">0</span>'}</div></div>`;
-                        // actions: default to needed unless server returned status
-                        const initialStatus = mat.status && mat.status !== '' ? mat.status : 'needed';
-                        if (initialStatus === 'needed') {
-                            li.innerHTML += `
-                                <div class="material-actions">
-                                    <a href="browse.php?query=${encodeURIComponent(mat.material_name)}&from_project=${projectId}" class="btn small find-donations-btn">Find Donations</a>
-                                    <form method="POST" class="inline-form" data-obtain-modal="1" action="project_details.php?id=${projectId}">
-                                        <input type="hidden" name="material_id" value="${mat.material_id}">
-                                        <input type="hidden" name="status" value="obtained">
-                                        <button type="submit" name="update_material_status" class="btn small" aria-label="Mark material obtained"><i class="fas fa-check" aria-hidden="true"></i></button>
-                                    </form>
-                                    <form method="POST" class="inline-form" data-confirm="Remove this material?" action="project_details.php?id=${projectId}">
-                                        <input type="hidden" name="material_id" value="${mat.material_id}">
-                                        <button type="submit" name="remove_material" class="btn small danger" aria-label="Delete material"><i class="fas fa-trash" aria-hidden="true"></i></button>
-                                    </form>
-                                </div>
-                            `;
-                        } else {
-                            li.innerHTML += `
-                                <div class="material-actions">
-                                    <span class="badge obtained" aria-hidden="true"><i class="fas fa-check-circle"></i> Obtained</span>
-                                    <button type="button" class="btn small upload-material-photo" data-material-id="${mat.material_id}" title="Upload photo" aria-label="Upload material photo"><i class="fas fa-camera"></i></button>
-                                </div>
-                            `;
-                        }
-                        li.innerHTML += `<div class="material-photos" data-material-id="${mat.material_id}"></div>`;
-                        ul.appendChild(li);
-                        requestAnimationFrame(()=> li.classList.remove('material-enter'));
-                    }
-                // reset and close modal
-                const f = modal.querySelector('form'); if (f) f.reset();
+                
+                // Find the materials list in the current active stage
+                const activeStage = document.querySelector('.workflow-stage.active') || 
+                                document.querySelector('.stage-card.current') ||
+                                document.querySelector('.workflow-stage.current');
+                let materialsList = activeStage ? activeStage.querySelector('.materials-list-stage') : null;
+                
+                // Fallback to first materials list if not found in active stage
+                if (!materialsList) {
+                    materialsList = document.querySelector('.materials-list-stage');
+                }
+                
+                if (materialsList) {
+                    const li = document.createElement('li');
+                    li.className = 'material-item';
+                    li.setAttribute('data-material-id', mat.material_id);
+                    
+                    // Build the material item structure
+                    li.innerHTML = `
+                        <div class="material-main">
+                            <span class="mat-name">${mat.material_name}</span>
+                            <div class="mat-meta">
+                                ${mat.quantity > 0 ? `<span class="mat-qty">${mat.quantity}</span>` : '<span class="mat-qty">0</span>'}
+                            </div>
+                        </div>
+                        <div class="material-actions">
+                            <a href="browse.php?query=${encodeURIComponent(mat.material_name)}&from_project=${projectId}" class="btn small find-donations-btn">Find Donations</a>
+                            <form method="POST" class="inline-form" data-obtain-modal="1" action="project_details.php?id=${projectId}">
+                                <input type="hidden" name="material_id" value="${mat.material_id}">
+                                <input type="hidden" name="status" value="obtained">
+                                <button type="submit" name="update_material_status" class="btn small" aria-label="Mark material obtained">
+                                    <i class="fas fa-check" aria-hidden="true"></i>
+                                </button>
+                            </form>
+                            <form method="POST" class="inline-form" data-confirm="Remove this material?" action="project_details.php?id=${projectId}">
+                                <input type="hidden" name="material_id" value="${mat.material_id}">
+                                <button type="submit" name="remove_material" class="btn small danger" aria-label="Delete material">
+                                    <i class="fas fa-trash" aria-hidden="true"></i>
+                                </button>
+                            </form>
+                        </div>
+                        <div class="material-photos" data-material-id="${mat.material_id}"></div>
+                    `;
+                    
+                    // Add to list with animation
+                    materialsList.appendChild(li);
+                    
+                    // Trigger smooth animation
+                    requestAnimationFrame(() => {
+                        li.style.opacity = '0';
+                        li.style.transform = 'translateY(-10px)';
+                        li.style.transition = 'all 0.3s ease';
+                        
+                        requestAnimationFrame(() => {
+                            li.style.opacity = '1';
+                            li.style.transform = 'translateY(0)';
+                        });
+                    });
+                }
+                
+                // Reset and close modal
+                form.reset();
                 modal.classList.remove('active');
-                showToast('Material added');
+                document.body.style.overflow = '';
+                
+                showToast('Material added successfully');
+                
+                // Refresh material requirements state
+                try { 
+                    refreshMaterialCollectionReqState(); 
+                } catch(e) { /* ignore */ }
+                
                 // If this material was added to a completed stage, auto-uncomplete that stage so it can be re-validated
                 try {
                     const li = document.querySelector('.material-item[data-material-id="' + (mat && mat.material_id ? mat.material_id : '') + '"]');
@@ -1791,15 +1890,33 @@ document.addEventListener('DOMContentLoaded', function() {
                             }
                             if (!isNaN(templateNum) && isFinite(templateNum)) {
                                 try {
-                                    await requestToggleStage(templateNum, <?= json_encode($project_id) ?>);
+                                    await requestToggleStage(templateNum, projectId);
                                     try { markStageUncompletedUI(templateNum); } catch(e){}
                                 } catch(e){ /* auto-uncomplete after modal add failed */ }
                             }
                         }
                     }
                 } catch(e) { /* auto-uncomplete modal add check failed */ }
-            } catch (err) { showToast('Network error', 'error'); }
+                
+            } catch (err) { 
+                showToast('Network error: ' + err.message, 'error'); 
+            }
         })();
+    });
+
+
+    // Fixed form submit handler for Enter key in add material modal
+    document.addEventListener('submit', function(e){
+        const form = e.target;
+        if (!form.closest || !form.closest('#addMaterialModal')) return;
+        e.preventDefault();
+        
+        // Trigger the same logic as the click handler
+        const submitBtn = form.querySelector('button[name="add_material"]');
+        if (submitBtn) {
+            const clickEvent = new Event('click', { bubbles: true });
+            submitBtn.dispatchEvent(clickEvent);
+        }
     });
 
     // Initialize Material Collection completion state on load
@@ -3450,8 +3567,12 @@ document.addEventListener('DOMContentLoaded', function(){
     
     <!-- Add Material modal will be created dynamically to avoid accidental auto-open -->
     <script>
+        // Updated createAddMaterialModal function with categorized dropdown
         function createAddMaterialModal(){
-            if (document.getElementById('addMaterialModal')) return document.getElementById('addMaterialModal');
+            if (document.getElementById('addMaterialModal')) {
+                return document.getElementById('addMaterialModal');
+            }
+            
             const modal = document.createElement('div');
             modal.className = 'modal';
             modal.id = 'addMaterialModal';
@@ -3462,30 +3583,253 @@ document.addEventListener('DOMContentLoaded', function(){
                         <h3 class="modal-title">Add Material</h3>
                         <button type="button" class="close-modal" data-action="close-add">&times;</button>
                     </div>
-                    <form method="POST">
+                    <form method="POST" id="addMaterialForm">
                         <div class="form-group">
-                            <label for="material_name">Material Name</label>
-                            <input type="text" id="material_name" name="material_name" required>
+                            <label for="material_category">Select Waste Category *</label>
+                            <select id="material_category" name="material_category" required class="category-select">
+                                <option value="">-- Select a category --</option>
+                                <!-- Categories will be populated by JavaScript -->
+                            </select>
                         </div>
                         <div class="form-group">
-                            <label for="quantity">Quantity</label>
-                            <input type="number" id="quantity" name="quantity" min="1" required>
+                            <label for="material_name">Material Name *</label>
+                            <select id="material_name" name="material_name" required class="material-select" disabled>
+                                <option value="">-- First select a category --</option>
+                            </select>
+                            <div class="form-hint">Or enter custom material name:</div>
+                            <input type="text" id="custom_material_name" name="custom_material_name" 
+                                placeholder="Enter custom material name" style="margin-top: 5px; display: none;">
+                        </div>
+                        <div class="form-group">
+                            <label for="quantity">Quantity *</label>
+                            <input type="number" id="quantity" name="quantity" min="1" value="1" required 
+                                placeholder="Enter quantity">
                         </div>
                         <div class="modal-actions">
                             <button type="button" class="action-btn" data-action="close-add">Cancel</button>
-                            <button type="submit" name="add_material" class="action-btn check-btn">Add Material</button>
+                            <button type="submit" name="add_material" class="action-btn check-btn">
+                                <i class="fas fa-plus"></i> Add Material
+                            </button>
                         </div>
                     </form>
                 </div>
             `;
+            
             document.body.appendChild(modal);
-            // attach close handlers
-            modal.querySelectorAll('[data-action="close-add"]').forEach(btn=>{
-                btn.addEventListener('click', function(ev){ ev.preventDefault(); modal.classList.remove('active'); document.body.style.overflow = ''; });
+            
+            // Initialize the category dropdown
+            initializeCategoryDropdown();
+            
+            // Attach close handlers
+            modal.querySelectorAll('[data-action="close-add"]').forEach(btn => {
+                btn.addEventListener('click', function(ev) {
+                    ev.preventDefault();
+                    modal.classList.remove('active');
+                    document.body.style.overflow = '';
+                });
             });
-            // overlay click
-            modal.addEventListener('click', function(e){ if (e.target === modal && modal.dataset.persistent !== '1'){ modal.classList.remove('active'); document.body.style.overflow = ''; } });
+            
+            // Overlay click
+            modal.addEventListener('click', function(e) {
+                if (e.target === modal && modal.dataset.persistent !== '1') {
+                    modal.classList.remove('active');
+                    document.body.style.overflow = '';
+                }
+            });
+            
             return modal;
+        }
+
+        // Initialize category dropdown with waste categories
+        function initializeCategoryDropdown() {
+            const categorySelect = document.getElementById('material_category');
+            const materialSelect = document.getElementById('material_name');
+            const customInput = document.getElementById('custom_material_name');
+            const otherWasteGroup = document.getElementById("otherWasteGroup");
+            const otherWasteInput = document.getElementById("otherWaste");
+            
+            if (!categorySelect) return;
+            
+            // Clear existing options
+            categorySelect.innerHTML = '<option value="">-- Select a category --</option>';
+            
+            // Define waste categories structure using your subcategories
+            const wasteCategories = [
+                {
+                    id: 'Plastic',
+                    name: '♻️ Plastic',
+                    subcategories: [
+                        'Plastic Bottles',
+                        'Plastic Containers', 
+                        'Plastic Bags',
+                        'Wrappers',
+                        'Other Plastic'
+                    ]
+                },
+                {
+                    id: 'Paper',
+                    name: '📄 Paper',
+                    subcategories: [
+                        'Newspapers',
+                        'Cardboard',
+                        'Magazines',
+                        'Office Paper',
+                        'Other Paper'
+                    ]
+                },
+                {
+                    id: 'Glass',
+                    name: '🍶 Glass',
+                    subcategories: [
+                        'Glass Bottles',
+                        'Glass Jars',
+                        'Broken Glassware',
+                        'Other Glass'
+                    ]
+                },
+                {
+                    id: 'Metal',
+                    name: '🔩 Metal',
+                    subcategories: [
+                        'Aluminum Cans',
+                        'Tin Cans',
+                        'Scrap Metal',
+                        'Other Metal'
+                    ]
+                },
+                {
+                    id: 'Electronic',
+                    name: '🔌 Electronic Waste',
+                    subcategories: [
+                        'Old Phones',
+                        'Chargers',
+                        'Batteries',
+                        'Broken Gadgets',
+                        'Other Electronic'
+                    ]
+                }
+            ];
+            
+            // Populate category dropdown
+            wasteCategories.forEach(category => {
+                const option = document.createElement('option');
+                option.value = category.id;
+                option.textContent = category.name;
+                categorySelect.appendChild(option);
+            });
+            
+            // Add "Other" category option
+            const otherOption = document.createElement('option');
+            otherOption.value = 'Other';
+            otherOption.textContent = '💡 Other Materials';
+            categorySelect.appendChild(otherOption);
+            
+            // Category change handler
+            categorySelect.addEventListener('change', function() {
+                const selectedCategory = this.value;
+                
+                // Reset states
+                materialSelect.innerHTML = '<option value="">-- Select a material --</option>';
+                materialSelect.disabled = true;
+                
+                // Handle Other Waste Group visibility
+                if (otherWasteGroup && otherWasteInput) {
+                    if (selectedCategory === 'Other') {
+                        otherWasteGroup.style.display = 'block';
+                        otherWasteInput.required = true;
+                        materialSelect.style.display = 'none';
+                        if (customInput) customInput.style.display = 'none';
+                    } else {
+                        otherWasteGroup.style.display = 'none';
+                        otherWasteInput.required = false;
+                        materialSelect.style.display = 'block';
+                    }
+                }
+                
+                // Handle custom input visibility
+                if (customInput) {
+                    customInput.style.display = 'none';
+                    customInput.required = false;
+                    materialSelect.required = true;
+                }
+                
+                if (selectedCategory === 'Other') {
+                    // Focus on other waste input when Other category is selected
+                    if (otherWasteInput) {
+                        setTimeout(() => otherWasteInput.focus(), 100);
+                    }
+                } else if (selectedCategory) {
+                    // Regular category flow - populate subcategories
+                    materialSelect.disabled = false;
+                    
+                    // Find the selected category and populate its subcategories
+                    const category = wasteCategories.find(cat => cat.id === selectedCategory);
+                    if (category && category.subcategories) {
+                        category.subcategories.forEach(subcat => {
+                            const option = document.createElement('option');
+                            option.value = subcat;
+                            option.textContent = subcat;
+                            materialSelect.appendChild(option);
+                        });
+                    }
+                    
+                    // Focus material select
+                    setTimeout(() => materialSelect.focus(), 100);
+                }
+            });
+            
+            // Material select change handler for "Other" subcategories
+            materialSelect.addEventListener('change', function() {
+                const selectedValue = this.value;
+                
+                // Show custom input when user selects "Other [Category]" option
+                if (selectedValue && selectedValue.startsWith('Other ') && customInput) {
+                    customInput.style.display = 'block';
+                    customInput.required = true;
+                    customInput.placeholder = `Specify ${selectedValue.toLowerCase()}`;
+                    setTimeout(() => customInput.focus(), 100);
+                } else if (customInput) {
+                    customInput.style.display = 'none';
+                    customInput.required = false;
+                }
+            });
+            
+            // Form submission handler to ensure proper data collection
+            const addMaterialForm = document.getElementById('addMaterialForm');
+            if (addMaterialForm) {
+                addMaterialForm.addEventListener('submit', function(e) {
+                    // Ensure the final material name is captured correctly
+                    const category = categorySelect.value;
+                    let finalMaterialName = '';
+                    
+                    if (category === 'Other' && otherWasteInput) {
+                        // Use the other waste input value
+                        finalMaterialName = otherWasteInput.value.trim();
+                    } else if (materialSelect.value && materialSelect.value.startsWith('Other ')) {
+                        // Use the custom input value for "Other" subcategories
+                        finalMaterialName = customInput ? customInput.value.trim() : materialSelect.value;
+                    } else {
+                        // Use the selected material value
+                        finalMaterialName = materialSelect.value;
+                    }
+                    
+                    // You can add validation here if needed
+                    if (category === 'Other' && !finalMaterialName) {
+                        e.preventDefault();
+                        showToast('Please specify the other material', 'error');
+                        return;
+                    }
+                    
+                    if (materialSelect.value.startsWith('Other ') && !finalMaterialName) {
+                        e.preventDefault();
+                        showToast('Please specify the material details', 'error');
+                        return;
+                    }
+                    
+                    // Set the final material name in a hidden field or ensure it's captured
+                    // This depends on your form structure and backend expectations
+                });
+            }
         }
     </script>
     <script>
