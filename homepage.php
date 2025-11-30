@@ -1190,7 +1190,6 @@ document.addEventListener('DOMContentLoaded', function () {
         Paper: ["Newspapers", "Cardboard", "Magazines", "Office Paper"],
         Glass: ["Glass Bottles", "Glass Jars", "Broken Glassware"],
         Metal: ["Aluminum Cans", "Tin Cans", "Scrap Metal"],
-        Organic: ["Food Waste", "Yard Waste", "Compostable Items"],
         Electronic: ["Old Phones", "Chargers", "Batteries", "Broken Gadgets"]
     };
 
