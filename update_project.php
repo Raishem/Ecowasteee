@@ -78,7 +78,9 @@ try {
             }
             if (!$name) { echo json_encode(['success'=>false,'message'=>'Missing material data','received_keys'=>array_values(array_keys($_POST))]); exit; }
             $stmt = $conn->prepare('INSERT INTO project_materials (project_id, material_name, quantity, unit, created_at) VALUES (?, ?, ?, ?, NOW())');
-            $qty = is_numeric($quantity) ? (int)$quantity : 0;
+            // Default to 1 when quantity is not provided (user didn't enter a number).
+            // If the user explicitly passes 0, keep 0 (treated as obtained by UI/server).
+            $qty = is_numeric($quantity) ? (int)$quantity : 1;
             // types: project_id (i), name (s), qty (i), unit (s)
             $stmt->bind_param('isis',$project_id,$name,$qty,$unit);
             $stmt->execute();

@@ -1444,11 +1444,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Before removing, check if we need to restore the upload button for the next material (if any)
                 const nextMaterial = li.nextElementSibling || li.previousElementSibling;
                 li.remove();
-                // If there is a next/prev material and it has no photo, restore upload button if needed
+                // If there is a next/prev material, only show upload button when that material is 'obtained'
+                // (either marked obtained or quantity is 0). Avoid adding upload buttons for materials
+                // that are still in 'needed' state.
                 if (nextMaterial && nextMaterial.classList.contains('material-item')) {
                     const meta = nextMaterial.querySelector('.mat-meta');
                     const hasPhoto = nextMaterial.querySelector('.material-photos .material-photo');
-                    if (meta && !hasPhoto && !meta.querySelector('.upload-material-photo')) {
+                    // Determine obtained state from class or badge or quantity == 0
+                    const hasObtainedBadge = !!nextMaterial.querySelector('.badge.obtained');
+                    let qtyEl = nextMaterial.querySelector('.mat-qty');
+                    let qtyVal = null;
+                    if (qtyEl) {
+                        try { qtyVal = parseInt(String(qtyEl.textContent || '').replace(/[^0-9\-]/g,''), 10); } catch(e) { qtyVal = null; }
+                    }
+                    const isObtained = hasObtainedBadge || (qtyVal !== null && !isNaN(qtyVal) && qtyVal <= 0) || nextMaterial.classList.contains('material-obtained');
+                    if (meta && !hasPhoto && isObtained && !meta.querySelector('.upload-material-photo')) {
                         const btn = document.createElement('button');
                         btn.type = 'button';
                         btn.className = 'btn small upload-material-photo';
@@ -1617,8 +1627,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 li.style.transform = 'translateY(-6px)';
                 const mainContent = document.createElement('div');
                 mainContent.className = 'material-main';
-                // Always include quantity (default to 0)
-                mainContent.innerHTML = `<span class="mat-name">${mat.material_name}</span><span class="mat-qty">${typeof mat.quantity !== 'undefined' ? mat.quantity : 0}</span>`;
+                // Always include quantity. Default to 1 when server didn't provide a number so
+                // newly-created materials start as 'needed' and receive the Check button.
+                const q = (typeof mat.quantity !== 'undefined' && mat.quantity !== null) ? mat.quantity : 1;
+                mainContent.innerHTML = `<span class="mat-name">${mat.material_name}</span><span class="mat-qty">${q}</span>`;
                 li.appendChild(mainContent);
                 const photosDiv = document.createElement('div');
                 photosDiv.className = 'material-photos';
@@ -1673,6 +1685,26 @@ document.addEventListener('DOMContentLoaded', function() {
                 modal.classList.remove('active');
             }
             showToast('Material added');
+
+            // If there is nowhere to append the newly added material (no materials list present)
+            // or the page is missing the full set of workflow tabs (less than 3), reload to make
+            // the server-rendered normalization (Preparation/Construction/Share) and material list visible.
+            try {
+                let hadMaterialsList = !!document.querySelector('.materials-list-stage');
+                const tabCount = document.querySelectorAll('.stage-tab').length || document.querySelectorAll('.stage-card').length || 0;
+                if (!hadMaterialsList) {
+                    try { if (typeof ensurePreparationStageInDOM === 'function') ensurePreparationStageInDOM(); } catch(e){}
+                    try { if (typeof insertMaterialIntoDOM === 'function' && insertMaterialIntoDOM(mat)) hadMaterialsList = true; } catch(e) { /* fallback silently */ }
+                }
+                if (!hadMaterialsList) {
+                    try { if (typeof ensurePreparationStageInDOM === 'function') ensurePreparationStageInDOM(); } catch(e){}
+                    try { if (typeof insertMaterialIntoDOM === 'function' && insertMaterialIntoDOM(mat)) hadMaterialsList = true; } catch(e) { /* fallback silently */ }
+                }
+                if (!hadMaterialsList || tabCount < 3) {
+                    // last resort: reload so the server render shows canonical UI
+                    setTimeout(function(){ try { location.reload(); } catch(e){} }, 700);
+                }
+            } catch(e) { /* ignore */ }
             // If this material was added inside a completed stage, auto-toggle that stage back to incomplete
                 try {
                     const newItem = document.querySelector('.material-item[data-material-id="' + (mat && mat.material_id ? mat.material_id : '') + '"]');
@@ -1819,7 +1851,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="material-main">
                             <span class="mat-name">${mat.material_name}</span>
                             <div class="mat-meta">
-                                ${mat.quantity > 0 ? `<span class="mat-qty">${mat.quantity}</span>` : '<span class="mat-qty">0</span>'}
+                                ${((typeof mat.quantity !== 'undefined' && mat.quantity !== null) ? (mat.quantity > 0 ? `<span class="mat-qty">${mat.quantity}</span>` : `<span class="mat-qty">${mat.quantity}</span>`) : `<span class="mat-qty">1</span>`)}
                             </div>
                         </div>
                         <div class="material-actions">
@@ -1863,6 +1895,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.body.style.overflow = '';
                 
                 showToast('Material added successfully');
+
+                // If the client did not find a materials list to add into, or there are fewer than
+                // 3 stage tabs rendered client-side, reload the page so the server can render the
+                // canonical Preparation stage and the new material will appear immediately.
+                try {
+                    const materialsListPresent = !!(document.querySelector('.materials-list-stage'));
+                    const tabs = document.querySelectorAll('.stage-tab');
+                    const tabCount = tabs ? tabs.length : 0;
+                    if (!materialsListPresent) {
+                        try { insertMaterialIntoDOM(mat); } catch(e) { /* fallback silently */ }
+                    }
+                    if (tabCount < 3) {
+                        try { ensureThreeStageTabs(); } catch(e) { /* ignore */ }
+                    }
+                } catch(e) { /* ignore */ }
                 
                 // Refresh material requirements state
                 try { 
@@ -1921,6 +1968,78 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Initialize Material Collection completion state on load
     document.addEventListener('DOMContentLoaded', function(){ try{ refreshMaterialCollectionReqState(); }catch(e){} });
+
+    // Ensure every unobtained material has a visible 'Check' button so users can
+    // mark it obtained. Some templates or dynamic flows can accidentally omit the
+    // inline obtain form, so this helper re-syncs the DOM and adds a small form
+    // with update_material_status where missing.
+    function ensureCheckButtonsForNeededMaterials() {
+        try {
+            const items = Array.from(document.querySelectorAll('.material-item'));
+            items.forEach(li => {
+                try {
+                    // determine if this material appears obtained
+                    const hasObtained = !!li.querySelector('.badge.obtained') || li.classList.contains('material-obtained') || (li.querySelector('.mat-qty') && parseInt(li.querySelector('.mat-qty').textContent||'0',10) <= 0);
+                    if (hasObtained) return; // nothing to do for obtained materials
+
+                    // find actions container (create if missing)
+                    let actions = li.querySelector('.material-actions');
+                    if (!actions) {
+                        actions = document.createElement('div'); actions.className = 'material-actions';
+                        li.appendChild(actions);
+                    }
+
+                    // If an update_material_status form/button already present, keep it
+                    if (actions.querySelector('form button[name="update_material_status"]')) return;
+
+                    // find existing find-donations anchor or delete form position to insert beside
+                    const findLink = actions.querySelector('.find-donations-btn');
+
+                    // build an inline-form to match our existing pattern
+                    const mid = li.getAttribute('data-material-id') || (li.querySelector('input[name="material_id"]') ? li.querySelector('input[name="material_id"]').value : '');
+                    const form = document.createElement('form');
+                    form.method = 'POST';
+                    form.className = 'inline-form';
+                    form.setAttribute('data-obtain-modal', '1');
+
+                    const hid = document.createElement('input'); hid.type = 'hidden'; hid.name = 'material_id'; hid.value = mid;
+                    const hs = document.createElement('input'); hs.type = 'hidden'; hs.name = 'status'; hs.value = 'obtained';
+                    const btn = document.createElement('button'); btn.type = 'submit'; btn.name = 'update_material_status'; btn.className = 'btn small obtain-btn'; btn.setAttribute('title','Mark obtained'); btn.setAttribute('aria-label','Mark material obtained'); btn.innerHTML = '<i class="fas fa-check" aria-hidden="true"></i>';
+                    form.appendChild(hid); form.appendChild(hs); form.appendChild(btn);
+
+                    // Insert before delete button where possible, otherwise append
+                    const deleteBtn = actions.querySelector('button[name="remove_material"], button.danger');
+                    if (deleteBtn && deleteBtn.parentNode === actions) actions.insertBefore(form, deleteBtn);
+                    else if (findLink && findLink.parentNode === actions) actions.insertBefore(form, findLink.nextSibling);
+                    else actions.appendChild(form);
+
+                } catch(e) { /* ignore per-item failures */ }
+            });
+        } catch(e){ /* ignore */ }
+    }
+
+    // Ensure check buttons are present shortly after load and after any known DOM mutations
+    document.addEventListener('DOMContentLoaded', function(){ try { ensureCheckButtonsForNeededMaterials(); } catch(e){} });
+    try { // also re-run after a small delay to catch any late DOM-inserted lists
+        setTimeout(function(){ try { ensureCheckButtonsForNeededMaterials(); } catch(e){} }, 450);
+    } catch(e){}
+
+    // Observe material lists for changes and ensure check buttons are present after any DOM updates
+    try {
+        const materialsRoot = document.querySelector('.materials-list-stage') || document.querySelector('.stage-materials') || document.body;
+        if (materialsRoot) {
+            const checkObserver = new MutationObserver(function(mutations){
+                try {
+                    let didChange = false;
+                    for (let m of mutations) {
+                        if (m.type === 'childList' || m.type === 'attributes') { didChange = true; break; }
+                    }
+                    if (didChange) try { ensureCheckButtonsForNeededMaterials(); } catch(e){}
+                } catch(e){}
+            });
+            checkObserver.observe(materialsRoot, { childList: true, subtree: true, attributes: true });
+        }
+    } catch(e) {}
 
     // Delegated handler: upload photo for a specific material
     // Helper: recompute whether Material Collection stage requirements are satisfied
@@ -2213,7 +2332,11 @@ document.addEventListener('DOMContentLoaded', function() {
         // Default photo type used for material uploads. Keep 'after' so server defaults still apply.
         pickAndUpload('after');
 
+        // guard against accidental double-invocation from duplicate events
+        let _pickInProgress = false;
         async function pickAndUpload(photoType){
+            if (_pickInProgress) return;
+            _pickInProgress = true;
             cleanUp();
             const input = document.createElement('input');
             input.type = 'file'; input.accept = 'image/*';
@@ -2339,7 +2462,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     } else {
                         showToast(json && json.message ? json.message : 'Upload failed', 'error');
                     }
-                } catch (err) { showToast('Upload failed', 'error'); }
+                    } catch (err) { showToast('Upload failed', 'error'); }
+                    finally { try { _pickInProgress = false; } catch(e){} }
             };
             input.click();
         }
@@ -2847,9 +2971,29 @@ document.addEventListener('DOMContentLoaded', function(){
     const stages = document.querySelectorAll('.workflow-stage');
 
     function showStageByIndex(idx){
+        // Ensure canonical tabs/stage ordering present before selecting (helps avoid race with ensureThreeStageTabs)
+        try { if (typeof ensureThreeStageTabs === 'function') ensureThreeStageTabs(); } catch(e){}
+
         // Toggle active classes on tabs and stages
         tabs.forEach(t => t.classList.toggle('active', parseInt(t.dataset.stageIndex,10) === idx));
         stages.forEach(s => s.classList.toggle('active', parseInt(s.getAttribute('data-stage-index'),10) === idx));
+
+        // Keep tab-badges in sync with tab state (completed/current/locked/incomplete).
+        try {
+            tabs.forEach(t => {
+                try {
+                    const badge = t.querySelector('.tab-badge');
+                    if (!badge) return;
+                    // reset classes
+                    badge.classList.remove('active','completed','locked','incomplete');
+                    // prefer existing tab classes where available
+                    if (t.classList.contains('completed')) { badge.classList.add('completed'); badge.textContent = 'Completed'; }
+                    else if (t.classList.contains('active')) { badge.classList.add('active'); badge.textContent = 'Current'; }
+                    else if (t.classList.contains('locked')) { badge.classList.add('locked'); badge.textContent = 'Locked'; }
+                    else { badge.classList.add('incomplete'); badge.textContent = 'Incomplete'; }
+                } catch(e){}
+            });
+        } catch(e){}
         // update URL hash for shareable link
         try {
             const hash = '#step-' + idx;
@@ -3055,6 +3199,60 @@ document.addEventListener('DOMContentLoaded', function(){
 
                 // Icon map by stage_number (fallback)
                 $stage_icons = [1 => 'fa-lightbulb', 2 => 'fa-box', 3 => 'fa-hammer', 4 => 'fa-paint-roller', 5 => 'fa-star', 6 => 'fa-camera'];
+
+                // Normalize number of top-level workflow tabs to exactly 3 stages
+                // We prefer existing templates when their names match the canonical set,
+                // otherwise fall back to sensible defaults. This guarantees consistent
+                // UI: Preparation, Construction, Share.
+                try {
+                    // Load canonical 3-stage definition from a centralized include so all
+                    // project detail variants use the same stage list and cannot drift.
+                    $canonical = [];
+                    try {
+                        $path = __DIR__ . '/includes/project_stages.php';
+                        if (file_exists($path)) {
+                            $canonical = include $path;
+                        }
+                    } catch (Exception $e) { $canonical = []; }
+
+                    // Fallback to embedded canonical set if include couldn't be loaded
+                    if (empty($canonical)) {
+                        $canonical = [
+                            ['name' => 'Preparation', 'description' => 'Collect materials required for this project'],
+                            ['name' => 'Construction', 'description' => 'Build your project, follow safety guidelines, document progress'],
+                            ['name' => 'Share', 'description' => 'Share your project with the community']
+                        ];
+                    }
+
+                    // prepare a map of existing stages by normalized name
+                    $haveMap = [];
+                    foreach ($workflow_stages as $st) {
+                        $nm = strtolower(trim((string)($st['name'] ?? $st['stage_name'] ?? '')));
+                        if ($nm === '') continue;
+                        $haveMap[$nm] = $st;
+                    }
+
+                    $normalized = [];
+                    foreach ($canonical as $idx => $canon) {
+                        $key = strtolower($canon['name']);
+                        if (isset($haveMap[$key])) {
+                            // preserve description/template_number when present
+                            $item = $haveMap[$key];
+                            $item['name'] = $canon['name'];
+                            if (!isset($item['description']) || trim($item['description']) === '') $item['description'] = $canon['description'];
+                            $normalized[] = $item;
+                        } else {
+                            // create a minimal canonical entry
+                            $normalized[] = ['name' => $canon['name'], 'description' => $canon['description'], 'number' => $idx + 1, 'template_number' => ($idx + 1)];
+                        }
+                    }
+
+                    // set workflow_stages to exactly the normalized 3 entries
+                    $workflow_stages = $normalized;
+
+                } catch (Exception $e) {
+                    // keep whatever $workflow_stages had — fail silently to avoid breaking page
+                }
 
                 // Get completed stages from database
                 $completed_stages = 0;
@@ -4289,7 +4487,16 @@ function showStagePhotoModal(stageNumber, missingTypes, projectId){
         input.accept = 'image/*';
         input.style.display = 'none';
 
-        btn.addEventListener('click', ()=> input.click());
+        // Prevent accidental double-click/open by tracking an opener flag on the wrapper
+        btn.addEventListener('click', ()=> {
+            try {
+                if (wrapper._opening) return;
+                wrapper._opening = true;
+                // ensure flag clears after a reasonable timeout if change handler fails to run
+                setTimeout(()=> { try { wrapper._opening = false; } catch(e){} }, 4000);
+                input.click();
+            } catch(e) { try { input.click(); } catch(err){} }
+        });
 
         input.addEventListener('change', async function(e){
             const file = input.files[0];
@@ -4323,8 +4530,11 @@ function showStagePhotoModal(stageNumber, missingTypes, projectId){
                         // leave as-is but show thumbnail? (omitted)
                     }
                     // tell the page to recompute requirement state (enables the main complete button)
+                    // clear the opener flag so a subsequent upload can be started manually
+                    try { wrapper._opening = false; } catch(e){}
                     try { if (typeof refreshMaterialCollectionReqState === 'function') refreshMaterialCollectionReqState(); } catch(e){}
                 } else {
+                    try { wrapper._opening = false; } catch(e){}
                     showToast(j && j.message ? j.message : 'Upload failed', 'error');
                     btn.disabled = false;
                     btn.textContent = 'Upload ' + type;
@@ -4471,5 +4681,284 @@ function showStagePhotoModal(stageNumber, missingTypes, projectId){
 <?php
 // Output materials script config and include via PHP to avoid editor parse issues
 echo '<script>window.ECW_DATA = window.ECW_DATA || {}; window.ECW_DATA.projectId = ' . json_encode($project_id) . ';</script>' . "\n";
+// expose canonical stages to the client for DOM-injection and fallbacks
+try {
+    $clientStages = isset($canonical) && is_array($canonical) ? $canonical : (file_exists(__DIR__ . '/includes/project_stages.php') ? include __DIR__ . '/includes/project_stages.php' : []);
+} catch (Exception $e) { $clientStages = []; }
+echo '<script>window.ECW_DATA = window.ECW_DATA || {}; window.ECW_DATA.canonicalStages = ' . json_encode(array_values($clientStages)) . ';</script>' . "\n";
 echo '<script src="assets/js/project-details-materials.js"></script>' . "\n";
 ?>
+<script>
+// Client helper: ensure exactly three stage tabs exist (canonical stages). If any are missing
+// insert them so UI can't drift when server-side or templates omit a stage.
+function ensureThreeStageTabs() {
+    try {
+        const canonical = (window.ECW_DATA && Array.isArray(window.ECW_DATA.canonicalStages)) ? window.ECW_DATA.canonicalStages : [
+            { name: 'Preparation', description: 'Collect materials required for this project', icon: 'fa-lightbulb' },
+            { name: 'Construction', description: 'Build your project, follow safety guidelines, document progress', icon: 'fa-hard-hat' },
+            { name: 'Share', description: 'Share your project with the community', icon: 'fa-share-alt' }
+        ];
+
+        const tabsRoot = document.querySelector('.stage-tabs');
+        if (!tabsRoot) return;
+
+        // map existing by normalized name
+        // Build map of existing tabs by normalized canonical title (use .tab-title if available)
+        const existingMap = {};
+        const tabs = Array.from(tabsRoot.querySelectorAll('.stage-tab'));
+        tabs.forEach(t => {
+            let titleEl = t.querySelector('.tab-title');
+            let ttext = titleEl ? (titleEl.textContent || '') : (t.textContent || '');
+            // strip common badge words to get a clean key
+            ttext = ttext.replace(/Completed|Current|Locked|Locked|\n|\r|\t/gi,'').trim().toLowerCase();
+            // sometimes inline text contains icons or extra markup; reduce to single name token
+            const token = (ttext.match(/[a-z0-9\s]+/i) || [''])[0].trim();
+            if (token) {
+                if (!existingMap[token]) existingMap[token] = t; else {
+                    // duplicate — remove the extra one to avoid duplicate tabs
+                    try { t.remove(); } catch(e){}
+                }
+            }
+        });
+
+        // If a canonical stage is missing, create and insert it in the canonical order
+        canonical.forEach((cs, idx) => {
+            const key = (cs.name || '').toLowerCase();
+            if (!existingMap[key]) {
+                const btn = document.createElement('button');
+                btn.className = 'stage-tab';
+                btn.setAttribute('data-stage-index', String(idx));
+                btn.setAttribute('data-stage-number', String(idx+1));
+                btn.setAttribute('aria-label', cs.name || 'Stage');
+                btn.innerHTML = `<span class="tab-icon"><i class="fas ${cs.icon || 'fa-circle'}" aria-hidden="true"></i></span><span class="tab-meta"><span class="tab-title">${cs.name}</span><span class="tab-badge">Locked</span></span>`;
+                // Insert at desired index if possible
+                const ref = tabsRoot.children[idx];
+                if (ref) tabsRoot.insertBefore(btn, ref); else tabsRoot.appendChild(btn);
+                // ensure the new button has interactive handlers so it works with the tab logic
+                attachTabHandlers(btn);
+            } else {
+                // Move existing tab into canonical position for consistent ordering
+                const existing = existingMap[key];
+                const ref = tabsRoot.children[idx];
+                if (ref && ref !== existing) tabsRoot.insertBefore(existing, ref);
+            }
+        });
+        // After ensuring canonical tabs exist, ensure stage-cards and tabs share consistent indices
+        try {
+            const stageCards = Array.from(document.querySelectorAll('.workflow-stage, .stage-card'));
+            // normalize stage-cards by canonical order: if a card's title matches canonical name, assign the canonical index
+            canonical.forEach((cs, ci) => {
+                const match = stageCards.find(sc => {
+                    try {
+                        const title = (sc.querySelector && sc.querySelector('.stage-title')) ? (sc.querySelector('.stage-title').textContent || '') : (sc.textContent || '');
+                        return typeof title === 'string' && title.toLowerCase().indexOf((cs.name || '').toLowerCase()) !== -1;
+                    } catch(e){ return false; }
+                });
+                if (match) {
+                    match.setAttribute('data-stage-index', String(ci));
+                }
+            });
+
+            // Now align tabs with canonical indices where possible
+            Array.from(tabsRoot.querySelectorAll('.stage-tab')).forEach((t, ti) => {
+                // find a matching canonical entry by title
+                let titleEl = t.querySelector('.tab-title');
+                let ttext = titleEl ? (titleEl.textContent || '') : (t.textContent || '');
+                ttext = ttext.replace(/Completed|Current|Locked|\n|\r|\t/gi,'').trim().toLowerCase();
+                const token = (ttext.match(/[a-z0-9\s]+/i) || [''])[0].trim();
+                const foundIndex = canonical.findIndex(cs => ((cs.name || '').toLowerCase() === token));
+                if (foundIndex >= 0) t.dataset.stageIndex = String(foundIndex);
+                else if (!t.dataset.stageIndex) t.dataset.stageIndex = String(ti);
+                // attach handlers now that indexes are set
+                attachTabHandlers(t);
+            });
+        } catch(e) { /* ignore */ }
+    } catch(e) { /* fail silently */ }
+}
+
+// Attach click/keydown handlers to tab if not already bound
+function attachTabHandlers(tabEl) {
+    try {
+        if (!tabEl || tabEl.dataset && tabEl.dataset._tabInit === '1') return;
+        const tabsRoot = tabEl.closest('.stage-tabs');
+        const all = tabsRoot ? Array.from(tabsRoot.querySelectorAll('.stage-tab')) : [tabEl];
+        const idx = Array.prototype.indexOf.call(all, tabEl);
+        tabEl.setAttribute('tabindex', '0');
+        if (!tabEl.dataset.stageIndex) tabEl.dataset.stageIndex = idx;
+        tabEl.addEventListener('click', function(){ try { const i = parseInt(this.dataset.stageIndex,10); const idx = isNaN(i) ? 0 : i; if (typeof showStageByIndex === 'function') showStageByIndex(idx); else { // fallback: toggle classes
+                document.querySelectorAll('.stage-tab').forEach(t=>t.classList.toggle('active', parseInt(t.dataset.stageIndex,10) === idx));
+                document.querySelectorAll('.workflow-stage, .stage-card').forEach(s=>s.classList.toggle('active', parseInt(s.getAttribute('data-stage-index'),10) === idx));
+            } } catch(e){} });
+        tabEl.addEventListener('keydown', function(ev){ try { const ti = parseInt(this.dataset.stageIndex,10); const tabs = Array.from(this.closest('.stage-tabs').querySelectorAll('.stage-tab')); if (ev.key === 'ArrowRight' || ev.key === 'ArrowDown') { ev.preventDefault(); const next = tabs[(ti + 1) % tabs.length]; if (next) next.focus(); } else if (ev.key === 'ArrowLeft' || ev.key === 'ArrowUp') { ev.preventDefault(); const prev = tabs[(ti - 1 + tabs.length) % tabs.length]; if (prev) prev.focus(); } else if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); this.click(); } } catch(e){} });
+        // make sure locked styling doesn't prevent focus/click
+        try { tabEl.style.pointerEvents = 'auto'; } catch(e){}
+        if (tabEl.dataset) tabEl.dataset._tabInit = '1';
+    } catch(e) { /* ignore */ }
+}
+
+// Client helper: when a Preparation / material-collection stage is not present in the DOM
+// create a minimal stage-card with materials section so add_material can attach items.
+function ensurePreparationStageInDOM() {
+    try {
+        // If a materials-list-stage already exists, nothing more to do
+        if (document.querySelector('.materials-list-stage')) return true;
+
+        // Look for an existing stage-card with a title that matches Preparation / Material Collection
+        const existingPrep = Array.from(document.querySelectorAll('.workflow-stage, .stage-card')).find(sc => {
+            try {
+                const titleEl = sc.querySelector && sc.querySelector('.stage-title');
+                const txt = titleEl ? (titleEl.textContent || '') : (sc.textContent || '');
+                const t = String(txt || '').trim().toLowerCase();
+                return t.indexOf('prepar') !== -1 || t.indexOf('material') !== -1;
+            } catch(e){ return false; }
+        });
+
+        // If an existing Preparation stage-card exists, ensure it contains a materials-list-stage element
+        if (existingPrep) {
+            try {
+                // prefer .stage-materials container inside this card
+                let materialsWrap = existingPrep.querySelector('.stage-materials');
+                if (!materialsWrap) {
+                    // create a reasonable container matching our template
+                    materialsWrap = document.createElement('div');
+                    materialsWrap.className = 'stage-materials';
+                    materialsWrap.innerHTML = '<h4>Materials Needed</h4><ul class="materials-list-stage"></ul>';
+                    // Insert before stage-actions or append at end
+                    const actions = existingPrep.querySelector('.stage-actions');
+                    if (actions && actions.parentNode) actions.parentNode.insertBefore(materialsWrap, actions);
+                    else existingPrep.appendChild(materialsWrap);
+                } else {
+                    // ensure inner list exists
+                    if (!materialsWrap.querySelector('.materials-list-stage')) {
+                        const ul = document.createElement('ul'); ul.className = 'materials-list-stage'; materialsWrap.appendChild(ul);
+                        // remove any empty-state placeholder message if present
+                        const empty = materialsWrap.querySelector('.empty-state'); if (empty) try { empty.remove(); } catch(e){}
+                    }
+                }
+                // ensure add material button exists inside this stage if missing
+                if (!existingPrep.querySelector('.add-material-btn')) {
+                    const actions = existingPrep.querySelector('.stage-actions') || existingPrep;
+                    const btn = document.createElement('button'); btn.type='button'; btn.className='btn add-material-btn'; btn.innerHTML='<i class="fas fa-plus"></i> Add Material'; btn.addEventListener('click', function(){ try{ if (typeof showAddMaterialModal === 'function') showAddMaterialModal(); }catch(e){} });
+                    actions.appendChild(btn);
+                }
+                // ensure this stage is active (so insertion shows in current view)
+                try { existingPrep.classList.add('active'); existingPrep.classList.remove('locked'); } catch(e){}
+                return true;
+            } catch(e) { /* ignore */ }
+        }
+
+        const canonical = window.ECW_DATA && Array.isArray(window.ECW_DATA.canonicalStages) ? window.ECW_DATA.canonicalStages : [];
+        const prep = (canonical.length ? canonical[0] : { name: 'Preparation', description: 'Collect materials required for this project', icon: 'fa-box-open' });
+
+        // Find container for stages
+        const container = document.querySelector('.workflow-stages-container') || document.querySelector('.workflow-section') || document.body;
+        if (!container) return false;
+
+        // Create a minimal stage-card element for Preparation
+        const card = document.createElement('div');
+        card.className = 'workflow-stage stage-card inactive';
+        card.setAttribute('data-stage-index', '0');
+        card.innerHTML = `
+            <i class="fas ${prep.icon || 'fa-box-open'} stage-icon" aria-hidden="true"></i>
+            <div class="stage-content">
+                <div class="stage-header">
+                    <div class="stage-info">
+                        <h3 class="stage-title">${prep.name}</h3>
+                        <div class="stage-desc">${prep.description || ''}</div>
+                    </div>
+                </div>
+                <div class="stage-materials">
+                    <h4>Materials Needed</h4>
+                    <ul class="materials-list-stage"></ul>
+                </div>
+                <div class="stage-actions"><button type="button" class="btn add-material-btn" onclick="showAddMaterialModal()"><i class="fas fa-plus"></i> Add Material</button></div>
+            </div>`;
+
+        // Insert near the beginning of the stages container
+        container.insertBefore(card, container.firstChild);
+
+        // Also ensure a top tab for Preparation exists
+        ensureThreeStageTabs();
+        return true;
+    } catch(e) { return false; }
+}
+
+// Helper to insert a new material item element into the materials list
+function insertMaterialIntoDOM(mat) {
+    try {
+        // ensure Preparation stage exists
+        ensurePreparationStageInDOM();
+        let list = document.querySelector('.materials-list-stage');
+        // If list still missing, attempt to locate or create it inside existing Preparation stage
+        if (!list) {
+            const prepStage = Array.from(document.querySelectorAll('.workflow-stage, .stage-card')).find(sc => {
+                try { const t = (sc.querySelector && sc.querySelector('.stage-title')) ? sc.querySelector('.stage-title').textContent || '' : sc.textContent || ''; return String(t || '').toLowerCase().indexOf('prepar') !== -1 || String(t || '').toLowerCase().indexOf('material') !== -1;} catch(e){return false;} });
+            if (prepStage) {
+                let materialsWrap = prepStage.querySelector('.stage-materials');
+                if (!materialsWrap) {
+                    materialsWrap = document.createElement('div'); materialsWrap.className = 'stage-materials'; materialsWrap.innerHTML = '<h4>Materials Needed</h4><ul class="materials-list-stage"></ul>';
+                    const actions = prepStage.querySelector('.stage-actions'); if (actions && actions.parentNode) actions.parentNode.insertBefore(materialsWrap, actions); else prepStage.appendChild(materialsWrap);
+                }
+                list = materialsWrap.querySelector('.materials-list-stage');
+            }
+        }
+        if (!list) return false;
+        if (!list) return false;
+
+        // normalize material fields (support multiple API shapes)
+        const matId = String(mat.material_id || mat.id || mat.id_str || mat.mid || '').trim();
+        const matName = String(mat.material_name || mat.name || mat.label || '').trim();
+        const matQty = (typeof mat.quantity !== 'undefined' && mat.quantity !== null) ? parseInt(mat.quantity, 10) : (typeof mat.qty !== 'undefined' ? parseInt(mat.qty, 10) : 1);
+
+        // avoid duplicating an already-inserted material with the same id
+        if (matId) {
+            try {
+                const existing = list.querySelector('li.material-item[data-material-id="' + matId + '"]');
+                if (existing) {
+                    // update quantity and name in place
+                    try { const qEl = existing.querySelector('.mat-qty'); if (qEl) qEl.textContent = String(isNaN(matQty) ? 0 : matQty); } catch(e){}
+                    try { const nEl = existing.querySelector('.mat-name'); if (nEl) nEl.textContent = matName || (nEl.textContent || ''); } catch(e){}
+                    // ensure the item is visible/active
+                    try { existing.classList.remove('hidden'); } catch(e){}
+                    try { const stageEl = list.closest('.workflow-stage, .stage-card'); if (stageEl) { stageEl.classList.add('active'); stageEl.classList.remove('locked'); } } catch(e){}
+                    try { refreshMaterialCollectionReqState(); } catch(e){}
+                    return true;
+                }
+            } catch(e) { /* ignore lookup errors */ }
+        }
+
+        const li = document.createElement('li');
+        li.className = 'material-item';
+        if (matId) li.setAttribute('data-material-id', matId);
+        li.innerHTML = `
+            <div class="material-main">
+                <span class="mat-name">${(matName || '')}</span>
+                <div class="mat-meta"><span class="mat-qty">${(isNaN(matQty) ? 0 : matQty)}</span></div>
+            </div>
+            <div class="material-actions">
+                <a href="browse.php?query=${encodeURIComponent(matName || '')}&from_project=${window.ECW_DATA && window.ECW_DATA.projectId ? window.ECW_DATA.projectId : ''}" class="btn small find-donations-btn">Find Donations</a>
+                <form method="POST" class="inline-form" data-obtain-modal="1" action="project_details.php?id=${window.ECW_DATA && window.ECW_DATA.projectId ? window.ECW_DATA.projectId : ''}">
+                    <input type="hidden" name="material_id" value="${matId}"><input type="hidden" name="status" value="obtained"><button type="submit" name="update_material_status" class="btn small"><i class="fas fa-check"></i></button>
+                </form>
+                <form method="POST" class="inline-form" data-confirm="Remove this material?">
+                    <input type="hidden" name="material_id" value="${matId}"><button type="submit" name="remove_material" class="btn small danger"><i class="fas fa-trash"></i></button>
+                </form>
+            </div>
+            <div class="material-photos" data-material-id="${matId}"></div>`;
+
+        list.appendChild(li);
+        // remove any 'No materials listed.' or placeholder messages in this container
+        try { const containerWrap = list.closest('.stage-materials'); if (containerWrap) {
+                const p = containerWrap.querySelector('.empty-state, .no-materials, .placeholder'); if (p) try { p.remove(); } catch(e){}
+            }
+        } catch(e){}
+        // make sure the preparation stage and tab are shown
+        try { const stageEl = list.closest('.workflow-stage, .stage-card'); if (stageEl) { stageEl.classList.add('active'); stageEl.classList.remove('locked'); } if (typeof showStageByIndex === 'function') try { showStageByIndex(0); } catch(e){} } catch(e){}
+        try { refreshMaterialCollectionReqState(); } catch(e){}
+        return true;
+    } catch(e){ return false; }
+}
+
+// Ensure tabs/stage exist on page load to avoid pages with only 2 tabs when no materials
+document.addEventListener('DOMContentLoaded', function(){ try { ensureThreeStageTabs(); } catch(e){} });
+</script>

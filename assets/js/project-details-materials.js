@@ -136,7 +136,49 @@
                         const fd = new URLSearchParams(); fd.append('action','add_material'); fd.append('project_id', String(pid)); fd.append('material_name', name); fd.append('quantity', qty);
                         fetch('update_project.php', { method: 'POST', body: fd }).then(r=>r.text()).then(txt=>{
                             let j = null; try { j = txt ? JSON.parse(txt) : null; } catch(e){ j = null; }
-                            if (j && j.success) { try { if (window.showToast) showToast('Material added', 'success'); } catch(e){} setTimeout(()=> location.reload(), 700); }
+                            if (j && j.success) {
+                                    try { if (window.showToast) showToast('Material added', 'success'); } catch(e){}
+
+                                    // Small helper: attempt to insert into DOM with retries. This covers
+                                    // slow-to-render pages or cases where a Preparation stage needs
+                                    // to be created first by ensurePreparationStageInDOM.
+                                    const tryInsertWithRetries = function(mat, attemptsLeft, delayMs) {
+                                        return new Promise(resolve => {
+                                            try {
+                                                // First try immediate insertion
+                                                if (window.insertMaterialIntoDOM && insertMaterialIntoDOM(mat)) {
+                                                    if (window.ensureThreeStageTabs) try { ensureThreeStageTabs(); } catch(e){}
+                                                    return resolve(true);
+                                                }
+
+                                                // If we can create the Preparation stage, try that then re-attempt
+                                                if (window.ensurePreparationStageInDOM) {
+                                                    try { ensurePreparationStageInDOM(); } catch(_){}
+                                                    if (window.insertMaterialIntoDOM && insertMaterialIntoDOM(mat)) {
+                                                        if (window.ensureThreeStageTabs) try { ensureThreeStageTabs(); } catch(e){}
+                                                        return resolve(true);
+                                                    }
+                                                }
+
+                                                // If not successful and we still have attempts, schedule another try
+                                                if (attemptsLeft > 0) {
+                                                    setTimeout(function(){ resolve( tryInsertWithRetries(mat, attemptsLeft - 1, delayMs * 2) ); }, delayMs);
+                                                } else {
+                                                    resolve(false);
+                                                }
+                                            } catch(e) { resolve(false); }
+                                        });
+                                    };
+
+                                    // Try up to 3 attempts: immediate, short and longer delay
+                                    tryInsertWithRetries(j.material, 2, 120).then(success => {
+                                        if (!success) {
+                                            // Final fallback: ensure tabs exist (makes server-rendered reload more friendly)
+                                            try { if (window.ensureThreeStageTabs) ensureThreeStageTabs(); } catch(e){}
+                                            setTimeout(()=> location.reload(), 700);
+                                        }
+                                    }).catch(()=> setTimeout(()=> location.reload(), 700));
+                            }
                             else { try { alert((j && j.message) ? j.message : 'Add failed'); } catch(e){} }
                         }).catch(()=>{ try{ alert('Add failed'); }catch(e){} });
                     } catch(e){}
