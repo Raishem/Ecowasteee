@@ -853,6 +853,57 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch (err) { /* silent */ }
     }
 
+    // Helper: parse displayed quantity format "X / Y" and return obtained, orig, remaining
+    function parseMatQtyText(txt) {
+        try {
+            if (!txt) return null;
+            const m = String(txt).match(/(\d+)\s*\/\s*(\d+)/);
+            if (m && m.length >= 3) {
+                const obtained = parseInt(m[1], 10);
+                const orig = parseInt(m[2], 10);
+                const remaining = (isNaN(orig) || isNaN(obtained)) ? null : Math.max(0, orig - obtained);
+                return { obtained: obtained, orig: orig, remaining: remaining };
+            }
+            // Fallback: single number – treat as 'orig' and 0 obtained (legacy remaining/orig format)
+            const s = String(txt).match(/-?\d+/);
+            if (s) {
+                const n = parseInt(s[0], 10);
+                return { obtained: 0, orig: n, remaining: n };
+            }
+        } catch (e) { /* ignore parse errors */ }
+        return null;
+    }
+
+    // Helper: compute the displayed obtained/orig string given server-provided remaining and optional original
+    // Prefer data from server (origFromJson) -> existing element attribute -> existing displayed value -> sane fallback
+    function computeDisplayedFromServer(remaining, origFromJson, node) {
+        try {
+            const rem = (typeof remaining !== 'undefined' && remaining !== null) ? (parseInt(remaining, 10) || 0) : 0;
+            let origVal = null;
+            if (typeof origFromJson !== 'undefined' && origFromJson !== null) {
+                origVal = parseInt(origFromJson, 10);
+            }
+            // prefer existing DOM attribute when available
+            if ((origVal === null || isNaN(origVal)) && node && node.getAttribute) {
+                const nodeAttr = node.getAttribute('data-original-quantity');
+                if (nodeAttr !== null && nodeAttr !== undefined && String(nodeAttr).trim() !== '') {
+                    const n = parseInt(nodeAttr, 10);
+                    if (!isNaN(n)) origVal = n;
+                }
+            }
+            // fallback to parsing existing text if still unknown
+            if ((origVal === null || isNaN(origVal)) && node && node.textContent) {
+                const parsed = parseMatQtyText(String(node.textContent || ''));
+                if (parsed && typeof parsed.orig === 'number') origVal = parsed.orig;
+            }
+            // final fallback
+            if (origVal === null || isNaN(origVal)) origVal = rem || 1;
+
+            const obtained = Math.max(0, origVal - rem);
+            return { obtained: obtained, orig: origVal };
+        } catch (e) { return { obtained: 0, orig: (typeof remaining !== 'undefined' && remaining !== null ? parseInt(remaining,10)||0 : 0) }; }
+    }
+
     // Request server to toggle completion for a stage (calls complete_stage.php) and update UI based on response
     async function requestToggleStage(stageNumber, projectId, options = {}) {
         try {
@@ -1069,10 +1120,27 @@ document.addEventListener('DOMContentLoaded', function() {
             const submitBtn = content.querySelector('#haveSubmit');
             const haveAllBtn = content.querySelector('#haveAll');
             const cancelBtn = content.querySelector('#haveCancel');
+            // Clamp on input and prevent non-numeric characters; enforce min/max while typing
+            input.addEventListener('input', function(){
+                try {
+                    let v = String(input.value || '').replace(/[^0-9]/g, '');
+                    if (v === '') { input.value = ''; return; }
+                    let n = parseInt(v, 10) || 0;
+                    if (n < 1) n = 1;
+                    if (typeof maxQty === 'number' && isFinite(maxQty) && n > maxQty) n = maxQty;
+                    input.value = String(n);
+                } catch(e) {}
+            });
+
             submitBtn.addEventListener('click', function() {
-                const qty = parseInt(input.value || '1', 10);
+                let qty = parseInt(input.value || '1', 10);
                 if (isNaN(qty) || qty < 1) { alert('Please enter a valid quantity'); return; }
-                if (maxQty && qty > maxQty) { alert('Cannot exceed required amount (' + maxQty + ')'); return; }
+                // If user supplied a value greater than the available quantity, clamp to max
+                if (typeof maxQty === 'number' && isFinite(maxQty) && qty > maxQty) {
+                    qty = maxQty;
+                    // reflect the clamped value in the UI so users see it corrected
+                    try { input.value = String(qty); } catch(e){}
+                }
                 modal.remove();
                 resolve({ qty: qty });
             });
@@ -1105,8 +1173,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     let maxQty = null;
                     const qtyEl = materialItem.querySelector('.mat-qty');
                     if (qtyEl) {
-                        const m = String(qtyEl.textContent).match(/\d+/);
-                        if (m) maxQty = parseInt(m[0], 10);
+                        const parsed = parseMatQtyText(String(qtyEl.textContent || ''));
+                        if (parsed && typeof parsed.remaining === 'number') maxQty = parsed.remaining;
                     }
                     // Use the newer showMaterialHaveModal to collect quantity from user.
                     // Pass material id (if available) and maxQty for clamping.
@@ -1148,24 +1216,30 @@ document.addEventListener('DOMContentLoaded', function() {
                             materialItem.classList.add('material-obtained');
 
                             // Update displayed quantity if server returned it
-                            if (typeof data.quantity !== 'undefined' && data.quantity !== null) {
+                                if (typeof data.quantity !== 'undefined' && data.quantity !== null) {
                                 let qtyEl = materialItem.querySelector('.mat-qty');
-                                if (data.quantity <= 0) {
-                                    if (qtyEl) qtyEl.remove();
+                                const orig = (typeof data.original_quantity !== 'undefined' && data.original_quantity !== null) ? data.original_quantity : (materialItem.dataset.originalQuantity ? parseInt(materialItem.dataset.originalQuantity,10) : data.quantity);
+                                // always show current / original so UX is clear
+                                if (qtyEl) {
+                                    // server returns remaining quantity in data.quantity; compute display with robust fallback
+                                    const dd = computeDisplayedFromServer(data.quantity, (typeof data.original_quantity !== 'undefined' ? data.original_quantity : null), qtyEl);
+                                    // only write when we have a sensible total; avoid writing 0/0 when server response is missing data
+                                    if (typeof dd.orig === 'number' && dd.orig > 0) qtyEl.textContent = String(dd.obtained) + ' / ' + String(dd.orig);
+                                    else console && console.warn && console.warn('Skipping invalid qty update (orig missing or zero)', dd, data, qtyEl);
                                 } else {
-                                    if (qtyEl) {
-                                        qtyEl.textContent = String(data.quantity);
-                                    } else {
-                                        // insert a new quantity element next to the name
-                                        const main = materialItem.querySelector('.material-main');
-                                        if (main) {
-                                            const span = document.createElement('span');
-                                            span.className = 'mat-qty';
-                                            span.textContent = String(data.quantity);
-                                            main.appendChild(span);
-                                        }
+                                    // insert a new quantity element next to the name
+                                    const main = materialItem.querySelector('.material-main');
+                                    if (main) {
+                                        const span = document.createElement('span');
+                                        span.className = 'mat-qty';
+                                        const dd2 = computeDisplayedFromServer(data.quantity, (typeof data.original_quantity !== 'undefined' ? data.original_quantity : null), span);
+                                        if (typeof dd2.orig === 'number' && dd2.orig > 0) span.textContent = String(dd2.obtained) + ' / ' + String(dd2.orig);
+                                        else console && console.warn && console.warn('Skipping invalid qty insertion (orig missing or zero)', dd2, data, span);
+                                        main.appendChild(span);
                                     }
                                 }
+                                // persist original quantity on the node if provided
+                                try { if (typeof data.original_quantity !== 'undefined' && data.original_quantity !== null) materialItem.setAttribute('data-original-quantity', String(data.original_quantity)); } catch(e){}
                             }
 
                             // Update action area based on returned status (if provided)
@@ -1228,34 +1302,35 @@ document.addEventListener('DOMContentLoaded', function() {
 
                             // If server reports that the stage completed (all materials obtained), reload to reflect the next stage
                             if (data.stage_completed) {
-                                showToast('All materials obtained — attempting to complete Material Collection stage');
-                                // Find the Material Collection stage button and invoke its template-numbered completion handler
+                                // Instead of auto-completing, enable the Proceed button and instruct the user to confirm
+                                showToast('All materials obtained — click Proceed to complete this stage');
                                 setTimeout(()=>{
                                     try {
                                         const container = document.querySelector('.workflow-stages-container');
+                                        let proceedFound = false;
                                         if (container) {
-                                            const btn = container.querySelector('button.complete-stage-btn[data-stage-number]');
-                                            // Prefer the button whose title or nearby heading contains "Material"
-                                            let target = null;
-                                            const candidateButtons = container.querySelectorAll('button.complete-stage-btn[data-stage-number]');
-                                            candidateButtons.forEach(b => {
-                                                if (target) return;
-                                                const stageWrap = b.closest('.workflow-stage, .stage-card');
-                                                if (stageWrap && /material/i.test(stageWrap.textContent || '')) target = b;
+                                            // Find the stage that looks like Material Collection and enable its proceed button
+                                            const candidateStages = container.querySelectorAll('.workflow-stage, .stage-card');
+                                            candidateStages.forEach(st => {
+                                                if (proceedFound) return;
+                                                if (/material/i.test(st.textContent || '')) {
+                                                    const p = st.querySelector('.proceed-stage-btn');
+                                                    if (p) {
+                                                        p.classList.remove('is-disabled'); p.removeAttribute('aria-disabled'); p.dataset.reqOk = '1'; proceedFound = true;
+                                                    }
+                                                }
                                             });
-                                            if (!target && candidateButtons.length) target = candidateButtons[0];
-                                                        if (target) {
-                                                            const tn = parseInt(target.getAttribute('data-stage-number'), 10);
-                                                            if (!isNaN(tn)) {
-                                                                // use requestToggleStage to ensure server toggling and UI update
-                                                                (async function(){ try { await requestToggleStage(tn, projectId); } catch(e){} })();
-                                                            } else location.reload();
-                                            } else {
-                                                location.reload();
-                                            }
-                                        } else {
-                                            location.reload();
                                         }
+                                        if (!proceedFound) {
+                                            // Fallback: try to enable any present proceed buttons
+                                            const any = document.querySelectorAll('.proceed-stage-btn');
+                                            if (any && any.length) {
+                                                any.forEach(p=>{ p.classList.remove('is-disabled'); p.removeAttribute('aria-disabled'); p.dataset.reqOk = '1'; });
+                                                proceedFound = true;
+                                            }
+                                        }
+                                        // final fallback: reload page to reconcile server state
+                                        if (!proceedFound) location.reload();
                                     } catch (e) { location.reload(); }
                                 }, 300);
                             }
@@ -1367,7 +1442,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (typeof json.quantity !== 'undefined' && json.quantity !== null) {
                         let qtyEl = li.querySelector('.mat-qty');
                         if (qtyEl) {
-                            qtyEl.textContent = String(json.quantity);
+                            // use original_quantity returned by server or fall back to element's data attribute
+                            const origFromJson = (typeof json.original_quantity !== 'undefined' && json.original_quantity !== null) ? json.original_quantity : null;
+                            const nodeOrig = li.getAttribute('data-original-quantity') || null;
+                            const origVal = origFromJson !== null ? origFromJson : (nodeOrig ? parseInt(nodeOrig, 10) : json.quantity);
+                            // json.quantity is remaining; display obtained = origVal - remaining
+                            const ddJ = computeDisplayedFromServer(json.quantity, origFromJson, qtyEl);
+                            if (typeof ddJ.orig === 'number' && ddJ.orig > 0) qtyEl.textContent = String(ddJ.obtained) + ' / ' + String(ddJ.orig);
+                            else console && console.warn && console.warn('Skipping invalid qty update (orig missing or zero)', ddJ, json, li);
+                            if (origFromJson !== null) try { li.setAttribute('data-original-quantity', String(origFromJson)); } catch(e){}
                             // If quantity has dropped to 0, keep badge but mark as 0 and switch to obtained controls
                             if (json.quantity <= 0) {
                                 // Move obtained badge into .mat-meta and show upload control in .material-photos
@@ -1379,7 +1462,10 @@ document.addEventListener('DOMContentLoaded', function() {
                                 const actions = li.querySelector('.material-actions');
                                 if (actions) actions.innerHTML = '';
                                 // ensure mat-qty still reflects 0
-                                if (qtyEl) qtyEl.textContent = '0';
+                                if (qtyEl) {
+                                    // fully obtained -> show orig / orig
+                                    qtyEl.textContent = String(origVal) + ' / ' + String(origVal);
+                                }
                                 const photos = li.querySelector('.material-photos');
                                 if (photos && !photos.querySelector('.material-photo:not(.placeholder)')) {
                                     // remove any old placeholder
@@ -1453,11 +1539,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Determine obtained state from class or badge or quantity == 0
                     const hasObtainedBadge = !!nextMaterial.querySelector('.badge.obtained');
                     let qtyEl = nextMaterial.querySelector('.mat-qty');
-                    let qtyVal = null;
+                    let remainingVal = null;
                     if (qtyEl) {
-                        try { qtyVal = parseInt(String(qtyEl.textContent || '').replace(/[^0-9\-]/g,''), 10); } catch(e) { qtyVal = null; }
+                        try { const parsed = parseMatQtyText(String(qtyEl.textContent || '')); if (parsed && typeof parsed.remaining === 'number') remainingVal = parsed.remaining; } catch(e) { remainingVal = null; }
                     }
-                    const isObtained = hasObtainedBadge || (qtyVal !== null && !isNaN(qtyVal) && qtyVal <= 0) || nextMaterial.classList.contains('material-obtained');
+                    const isObtained = hasObtainedBadge || (remainingVal !== null && !isNaN(remainingVal) && remainingVal <= 0) || nextMaterial.classList.contains('material-obtained');
                     if (meta && !hasPhoto && isObtained && !meta.querySelector('.upload-material-photo')) {
                         const btn = document.createElement('button');
                         btn.type = 'button';
@@ -1541,8 +1627,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (!total && materialItem) {
                         const qtyEl = materialItem.querySelector('.mat-qty');
                         if (qtyEl) {
-                            const m = String(qtyEl.textContent).match(/\d+/);
-                            if (m) total = parseInt(m[0], 10);
+                            const parsed = parseMatQtyText(String(qtyEl.textContent || ''));
+                            if (parsed && typeof parsed.remaining === 'number') total = parsed.remaining;
                         }
                     }
                     if (total) { qInput.value = String(total); qInput.focus(); try { const l = String(qInput.value || '').length; qInput.setSelectionRange(l,l); } catch(e){} }
@@ -1617,6 +1703,11 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!json || !json.success) { showToast(json && json.message ? json.message : 'Could not add material', 'error'); return; }
 
             const mat = json.material;
+            if (!mat) {
+                showToast('Server returned invalid material data', 'error');
+                console && console.warn && console.warn('add_material response missing material:', json);
+                return;
+            }
             const ul = document.querySelector('.materials-list-stage');
             if (ul) {
                 const li = document.createElement('li');
@@ -1630,8 +1721,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Always include quantity. Default to 1 when server didn't provide a number so
                 // newly-created materials start as 'needed' and receive the Check button.
                 const q = (typeof mat.quantity !== 'undefined' && mat.quantity !== null) ? mat.quantity : 1;
-                mainContent.innerHTML = `<span class="mat-name">${mat.material_name}</span><span class="mat-qty">${q}</span>`;
+                // Show obtained / original instead of remaining/original. Server returns original_quantity when available.
+                const origForInsert = (typeof mat.original_quantity !== 'undefined' && mat.original_quantity !== null) ? mat.original_quantity : q;
+                const obtainedForInsert = (isNaN(origForInsert) ? 0 : Math.max(0, parseInt(origForInsert,10) - parseInt(q,10)));
+                mainContent.innerHTML = `<span class="mat-name">${mat.material_name}</span><span class="mat-qty">${obtainedForInsert} / ${origForInsert}</span>`;
                 li.appendChild(mainContent);
+                li.setAttribute('data-original-quantity', String(origForInsert));
                 const photosDiv = document.createElement('div');
                 photosDiv.className = 'material-photos';
                 photosDiv.setAttribute('data-material-id', mat.material_id);
@@ -1781,6 +1876,34 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Fixed add material modal submission handler
     document.addEventListener('click', function(e){
+        // Handle Proceed button for stages: enabled only when requirements satisfied
+        const pbtn = e.target.closest && e.target.closest('.proceed-stage-btn');
+        if (pbtn) {
+            e.preventDefault();
+            try {
+                // If disabled, inform user
+                if (pbtn.getAttribute && pbtn.getAttribute('aria-disabled') === 'true' || pbtn.classList && pbtn.classList.contains('is-disabled')) {
+                    showToast('Complete all materials and upload required photos before proceeding', 'error');
+                    return;
+                }
+                // Determine stage number
+                let sn = pbtn.getAttribute('data-stage-number');
+                if (!sn) {
+                    const stageEl = pbtn.closest('.workflow-stage, .stage-card');
+                    if (stageEl) sn = stageEl.getAttribute('data-stage-number') || stageEl.getAttribute('data-stage-index');
+                }
+                const stageNum = sn ? parseInt(sn, 10) : NaN;
+                if (!stageNum || isNaN(stageNum)) { showToast('Cannot determine stage to proceed', 'error'); return; }
+
+                // Prevent double clicks
+                if (pbtn.dataset._processing === '1') return;
+                pbtn.dataset._processing = '1';
+                pbtn.classList.add('is-processing');
+                // Request server to complete the stage
+                (async function(){ try { await requestToggleStage(stageNum, projectId); } catch(e){ showToast('Failed to proceed — try again', 'error'); } finally { try{ delete pbtn.dataset._processing; pbtn.classList.remove('is-processing'); } catch(e){} } })();
+            } catch(e) { /* ignore */ }
+            return;
+        }
         const btn = e.target.closest('#addMaterialModal button[name="add_material"]');
         if (!btn) return;
         e.preventDefault();
@@ -1829,6 +1952,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
 
                 const mat = json.material;
+                if (!mat) {
+                    showToast('Server returned invalid material data', 'error');
+                    console && console.warn && console.warn('add_material response missing material:', json);
+                    return;
+                }
                 
                 // Find the materials list in the current active stage
                 const activeStage = document.querySelector('.workflow-stage.active') || 
@@ -1844,14 +1972,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (materialsList) {
                     const li = document.createElement('li');
                     li.className = 'material-item';
+                    // store original total quantity for client updates
+                    const origQ = (typeof mat.original_quantity !== 'undefined' && mat.original_quantity !== null) ? mat.original_quantity : ((typeof mat.quantity !== 'undefined' && mat.quantity !== null) ? mat.quantity : 1);
+                    li.setAttribute('data-original-quantity', String(origQ));
                     li.setAttribute('data-material-id', mat.material_id);
                     
-                    // Build the material item structure
+                    // Build the material item structure (display obtained / original)
+                    const obtainedQ = (isNaN(origQ) ? 0 : Math.max(0, parseInt(origQ,10) - ((typeof mat.quantity !== 'undefined' && mat.quantity !== null) ? parseInt(mat.quantity,10) : origQ)));
                     li.innerHTML = `
                         <div class="material-main">
                             <span class="mat-name">${mat.material_name}</span>
                             <div class="mat-meta">
-                                ${((typeof mat.quantity !== 'undefined' && mat.quantity !== null) ? (mat.quantity > 0 ? `<span class="mat-qty">${mat.quantity}</span>` : `<span class="mat-qty">${mat.quantity}</span>`) : `<span class="mat-qty">1</span>`)}
+                                ${((typeof mat.quantity !== 'undefined' && mat.quantity !== null) ? `<span class="mat-qty">${obtainedQ} / ${(typeof mat.original_quantity !== 'undefined' && mat.original_quantity !== null) ? mat.original_quantity : mat.quantity}</span>` : `<span class="mat-qty">0 / 1</span>`)}
                             </div>
                         </div>
                         <div class="material-actions">
@@ -1979,7 +2111,10 @@ document.addEventListener('DOMContentLoaded', function() {
             items.forEach(li => {
                 try {
                     // determine if this material appears obtained
-                    const hasObtained = !!li.querySelector('.badge.obtained') || li.classList.contains('material-obtained') || (li.querySelector('.mat-qty') && parseInt(li.querySelector('.mat-qty').textContent||'0',10) <= 0);
+                    const qtyNode = li.querySelector('.mat-qty');
+                    let parsedQty = null;
+                    try { parsedQty = qtyNode ? parseMatQtyText(String(qtyNode.textContent || '')) : null; } catch(e) { parsedQty = null; }
+                    const hasObtained = !!li.querySelector('.badge.obtained') || li.classList.contains('material-obtained') || (parsedQty && typeof parsedQty.remaining === 'number' && parsedQty.remaining <= 0);
                     if (hasObtained) return; // nothing to do for obtained materials
 
                     // find actions container (create if missing)
@@ -2208,24 +2343,19 @@ document.addEventListener('DOMContentLoaded', function() {
                             }
                             const sn = stageNum ? parseInt(stageNum, 10) : NaN;
                             if (!isNaN(sn)) {
-                                // If stage DOM isn't marked completed yet, request server to mark completed
+                                // When all requirements are present, do NOT auto-complete the stage.
+                                // Instead: enable the explicit "Proceed" button so the user can confirm moving on.
                                 const isCompleted = stageCard.classList.contains('completed');
                                 if (finalOk && !isCompleted) {
                                     try {
-                                        // Optimistic UI: mark stage/tab as completed immediately so the user sees instant feedback.
-                                        try {
-                                            stageCard.classList.add('completed');
-                                            stageCard.classList.remove('current');
-                                            const tab = document.querySelector('.stage-tab[data-stage-index="' + (parseInt(stageCard.getAttribute('data-stage-index')||sn,10)) + '"]') || document.querySelector('.stage-tab[data-stage-number="' + sn + '"]');
-                                            if (tab) {
-                                                const badge = tab.querySelector('.tab-badge');
-                                                if (badge) { badge.classList.remove('active'); badge.classList.add('completed'); badge.textContent = 'Completed'; }
-                                                tab.classList.remove('active'); tab.classList.add('completed');
-                                            }
-                                        } catch(e){}
-                                        // Fire the server request; server response will reconcile UI if it fails.
-                                        try { requestToggleStage(sn, projectId).then(()=>{/* auto-complete attempted */}).catch(()=>{}); } catch(e){}
-                                    } catch(e){}
+                                        const proceedBtn = stageCard.querySelector('.proceed-stage-btn') || (btn ? btn.parentNode && btn.parentNode.querySelector('.proceed-stage-btn') : null);
+                                        if (proceedBtn) {
+                                            proceedBtn.classList.remove('is-disabled');
+                                            proceedBtn.removeAttribute('aria-disabled');
+                                            proceedBtn.dataset.reqOk = '1';
+                                            proceedBtn.title = 'Proceed to next stage';
+                                        }
+                                    } catch(e) { /* enabling proceed button failed (silenced) */ }
                                 }
                                 // If requirements are met but server already marked completed, ensure label updated (renderStageStatusLabel handled in response)
                             }
@@ -2247,6 +2377,21 @@ document.addEventListener('DOMContentLoaded', function() {
                                             if (badge2) { badge2.classList.remove('completed'); badge2.classList.add('active'); badge2.textContent = 'Current'; }
                                             tab2.classList.remove('completed'); tab2.classList.add('active');
                                         }
+                                            try {
+                                                // Update proceed button enabled state (if present)
+                                                const proceedBtn = stageCard.querySelector('.proceed-stage-btn') || (btn ? btn.parentNode && btn.parentNode.querySelector('.proceed-stage-btn') : null);
+                                                if (proceedBtn) {
+                                                    if (finalOk) {
+                                                        proceedBtn.classList.remove('is-disabled');
+                                                        proceedBtn.removeAttribute('aria-disabled');
+                                                        proceedBtn.dataset.reqOk = '1';
+                                                    } else {
+                                                        proceedBtn.classList.add('is-disabled');
+                                                        proceedBtn.setAttribute('aria-disabled', 'true');
+                                                        proceedBtn.dataset.reqOk = '0';
+                                                    }
+                                                }
+                                            } catch (e) { /* ignore proceed btn update */ }
                                     } catch(e){}
                                     try { requestToggleStage(sn2, projectId, { force_uncomplete: 1 }).then(()=>{/* auto-uncomplete attempted */}).catch(()=>{}); } catch(e){}
                                 } catch(e){}
@@ -2453,8 +2598,18 @@ document.addEventListener('DOMContentLoaded', function() {
                                     const sn = parseInt(stageNum, 10);
                                     if (!isNaN(sn)) {
                                         try {
-                                            requestToggleStage(sn, projectId).then(r => { /* auto-complete response (silenced) */ }).catch(err => { /* auto-complete request failed (silenced) */ });
-                                        } catch(e) { if (dbg) console.debug('[auto-complete] request threw', e); }
+                                            // Do not auto-complete — enable the explicit Proceed button in this stage
+                                            try {
+                                                const stageEl2 = stageEl || (document.querySelector('.workflow-stage[data-stage-number="' + sn + '"]') || document.querySelector('.stage-card[data-stage-number="' + sn + '"]'));
+                                                const proceedBtn2 = stageEl2 ? (stageEl2.querySelector('.proceed-stage-btn') || stageEl2.querySelector('button.proceed-stage-btn')) : null;
+                                                if (proceedBtn2) {
+                                                    proceedBtn2.classList.remove('is-disabled');
+                                                    proceedBtn2.removeAttribute('aria-disabled');
+                                                    proceedBtn2.dataset.reqOk = '1';
+                                                    proceedBtn2.title = 'Proceed to next stage';
+                                                }
+                                            } catch(e) {}
+                                        } catch(e) { if (dbg) console.debug('[auto-complete] enabling proceed button threw', e); }
                                     } else if (dbg) console.debug('[auto-complete] stageNum parsed NaN', stageNum);
                                 } else if (dbg) console.debug('[auto-complete] stageNum not found');
                             }
@@ -3533,8 +3688,9 @@ document.addEventListener('DOMContentLoaded', function(){
             <ul class="materials-list-stage">
                 <?php foreach ($materials as $m): ?>
                     <?php $mid = (int)($m['material_id'] ?? $m['id'] ?? 0); ?>
-                    <?php 
+                        <?php 
                         $currentQty = isset($m['quantity']) ? (int)$m['quantity'] : 0;
+                        $origQty = isset($m['original_quantity']) && $m['original_quantity'] !== null ? (int)$m['original_quantity'] : $currentQty;
                         $currentStatus = strtolower($m['status'] ?? '');
                         // If quantity is zero or less, treat as obtained even if DB status wasn't updated yet
                         if ($currentQty <= 0) { $currentStatus = 'obtained'; }
@@ -3556,12 +3712,13 @@ document.addEventListener('DOMContentLoaded', function(){
                             }
                         } catch (Exception $e) { /* ignore */ }
                     ?>
-                    <li class="material-item<?= ($currentStatus !== 'needed') ? ' material-obtained' : '' ?>" data-material-id="<?= $mid ?>">
+                    <li class="material-item<?= ($currentStatus !== 'needed') ? ' material-obtained' : '' ?>" data-material-id="<?= $mid ?>" data-original-quantity="<?= htmlspecialchars($origQty) ?>">
                         <div class="material-main">
                             <span class="mat-name"><?= htmlspecialchars($m['material_name'] ?? $m['name'] ?? '') ?></span>
                             <div class="mat-meta">
-                                <?php if ($currentQty > 0): ?>
-                                    <span class="mat-qty"><?= htmlspecialchars($currentQty) ?></span>
+                                <?php if ($currentQty >= 0): ?>
+                                            <?php $obtained = max(0, $origQty - $currentQty); ?>
+                                            <span class="mat-qty"><?= htmlspecialchars($obtained) ?> / <?= htmlspecialchars($origQty) ?></span>
                                 <?php endif; ?>
                                 <?php if ($currentStatus !== 'needed' && $currentStatus !== ''): ?>
                                     <span class="badge obtained" aria-hidden="true"><i class="fas fa-check-circle"></i> Obtained</span>
@@ -3617,10 +3774,18 @@ document.addEventListener('DOMContentLoaded', function(){
 
                                             <?php if (!$is_locked): ?>
                                             <div class="stage-actions">
+                                                <div class="stage-actions-left">
                                                 <?php if (in_array(strtolower(trim($stage['name'] ?? '')), ['material collection','preparation'])): ?>
                                                     <button type="button" class="btn add-material-btn" onclick="showAddMaterialModal()">
                                                         <i class="fas fa-plus"></i> Add Material
                                                     </button>
+                                                </div>
+                                                <div class="stage-actions-right">
+                                                    <!-- Proceed button: enabled only when all materials obtained and photos present -->
+                                                    <button type="button" class="btn proceed-stage-btn is-disabled" data-stage-number="<?= htmlspecialchars($stage['number'] ?? '') ?>" aria-disabled="true" title="Proceed to next stage">
+                                                        Proceed
+                                                    </button>
+                                                </div>
                                                 <?php endif; ?>
                             </div>
                             <?php else: ?>
@@ -4251,6 +4416,15 @@ document.addEventListener('click', function (e) {
 </script>
 <!-- Add the new CSS file -->
 <link rel="stylesheet" href="assets/css/project-stages.css">
+    <style>
+    /* Proceed button styling: right aligned, disabled (gray) -> enabled (green) */
+    .stage-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .stage-actions .stage-actions-left, .stage-actions .stage-actions-right { display:flex; align-items:center; gap:8px; }
+    .proceed-stage-btn { padding: 8px 14px; border-radius: 8px; border: 1px solid #cfcfcf; background: #ffffff; color: #111; cursor: not-allowed; opacity: 0.6; transition: all .12s ease; font-weight:600; }
+    .proceed-stage-btn.is-disabled { pointer-events: none; }
+    .proceed-stage-btn:not(.is-disabled) { background:#2E8B57; border-color:#2E8B57; color:#fff; opacity:1; cursor:pointer; box-shadow: 0 6px 20px rgba(46,139,87,0.18); }
+    .proceed-stage-btn.is-processing { opacity:0.85; transform: translateY(0); }
+    </style>
 
 <script>
 // ...existing code continues (keeps the later, improved completeStage implementation)
@@ -4838,8 +5012,10 @@ function ensurePreparationStageInDOM() {
                 // ensure add material button exists inside this stage if missing
                 if (!existingPrep.querySelector('.add-material-btn')) {
                     const actions = existingPrep.querySelector('.stage-actions') || existingPrep;
+                    // find left-side container if present, otherwise fall back to actions
+                    const left = actions && actions.querySelector ? (actions.querySelector('.stage-actions-left') || actions) : actions;
                     const btn = document.createElement('button'); btn.type='button'; btn.className='btn add-material-btn'; btn.innerHTML='<i class="fas fa-plus"></i> Add Material'; btn.addEventListener('click', function(){ try{ if (typeof showAddMaterialModal === 'function') showAddMaterialModal(); }catch(e){} });
-                    actions.appendChild(btn);
+                    if (left && left.appendChild) left.appendChild(btn); else if (actions && actions.appendChild) actions.appendChild(btn);
                 }
                 // ensure this stage is active (so insertion shows in current view)
                 try { existingPrep.classList.add('active'); existingPrep.classList.remove('locked'); } catch(e){}
@@ -4871,7 +5047,10 @@ function ensurePreparationStageInDOM() {
                     <h4>Materials Needed</h4>
                     <ul class="materials-list-stage"></ul>
                 </div>
-                <div class="stage-actions"><button type="button" class="btn add-material-btn" onclick="showAddMaterialModal()"><i class="fas fa-plus"></i> Add Material</button></div>
+                <div class="stage-actions">
+                    <div class="stage-actions-left"><button type="button" class="btn add-material-btn" onclick="showAddMaterialModal()"><i class="fas fa-plus"></i> Add Material</button></div>
+                    <div class="stage-actions-right"><button type="button" class="btn proceed-stage-btn is-disabled" aria-disabled="true" title="Proceed to next stage">Proceed</button></div>
+                </div>
             </div>`;
 
         // Insert near the beginning of the stages container
@@ -4886,6 +5065,11 @@ function ensurePreparationStageInDOM() {
 // Helper to insert a new material item element into the materials list
 function insertMaterialIntoDOM(mat) {
     try {
+        if (!mat) {
+            try { showToast('Invalid material data returned from server', 'error'); } catch(e) {}
+            console && console.warn && console.warn('insertMaterialIntoDOM called with null/invalid mat:', mat);
+            return false;
+        }
         // ensure Preparation stage exists
         ensurePreparationStageInDOM();
         let list = document.querySelector('.materials-list-stage');
@@ -4909,6 +5093,9 @@ function insertMaterialIntoDOM(mat) {
         const matId = String(mat.material_id || mat.id || mat.id_str || mat.mid || '').trim();
         const matName = String(mat.material_name || mat.name || mat.label || '').trim();
         const matQty = (typeof mat.quantity !== 'undefined' && mat.quantity !== null) ? parseInt(mat.quantity, 10) : (typeof mat.qty !== 'undefined' ? parseInt(mat.qty, 10) : 1);
+        const matOrig = (typeof mat.original_quantity !== 'undefined' && mat.original_quantity !== null) ? parseInt(mat.original_quantity, 10) : matQty;
+        // Compute obtained = original - remaining
+        const matObtained = (isNaN(matOrig) ? 0 : Math.max(0, matOrig - matQty));
 
         // avoid duplicating an already-inserted material with the same id
         if (matId) {
@@ -4916,7 +5103,13 @@ function insertMaterialIntoDOM(mat) {
                 const existing = list.querySelector('li.material-item[data-material-id="' + matId + '"]');
                 if (existing) {
                     // update quantity and name in place
-                    try { const qEl = existing.querySelector('.mat-qty'); if (qEl) qEl.textContent = String(isNaN(matQty) ? 0 : matQty); } catch(e){}
+                    try { const qEl = existing.querySelector('.mat-qty'); if (qEl) {
+                        const existingOrig = existing.getAttribute('data-original-quantity');
+                        const origVal = (typeof mat.original_quantity !== 'undefined' && mat.original_quantity !== null) ? mat.original_quantity : (existingOrig ? parseInt(existingOrig,10) : matQty);
+                        const ddExist = computeDisplayedFromServer(matQty, (typeof mat.original_quantity !== 'undefined' && mat.original_quantity !== null) ? mat.original_quantity : null, existing);
+                        qEl.textContent = String(ddExist.obtained) + ' / ' + String(ddExist.orig);
+                        if (typeof mat.original_quantity !== 'undefined' && mat.original_quantity !== null) existing.setAttribute('data-original-quantity', String(mat.original_quantity));
+                    } } catch(e){}
                     try { const nEl = existing.querySelector('.mat-name'); if (nEl) nEl.textContent = matName || (nEl.textContent || ''); } catch(e){}
                     // ensure the item is visible/active
                     try { existing.classList.remove('hidden'); } catch(e){}
@@ -4930,10 +5123,11 @@ function insertMaterialIntoDOM(mat) {
         const li = document.createElement('li');
         li.className = 'material-item';
         if (matId) li.setAttribute('data-material-id', matId);
+        li.setAttribute('data-original-quantity', String(matOrig));
         li.innerHTML = `
             <div class="material-main">
                 <span class="mat-name">${(matName || '')}</span>
-                <div class="mat-meta"><span class="mat-qty">${(isNaN(matQty) ? 0 : matQty)}</span></div>
+                <div class="mat-meta"><span class="mat-qty">${(isNaN(matObtained) ? 0 : matObtained)} / ${isNaN(matOrig) ? (isNaN(matQty) ? 0 : matQty) : matOrig}</span></div>
             </div>
             <div class="material-actions">
                 <a href="browse.php?query=${encodeURIComponent(matName || '')}&from_project=${window.ECW_DATA && window.ECW_DATA.projectId ? window.ECW_DATA.projectId : ''}" class="btn small find-donations-btn">Find Donations</a>

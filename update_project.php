@@ -28,7 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['action']) && $_GET['act
     if (!$proj) { echo json_encode(['success'=>false,'message'=>'Project not found']); exit; }
 
     // materials
-    $m = $conn->prepare('SELECT material_id, material_name, quantity, unit, status FROM project_materials WHERE project_id = ?');
+    $m = $conn->prepare('SELECT material_id, material_name, quantity, COALESCE(original_quantity, quantity) AS original_quantity, unit, status FROM project_materials WHERE project_id = ?');
     $m->bind_param('i',$project_id); $m->execute(); $mr = $m->get_result(); $materials = $mr ? $mr->fetch_all(MYSQLI_ASSOC) : [];
 
     // steps
@@ -83,10 +83,38 @@ try {
             $qty = is_numeric($quantity) ? (int)$quantity : 1;
             // types: project_id (i), name (s), qty (i), unit (s)
             $stmt->bind_param('isis',$project_id,$name,$qty,$unit);
-            $stmt->execute();
-            $mid = $conn->insert_id;
-            $f = $conn->prepare('SELECT material_id, material_name, quantity, unit, COALESCE(status,\'needed\') as status FROM project_materials WHERE material_id = ?');
+            $executed = $stmt->execute();
+            // Immediately capture inserted id so we can safely use it below.
+            $mid = (int) $conn->insert_id;
+
+            // If insert didn't create a new row, return a helpful error instead of a null material.
+            if (!$executed || $mid <= 0) {
+                // Attempt to surface DB error message when available
+                $dbErr = null;
+                try { $dbErr = $conn->error ?: null; } catch (Exception $e) { /* ignore */ }
+                echo json_encode(['success' => false, 'message' => 'Failed to create material', 'db_error' => $dbErr]);
+                exit;
+            }
+
+            // Ensure column original_quantity exists (idempotent): if it doesn't, add it.
+            try {
+                $colCheck = $conn->query("SHOW COLUMNS FROM project_materials LIKE 'original_quantity'");
+                if ($colCheck && $colCheck->num_rows === 0) {
+                    $conn->query("ALTER TABLE project_materials ADD COLUMN original_quantity INT DEFAULT NULL");
+                }
+                // For this new row, set original_quantity if NULL to the inserted quantity
+                try {
+                    $uorig = $conn->prepare('UPDATE project_materials SET original_quantity = quantity WHERE material_id = ? AND (original_quantity IS NULL OR original_quantity = 0)');
+                    if ($uorig) { $uorig->bind_param('i', $mid); $uorig->execute(); }
+                } catch(Exception $e) { /* ignore per-row update errors */ }
+            } catch (Exception $e) { /* non-fatal */ }
+            $f = $conn->prepare('SELECT material_id, material_name, quantity, unit, COALESCE(original_quantity, quantity) AS original_quantity, COALESCE(status,\'needed\') as status FROM project_materials WHERE material_id = ?');
             $f->bind_param('i',$mid); $f->execute(); $fres = $f->get_result(); $mat = $fres ? $fres->fetch_assoc() : null;
+
+            if (!$mat) {
+                echo json_encode(['success' => false, 'message' => 'Could not fetch created material']);
+                exit;
+            }
 
             // If a material was added, ensure any Material Collection stage marked completed is unset
             // This keeps server-state authoritative and avoids UI-only toggles getting out of sync.
@@ -116,11 +144,16 @@ try {
             $qty = isset($_POST['quantity']) ? (int)$_POST['quantity'] : null;
             if ($qty !== null) { $up = $conn->prepare('UPDATE project_materials SET quantity = GREATEST(quantity - ?, 0) WHERE material_id = ? AND project_id = ?'); 
                 $up->bind_param('iii',$qty,$mid,$project_id); $up->execute(); }
+            // If original_quantity is not set for this material, ensure it is initialized to the current quantity
+            try {
+                $initOrig = $conn->prepare('UPDATE project_materials SET original_quantity = quantity WHERE material_id = ? AND project_id = ? AND (original_quantity IS NULL OR original_quantity = 0)');
+                if ($initOrig) { $initOrig->bind_param('ii', $mid, $project_id); $initOrig->execute(); }
+            } catch (Exception $e) { /* non-fatal */ }
             if ($status !== null) { $u2 = $conn->prepare('UPDATE project_materials SET status = ? WHERE material_id = ? AND project_id = ?'); 
                 $u2->bind_param('sii',$status,$mid,$project_id); $u2->execute(); }
-            $q = $conn->prepare('SELECT quantity, status FROM project_materials WHERE material_id = ? AND project_id = ?'); 
+            $q = $conn->prepare('SELECT quantity, COALESCE(original_quantity, quantity) AS original_quantity, status FROM project_materials WHERE material_id = ? AND project_id = ?'); 
             $q->bind_param('ii',$mid,$project_id); $q->execute(); $qr = $q->get_result(); $row = $qr ? $qr->fetch_assoc() : null;
-            $current_qty = $row ? (int)$row['quantity'] : null; $current_status = $row ? $row['status'] : ($status ?: 'needed');
+            $current_qty = $row ? (int)$row['quantity'] : null; $orig_qty = $row ? (isset($row['original_quantity']) ? (int)$row['original_quantity'] : null) : null; $current_status = $row ? $row['status'] : ($status ?: 'needed');
             if (!is_null($current_qty) && $current_qty <= 0 && $current_status !== 'obtained') 
                 { $up3 = $conn->prepare("UPDATE project_materials SET status = 'obtained' WHERE material_id = ? AND project_id = ?"); 
                 $up3->bind_param('ii',$mid,$project_id); $up3->execute(); $current_status = 'obtained'; }
@@ -130,7 +163,7 @@ try {
             $cstmt->bind_param('i',$project_id); $cstmt->execute(); $cres2 = $cstmt->get_result(); $crow = $cres2 ? $cres2->fetch_assoc() : null; 
             $not_obtained = $crow ? (int)$crow['not_obtained'] : 0;
             $stage_completed = ($not_obtained === 0);
-            echo json_encode(['success'=>true,'material_id'=>$mid,'status'=>$current_status,'quantity'=>$current_qty,'stage_completed'=>$stage_completed]); 
+            echo json_encode(['success'=>true,'material_id'=>$mid,'status'=>$current_status,'quantity'=>$current_qty,'original_quantity'=>$orig_qty,'stage_completed'=>$stage_completed]); 
             exit;
 
         case 'toggle_step':
