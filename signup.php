@@ -1,32 +1,6 @@
 <?php
+session_start();
 require_once "config.php";
-$conn = getDBConnection();
-
-if ($_SERVER["REQUEST_METHOD"] === "POST") {
-    $email = trim($_POST["email"]);
-
-    // Check if email exists
-    $stmt = $conn->prepare("SELECT user_id FROM users WHERE email = ?");
-    $stmt->bind_param("s", $email);
-    $stmt->execute();
-    $stmt->store_result();
-
-    if ($stmt->num_rows > 0) {
-        $_SESSION['signup_error'] = "Email already exists. Please use another one.";
-        header("Location: signup.php");
-        exit();
-    }
-
-    // If not exists → continue inserting new user
-    $password = password_hash($_POST["password"], PASSWORD_DEFAULT);
-    $stmt = $conn->prepare("INSERT INTO users (first_name, last_name, email, password) VALUES (?, ?, ?, ?)");
-    $stmt->bind_param("ssss", $_POST["first_name"], $_POST["last_name"], $email, $password);
-    $stmt->execute();
-
-    $_SESSION['signup_success'] = "Account created successfully! You can now log in.";
-    header("Location: login.php");
-    exit();
-}
 
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
@@ -38,9 +12,7 @@ $error_message = '';
 
 // Process form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    require_once 'config.php';
     
-
     // Get and sanitize form data
     $firstName = htmlspecialchars($_POST['first-name'] ?? '');
     $middleName = htmlspecialchars($_POST['middle-name'] ?? '');
@@ -50,6 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $contactNumber = htmlspecialchars($_POST['contact-number'] ?? '');
     $address = htmlspecialchars($_POST['address'] ?? '');
     $zipCode = htmlspecialchars($_POST['zip-code'] ?? '');
+    $city = htmlspecialchars($_POST['city'] ?? ''); // Added city field
 
     // Validate input
     if (empty($firstName) || empty($lastName) || empty($email) || empty($password) || 
@@ -75,32 +48,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             if ($stmt->num_rows > 0) {
                 $error_message = "Email already registered";
+                $_SESSION['signup_error'] = "Email already registered";
             } else {
                 // Insert new user
-$stmt = $conn->prepare("INSERT INTO users 
-    (email, password_hash, first_name, middle_name, last_name, 
-    contact_number, address, city, zip_code) 
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                // Check if city column exists in your table, if not, use this version:
+                // If you have city column:
+                $stmt = $conn->prepare("INSERT INTO users 
+                    (email, password_hash, first_name, middle_name, last_name, 
+                    contact_number, address, zip_code, city) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                
+                // If you don't have city column, use this instead:
+                // $stmt = $conn->prepare("INSERT INTO users 
+                //     (email, password_hash, first_name, middle_name, last_name, 
+                //     contact_number, address, zip_code) 
+                //     VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
 
-if (false === $stmt) {
-    die("Prepare failed: " . $conn->error);
-}
+                if (false === $stmt) {
+                    die("Prepare failed: " . $conn->error);
+                }
 
-$bindResult = $stmt->bind_param("sssssssss", 
-    $email, $passwordHash, $firstName, $middleName, $lastName,
-    $contactNumber, $address, $zipCode);
+                // With city parameter (9 parameters):
+                $bindResult = $stmt->bind_param("sssssssss", 
+                    $email, $passwordHash, $firstName, $middleName, $lastName,
+                    $contactNumber, $address, $zipCode, $city);
+                
+                // Without city parameter (8 parameters):
+                // $bindResult = $stmt->bind_param("ssssssss", 
+                //     $email, $passwordHash, $firstName, $middleName, $lastName,
+                //     $contactNumber, $address, $zipCode);
 
-if (false === $bindResult) {
-    die("Bind failed: " . $stmt->error);
-}
+                if (false === $bindResult) {
+                    die("Bind failed: " . $stmt->error);
+                }
 
-if ($stmt->execute()) {
-    $_SESSION['new_user_email'] = $email;
-    $show_success_modal = true;
-} else {
-    $error_message = "Execute failed: " . $stmt->error;
-    error_log("Database error: " . $stmt->error);
-}
+                if ($stmt->execute()) {
+                    $_SESSION['new_user_email'] = $email;
+                    $_SESSION['signup_success'] = "Account created successfully! You can now log in.";
+                    $show_success_modal = true;
+                } else {
+                    $error_message = "Execute failed: " . $stmt->error;
+                    error_log("Database error: " . $stmt->error);
+                }
             }
             $stmt->close();
             $conn->close();
@@ -127,6 +116,18 @@ if ($stmt->execute()) {
             left: 50%;
             transform: translateX(-50%);
             background: #ff4444;
+            color: white;
+            padding: 15px 25px;
+            border-radius: 5px;
+            z-index: 1000;
+            animation: fadeIn 0.3s;
+        }
+        .success-banner {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #4CAF50;
             color: white;
             padding: 15px 25px;
             border-radius: 5px;
@@ -225,6 +226,13 @@ if ($stmt->execute()) {
                             <input type="text" id="address" name="address" required
                                 value="<?= htmlspecialchars($address ?? '') ?>" 
                                 placeholder="Enter Full Address">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="city" class="required">City</label>
+                            <input type="text" id="city" name="city" required
+                                value="<?= htmlspecialchars($city ?? '') ?>" 
+                                placeholder="Enter City">
                         </div>
                         
                         <div class="form-group">
@@ -345,28 +353,28 @@ if ($stmt->execute()) {
             }
         });
 
-            <?php if ($show_success_modal): ?>
-        document.getElementById('successModal').style.display = 'flex';
-        document.getElementById('success-email').textContent = '<?= $_SESSION['new_user_email'] ?>';
-    <?php endif; ?>
+        <?php if ($show_success_modal): ?>
+            document.getElementById('successModal').style.display = 'flex';
+            document.getElementById('success-email').textContent = '<?= $_SESSION['new_user_email'] ?>';
+        <?php endif; ?>
     
 
-// Popup toast function
-function showPopup(message) {
-    const popup = document.getElementById('popupToast');
-    const popupMsg = document.getElementById('popupMessage');
-    popupMsg.textContent = message;
-    popup.classList.add('show');
-    setTimeout(() => popup.classList.remove('show'), 4000);
-}
-document.querySelector('.popup-close').addEventListener('click', function() {
-    document.getElementById('popupToast').classList.remove('show');
-});
+        // Popup toast function
+        function showPopup(message) {
+            const popup = document.getElementById('popupToast');
+            const popupMsg = document.getElementById('popupMessage');
+            popupMsg.textContent = message;
+            popup.classList.add('show');
+            setTimeout(() => popup.classList.remove('show'), 4000);
+        }
+        document.querySelector('.popup-close').addEventListener('click', function() {
+            document.getElementById('popupToast').classList.remove('show');
+        });
 
-// Facebook button click
-document.getElementById('facebookBtnSignup').addEventListener('click', function() {
-    showPopup('Facebook authentication coming soon!');
-});
+        // Facebook button click
+        document.getElementById('facebookBtnSignup').addEventListener('click', function() {
+            showPopup('Facebook authentication coming soon!');
+        });
     </script>
 </body>
 </html>
