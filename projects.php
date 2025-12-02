@@ -174,6 +174,12 @@ if (!$user) {
                     echo '<div class="error-message">Error loading projects: ' . htmlspecialchars($e->getMessage()) . '</div>';
                 }
                 ?>
+                <!-- Add this placeholder message div -->
+                <div id="noCompletedProjects" class="empty-state" style="display: none;">
+                    <i class="fas fa-check-circle"></i>
+                    <p><b>No Completed Projects yet</b></p>
+                    <p class="empty-state-subtext">Complete a project to see it here!</p>
+                </div>
             </div>
             </div>
 
@@ -886,6 +892,7 @@ if (!$user) {
         }
 
         // Project filters functionality
+        
         const filterTabsInit = document.querySelectorAll('.filter-tab');
         filterTabsInit.forEach(tab => {
             tab.addEventListener('click', () => {
@@ -895,6 +902,10 @@ if (!$user) {
 
                 const filter = tab.getAttribute('data-filter');
                 const projectCards = document.querySelectorAll('.project-card');
+                const noCompletedPlaceholder = document.getElementById('noCompletedProjects');
+                
+                let hasCompletedProjects = false;
+                let visibleProjects = 0;
 
                 projectCards.forEach(card => {
                     if (filter === 'all' || card.getAttribute('data-status') === filter) {
@@ -903,6 +914,12 @@ if (!$user) {
                             card.style.opacity = '1';
                             card.style.transform = 'translateY(0)';
                         }, 10);
+                        visibleProjects++;
+                        
+                        // Check if we have completed projects when filtering
+                        if (filter === 'completed' && card.getAttribute('data-status') === 'completed') {
+                            hasCompletedProjects = true;
+                        }
                     } else {
                         card.style.opacity = '0';
                         card.style.transform = 'translateY(20px)';
@@ -911,6 +928,27 @@ if (!$user) {
                         }, 300);
                     }
                 });
+                
+                // Show/hide the "No Completed Projects" placeholder
+                if (filter === 'completed' && !hasCompletedProjects) {
+                    noCompletedPlaceholder.style.display = 'block';
+                    // Add animation for the placeholder
+                    setTimeout(() => {
+                        noCompletedPlaceholder.style.opacity = '1';
+                        noCompletedPlaceholder.style.transform = 'translateY(0)';
+                    }, 10);
+                } else {
+                    noCompletedPlaceholder.style.opacity = '0';
+                    noCompletedPlaceholder.style.transform = 'translateY(20px)';
+                    setTimeout(() => {
+                        noCompletedPlaceholder.style.display = 'none';
+                    }, 300);
+                }
+                
+                // If you want to show a message when no projects match any filter
+                if (visibleProjects === 0 && filter !== 'completed') {
+                    // You could add similar logic for other filters if needed
+                }
             });
         });
 
