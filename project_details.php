@@ -853,6 +853,7 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch (err) { /* silent */ }
     }
 
+<<<<<<< Updated upstream
     // Helper: parse displayed quantity format "X / Y" and return obtained, orig, remaining
     function parseMatQtyText(txt) {
         try {
@@ -904,6 +905,9 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch (e) { return { obtained: 0, orig: (typeof remaining !== 'undefined' && remaining !== null ? parseInt(remaining,10)||0 : 0) }; }
     }
 
+=======
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
     // Request server to toggle completion for a stage (calls complete_stage.php) and update UI based on response
     async function requestToggleStage(stageNumber, projectId, options = {}) {
         try {
@@ -929,48 +933,172 @@ document.addEventListener('DOMContentLoaded', function() {
                     else {
                         const btn = document.querySelector('.complete-stage-btn[data-stage-number="' + stageNumber + '"]') || document.querySelector('button[data-stage-number="' + stageNumber + '"]');
                         if (btn) { btn.innerHTML = '<i class="fas fa-undo"></i> Mark as Complete'; }
-                    }
-                } catch(e){}
+=======
+    // Helper: parse displayed quantity format "X / Y" and return obtained, orig, remaining
+    function parseMatQtyText(txt) {
+        try {
+            if (!txt) return null;
+            const m = String(txt).match(/(\d+)\s*\/\s*(\d+)/);
+            if (m && m.length >= 3) {
+                const obtained = parseInt(m[1], 10);
+                const orig = parseInt(m[2], 10);
+                const remaining = (isNaN(orig) || isNaN(obtained)) ? null : Math.max(0, orig - obtained);
+                return { obtained: obtained, orig: orig, remaining: remaining };
             }
-            // If server returned completed, ensure UI shows completed (use label renderer when available)
-            if (data.success && data.action === 'completed') {
-                try {
-                    if (typeof renderStageStatusLabel === 'function') {
-                        try { renderStageStatusLabel(stageNumber, 'completed'); }
-                        catch(e) { /* fallback below */ }
-                    } else {
-                        const btn = document.querySelector('.complete-stage-btn[data-stage-number="' + stageNumber + '"]') || document.querySelector('button[data-stage-number="' + stageNumber + '"]');
-                        if (btn) btn.innerHTML = '<i class="fas fa-check"></i> Completed!';
+            // Fallback: single number – treat as 'orig' and 0 obtained (legacy remaining/orig format)
+            const s = String(txt).match(/-?\d+/);
+            if (s) {
+                const n = parseInt(s[0], 10);
+                return { obtained: 0, orig: n, remaining: n };
+            }
+        } catch (e) { /* ignore parse errors */ }
+        return null;
+    }
+
+    // Helper: compute the displayed obtained/orig string given server-provided remaining and optional original
+    // Prefer data from server (origFromJson) -> existing element attribute -> existing displayed value -> sane fallback
+    function computeDisplayedFromServer(remaining, origFromJson, node) {
+        try {
+            const rem = (typeof remaining !== 'undefined' && remaining !== null) ? (parseInt(remaining, 10) || 0) : 0;
+            let origVal = null;
+            if (typeof origFromJson !== 'undefined' && origFromJson !== null) {
+                origVal = parseInt(origFromJson, 10);
+            }
+            // prefer existing DOM attribute when available
+            if ((origVal === null || isNaN(origVal)) && node && node.getAttribute) {
+                const nodeAttr = node.getAttribute('data-original-quantity');
+                if (nodeAttr !== null && nodeAttr !== undefined && String(nodeAttr).trim() !== '') {
+                    const n = parseInt(nodeAttr, 10);
+                    if (!isNaN(n)) origVal = n;
+                }
+            }
+            // fallback to parsing existing text if still unknown
+            if ((origVal === null || isNaN(origVal)) && node && node.textContent) {
+                const parsed = parseMatQtyText(String(node.textContent || ''));
+                if (parsed && typeof parsed.orig === 'number') origVal = parsed.orig;
+            }
+            // final fallback
+            if (origVal === null || isNaN(origVal)) origVal = rem || 1;
+
+            const obtained = Math.max(0, origVal - rem);
+            return { obtained: obtained, orig: origVal };
+        } catch (e) { return { obtained: 0, orig: (typeof remaining !== 'undefined' && remaining !== null ? parseInt(remaining,10)||0 : 0) }; }
+    }
+
+   // Request server to toggle completion for a stage (calls complete_stage.php) and update UI based on response
+async function requestToggleStage(stageNumber, projectId, options = {}) {
+    try {
+        let body = 'stage_number=' + encodeURIComponent(stageNumber) + '&project_id=' + encodeURIComponent(projectId);
+        if (options && options.force_uncomplete) body += '&force_uncomplete=1';
+        
+        const res = await fetch('complete_stage.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body
+        });
+        const data = await res.json().catch(()=>null);
+        
+        if (!data) return null;
+        
+        // If server marked as completed, mark current stage as completed and advance
+        if (data.success && data.action === 'completed') {
+            try {
+                // Get current stage element
+                const currentStageEl = document.querySelector('.workflow-stage.current');
+                if (!currentStageEl) return data;
+                
+                const currentStageIndex = parseInt(currentStageEl.getAttribute('data-stage-index'), 10);
+                const currentStageNumber = stageNumber;
+                
+                // Mark current stage as completed
+                currentStageEl.classList.remove('current', 'active', 'inactive', 'locked');
+                currentStageEl.classList.add('completed');
+                
+                // Disable actions in completed stage
+                const currentActions = currentStageEl.querySelector('.stage-actions');
+                if (currentActions) {
+                    currentActions.style.pointerEvents = 'none';
+                    currentActions.style.opacity = '0.6';
+                }
+                
+                // Update current tab to show completed
+                const currentTab = document.querySelector('.stage-tab.current, .stage-tab.active');
+                if (currentTab) {
+                    currentTab.classList.remove('current', 'active');
+                    currentTab.classList.add('completed');
+                    const tabBadge = currentTab.querySelector('.tab-badge');
+                    if (tabBadge) {
+                        tabBadge.classList.remove('active', 'current');
+                        tabBadge.classList.add('completed');
+                        tabBadge.textContent = 'Completed';
+>>>>>>> Stashed changes
                     }
-                    // Ensure classes for stage and tab are correct even if label renderer modified DOM
-                    const stageEl = document.querySelector('.workflow-stage[data-stage-number="' + stageNumber + '"]') || document.querySelector('.workflow-stage[data-stage-index]');
-                    if (stageEl) {
-                        stageEl.classList.remove('current');
-                        stageEl.classList.add('completed');
-                        const idx = parseInt(stageEl.getAttribute('data-stage-index'), 10);
-                        if (!isNaN(idx)) {
-                            const tab = document.querySelector('.stage-tab[data-stage-index="' + idx + '"]');
-                            if (tab) { tab.classList.remove('active'); tab.classList.add('completed'); }
+                }
+                
+                // Find next stage and unlock it
+                const nextStageIndex = currentStageIndex + 1;
+                const nextStageEl = document.querySelector('.workflow-stage[data-stage-index="' + nextStageIndex + '"]');
+                
+                if (nextStageEl) {
+                    // Unlock next stage - make it current and interactive
+                    nextStageEl.classList.remove('locked', 'completed', 'inactive');
+                    nextStageEl.classList.add('current', 'active');
+                    
+                    // Enable actions in next stage
+                    const nextActions = nextStageEl.querySelector('.stage-actions');
+                    if (nextActions) {
+                        nextActions.style.pointerEvents = 'auto';
+                        nextActions.style.opacity = '1';
+                    }
+                    
+                    // Update next tab to current
+                    const nextTab = document.querySelector('.stage-tab[data-stage-index="' + nextStageIndex + '"]');
+                    if (nextTab) {
+                        nextTab.classList.remove('locked', 'completed');
+                        nextTab.classList.add('current', 'active');
+                        const nextTabBadge = nextTab.querySelector('.tab-badge');
+                        if (nextTabBadge) {
+                            nextTabBadge.classList.remove('locked', 'completed');
+                            nextTabBadge.classList.add('active', 'current');
+                            nextTabBadge.textContent = 'Current';
                         }
                     }
-                } catch(e){}
-            }
-            // If server returned a failure reason about missing materials/photos, show Incomplete state
-            if (data && data.success === false && (data.reason === 'missing_materials' || data.reason === 'missing_after_photos' || data.reason === 'missing_stage_photos')) {
-                try {
-                    if (typeof renderStageStatusLabel === 'function') renderStageStatusLabel(stageNumber, 'incomplete');
-                    else if (typeof markStageUncompletedUI === 'function') markStageUncompletedUI(stageNumber);
-                    else {
-                        const btn = document.querySelector('.complete-stage-btn[data-stage-number="' + stageNumber + '"]') || document.querySelector('button[data-stage-number="' + stageNumber + '"]');
-                        if (btn) btn.innerHTML = '<i class="fas fa-undo"></i> Mark as Complete';
-                    }
-                } catch(e){}
-            }
-            return data;
-        } catch (err) {
-            return null;
+                    
+                    // Scroll to next stage for better UX
+                    setTimeout(() => {
+                        nextStageEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }, 300);
+                }
+                
+            } catch(e){ console.error('Error updating UI:', e); }
         }
+        
+        // If server marked as uncompleted, revert stage
+        if (data.success && data.action === 'uncompleted') {
+            try {
+                const stageEl = document.querySelector('.workflow-stage[data-stage-number="' + stageNumber + '"]');
+                if (stageEl) {
+                    stageEl.classList.remove('completed');
+                    stageEl.classList.add('current', 'active');
+                    
+                    // Enable actions
+                    const actions = stageEl.querySelector('.stage-actions');
+                    if (actions) {
+                        actions.style.pointerEvents = 'auto';
+                        actions.style.opacity = '1';
+                    }
+                }
+            } catch(e){}
+        }
+        
+        return data;
+    } catch (err) {
+        return null;
     }
+}
 
     // Render non-clickable status label for a stage: 'completed' or 'incomplete'
     function renderStageStatusLabel(stageNumber, status) {
@@ -1309,6 +1437,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                         const container = document.querySelector('.workflow-stages-container');
                                         let proceedFound = false;
                                         if (container) {
+<<<<<<< Updated upstream
                                             // Find the stage that looks like Material Collection and enable its proceed button
                                             const candidateStages = container.querySelectorAll('.workflow-stage, .stage-card');
                                             candidateStages.forEach(st => {
@@ -1320,6 +1449,64 @@ document.addEventListener('DOMContentLoaded', function() {
                                                     }
                                                 }
                                             });
+=======
+<<<<<<< Updated upstream
+                                            const btn = container.querySelector('button.complete-stage-btn[data-stage-number]');
+                                            // Prefer the button whose title or nearby heading contains "Material"
+                                            let target = null;
+                                            const candidateButtons = container.querySelectorAll('button.complete-stage-btn[data-stage-number]');
+                                            candidateButtons.forEach(b => {
+                                                if (target) return;
+                                                const stageWrap = b.closest('.workflow-stage, .stage-card');
+                                                if (stageWrap && /material/i.test(stageWrap.textContent || '')) target = b;
+                                            });
+                                            if (!target && candidateButtons.length) target = candidateButtons[0];
+                                                        if (target) {
+                                                            const tn = parseInt(target.getAttribute('data-stage-number'), 10);
+                                                            if (!isNaN(tn)) {
+                                                                // use requestToggleStage to ensure server toggling and UI update
+                                                                (async function(){ try { await requestToggleStage(tn, projectId); } catch(e){} })();
+                                                            } else location.reload();
+                                            } else {
+                                                location.reload();
+=======
+                                            // Find the stage that looks like Material Collection and enable its proceed button
+                                            const candidateStages = container.querySelectorAll('.workflow-stage, .stage-card');
+                                            candidateStages.forEach(st => {
+                                                if (proceedFound) return;
+                                                if (/material/i.test(st.textContent || '')) {
+                                                    const p = st.querySelector('.proceed-stage-btn');
+                                                    if (p) {
+                                                        // only enable proceed automatically if this stage actually contains materials
+                                                        const matItems = st.querySelectorAll('.material-item');
+                                                        if (matItems && matItems.length > 0) {
+                                                            p.classList.remove('is-disabled'); p.removeAttribute('aria-disabled'); p.dataset.reqOk = '1'; proceedFound = true;
+                                                        }
+                                                    }
+                                                }
+                                            });
+                                        }
+                                        if (!proceedFound) {
+                                            // Fallback: try to enable any present proceed buttons
+                                            const any = document.querySelectorAll('.proceed-stage-btn');
+                                            if (any && any.length) {
+                                                any.forEach(p=>{
+                                                    // Do not enable proceed in stages that expose a materials list but have no items
+                                                    try {
+                                                        const stageRoot = p.closest('.workflow-stage, .stage-card');
+                                                        if (stageRoot) {
+                                                            const mats = stageRoot.querySelectorAll('.material-item');
+                                                            if (mats && mats.length === 0) return; // skip enabling for empty materials stages
+                                                        }
+                                                        p.classList.remove('is-disabled'); p.removeAttribute('aria-disabled'); p.dataset.reqOk = '1';
+                                                    } catch(e) { /* ignore per-button logic failures */ }
+                                                });
+                                                proceedFound = true;
+>>>>>>> Stashed changes
+                                            }
+                                        } else {
+                                            location.reload();
+>>>>>>> Stashed changes
                                         }
                                         if (!proceedFound) {
                                             // Fallback: try to enable any present proceed buttons
@@ -2215,7 +2402,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     });
 
                     // final decision: satisfied when every material has either obtained badge or photo
-                    const finalOk = (total === 0) ? true : (have >= total);
+                    // IMPORTANT: if there are no materials (total === 0) treat the requirements as NOT satisfied
+                    // so users must add materials before the Proceed button becomes actionable.
+                    const finalOk = (total === 0) ? false : (have >= total);
                     // debug removed
 
                     // If debug flag present in URL (search or hash), render/refresh a small overlay showing per-stage counts
@@ -2420,15 +2609,18 @@ document.addEventListener('DOMContentLoaded', function() {
         const materialsNode = getActiveMaterialsNode();
         if (!materialsNode) return false;
         const items = Array.from(materialsNode.querySelectorAll('.material-item'));
-        if (items.length === 0) return true; // nothing to satisfy
-        return items.every(li => !!li.querySelector('.badge.obtained'));
+        // If there are no materials, we want this to be considered NOT obtained so the Proceed
+        // button remains disabled until user adds and marks materials as complete.
+        if (items.length === 0) return false;
+                return items.every(li => !!li.querySelector('.badge.obtained'));
     }
 
     function checkAllPhotosUploaded(){
         const materialsNode = getActiveMaterialsNode();
         if (!materialsNode) return false;
         const items = Array.from(materialsNode.querySelectorAll('.material-item'));
-        if (items.length === 0) return true;
+        // If no materials exist for the active node, treat this as NOT satisfied so Proceed remains disabled
+        if (items.length === 0) return false;
         return items.every(li => {
             const photos = li.querySelector('.material-photos');
             return !!(photos && photos.querySelector('.material-photo:not(.placeholder)'));
@@ -2453,7 +2645,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (!(photos && photos.querySelector('.material-photo:not(.placeholder)'))) scopedAllPhotos = false;
                     });
                 }
-                const ok = (items && items.length === 0) ? true : (scopedAllObtained && scopedAllPhotos);
+                // If there are no materials, treat the state as NOT satisfied so Proceed remains disabled
+                const ok = (items && items.length === 0) ? false : (scopedAllObtained && scopedAllPhotos);
                 if (!ok) {
                     try { btn.setAttribute('aria-disabled', 'true'); } catch(e){}
                     try { btn.classList.add('is-disabled'); } catch(e){}
@@ -3126,29 +3319,48 @@ document.addEventListener('DOMContentLoaded', function(){
     const stages = document.querySelectorAll('.workflow-stage');
 
     function showStageByIndex(idx){
-        // Ensure canonical tabs/stage ordering present before selecting (helps avoid race with ensureThreeStageTabs)
-        try { if (typeof ensureThreeStageTabs === 'function') ensureThreeStageTabs(); } catch(e){}
+        // Hide all stage content
+        stages.forEach(s => {
+            s.classList.remove('active', 'current');
+            s.style.display = 'none';
+        });
+        
+        // Show only the selected stage content
+        const targetStage = document.querySelector('.workflow-stage[data-stage-index="' + idx + '"]');
+        if (targetStage) {
+            targetStage.style.display = 'block';
+            targetStage.classList.add('active', 'current');
+        }
+        
+        // Update tab states
+        tabs.forEach(t => {
+            t.classList.remove('active', 'current');
+            const tabIdx = parseInt(t.dataset.stageIndex, 10);
+            
+            // Update badge based on actual status
+            const badge = t.querySelector('.tab-badge');
+            if (badge) {
+                if (t.classList.contains('completed')) {
+                    badge.textContent = 'Completed';
+                    badge.className = 'tab-badge completed';
+                } else if (tabIdx === idx) {
+                    badge.textContent = 'Current';
+                    badge.className = 'tab-badge active';
+                } else if (t.classList.contains('locked')) {
+                    badge.textContent = 'Locked';
+                    badge.className = 'tab-badge locked';
+                } else {
+                    badge.textContent = 'Incomplete';
+                    badge.className = 'tab-badge incomplete';
+                }
+            }
+            
+            // Mark current tab as active
+            if (tabIdx === idx) {
+                t.classList.add('active', 'current');
+            }
+        });
 
-        // Toggle active classes on tabs and stages
-        tabs.forEach(t => t.classList.toggle('active', parseInt(t.dataset.stageIndex,10) === idx));
-        stages.forEach(s => s.classList.toggle('active', parseInt(s.getAttribute('data-stage-index'),10) === idx));
-
-        // Keep tab-badges in sync with tab state (completed/current/locked/incomplete).
-        try {
-            tabs.forEach(t => {
-                try {
-                    const badge = t.querySelector('.tab-badge');
-                    if (!badge) return;
-                    // reset classes
-                    badge.classList.remove('active','completed','locked','incomplete');
-                    // prefer existing tab classes where available
-                    if (t.classList.contains('completed')) { badge.classList.add('completed'); badge.textContent = 'Completed'; }
-                    else if (t.classList.contains('active')) { badge.classList.add('active'); badge.textContent = 'Current'; }
-                    else if (t.classList.contains('locked')) { badge.classList.add('locked'); badge.textContent = 'Locked'; }
-                    else { badge.classList.add('incomplete'); badge.textContent = 'Incomplete'; }
-                } catch(e){}
-            });
-        } catch(e){}
         // update URL hash for shareable link
         try {
             const hash = '#step-' + idx;
@@ -3157,61 +3369,23 @@ document.addEventListener('DOMContentLoaded', function(){
         } catch (e) {}
     }
 
-    // add click handlers and keyboard support
+    // Add click handlers to tabs
     tabs.forEach((t, ti) => {
         t.setAttribute('tabindex', '0');
         t.dataset.stageIndex = t.dataset.stageIndex || ti;
         t.addEventListener('click', function(){
+            // Don't allow clicking on locked tabs
+            if (this.classList.contains('locked')) return;
+            
             const idx = parseInt(this.dataset.stageIndex,10);
             if (isNaN(idx)) return;
-            // always activate the tab (this updates the URL hash via showStageByIndex)
             showStageByIndex(idx);
-            // scroll the selected stage into view for clarity
-            const s = document.querySelector('.workflow-stage[data-stage-index="' + idx + '"]');
-            if (s) s.scrollIntoView({behavior:'smooth', block:'start'});
-        });
-        // keyboard nav: left/right to move, enter/space to activate
-        t.addEventListener('keydown', function(ev){
-            if (ev.key === 'ArrowRight' || ev.key === 'ArrowDown') {
-                ev.preventDefault();
-                const next = tabs[(ti + 1) % tabs.length];
-                if (next) next.focus();
-            } else if (ev.key === 'ArrowLeft' || ev.key === 'ArrowUp') {
-                ev.preventDefault();
-                const prev = tabs[(ti - 1 + tabs.length) % tabs.length];
-                if (prev) prev.focus();
-            } else if (ev.key === 'Enter' || ev.key === ' ') {
-                ev.preventDefault();
-                this.click();
-            }
         });
     });
 
-    // on load, check URL hash like #step-2 and open that step if present
-    try {
-        const m = (location.hash || '').match(/#step-(\d+)/i);
-        if (m && m[1]) {
-            const idx = parseInt(m[1], 10);
-            if (!isNaN(idx)) showStageByIndex(idx);
-        }
-    } catch (e) {}
-    // always show only the current stage by default (no 'show all' control)
-    // initialize to current active tab or index 0
-    (function(){
-        const active = document.querySelector('.stage-tab.active');
-        const idx = active ? parseInt(active.dataset.stageIndex,10) : 0;
-        showStageByIndex(idx);
-    })();
-
-    // JS fallback: ensure locked tabs show a consistent forbidden cursor on hover
-    try {
-        const svgCursor = `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32'><circle cx='16' cy='16' r='12' stroke='black' stroke-width='2' fill='white'/><line x1='6' y1='26' x2='26' y2='6' stroke='black' stroke-width='3' stroke-linecap='round'/></svg>") 16 16, not-allowed`;
-        document.querySelectorAll('.stage-tab.locked').forEach(el => {
-            el.addEventListener('mouseenter', function(){ el.style.cursor = svgCursor; el.style.pointerEvents = 'auto'; });
-            el.addEventListener('mouseleave', function(){ el.style.cursor = ''; });
-        });
-    } catch (e) { /* ignore */ }
-    // (explicit uncomplete button removed — completion toggles now happen automatically when materials change)
+    // Initialize: show only the current stage
+    const currentStageIndex = <?= $current_stage_index ?: 0 ?>;
+    showStageByIndex(currentStageIndex);
 });
 </script>
 
