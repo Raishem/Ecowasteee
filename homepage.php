@@ -828,7 +828,107 @@ function render_comments($comments, $donation_id, $parent_id = NULL) {
 <!-- Recycled Ideas Tab Content -->
 <div id="recycled-ideas" class="tab-content" style="display:none;">
     <?php if (count($ideas) === 0): ?>
-        <p>No recycled ideas yet.</p>
+        <!-- START OF SAMPLE POSTS -->
+        <!-- Sample Post 1: Plastic Planters -->
+        <div class="idea-card">
+            <div class="idea-header">
+                <h3>Plastic Planters</h3>
+                <div class="idea-meta">
+                    <span class="author">Susha</span>
+                    <span class="time-ago">2 days ago</span>
+                </div>
+            </div>
+            <div class="idea-image-container">
+                <img src="https://www.theinspirationedit.com/wp-content/uploads/2020/05/DIY-Monster-Planters.jpg" 
+                alt="Plastic Bottle Planters" class="idea-image">
+            </div>
+            <p class="idea-description">Cute recycled plant base using plastic bottles. Perfect for small herbs and succulents!</p>
+            <div class="idea-actions">
+                <button class="action-btn">Try This Idea</button>
+                <span class="comments">34 Comments</span>
+            </div>
+        </div>
+
+        <!-- Sample Post 2: Glass Jar Lanterns -->
+        <div class="idea-card">
+            <div class="idea-header">
+                <h3>Glass Jar Lanterns</h3>
+                <div class="idea-meta">
+                    <span class="author">Mark</span>
+                    <span class="time-ago">1 week ago</span>
+                </div>
+            </div>
+            <div class="idea-image-container">
+                <img src="https://images.immediate.co.uk/production/volatile/sites/10/2018/02/04589917-60b2-43f4-abaa-f5d19350f31e-61437ec.jpg?resize=1200%2C630" 
+                alt="Glass Jar Lanterns" class="idea-image">
+            </div>
+            <p class="idea-description">Transform old glass jars into beautiful outdoor lanterns with LED lights.</p>
+            <div class="idea-actions">
+                <button class="action-btn">Try This Idea</button>
+                <span class="comments">27 Comments</span>
+            </div>
+        </div>
+
+        <!-- Sample Post 3: Cardboard Organizers -->
+        <div class="idea-card">
+            <div class="idea-header">
+                <h3>Cardboard Organizers</h3>
+                <div class="idea-meta">
+                    <span class="author">Lisa</span>
+                    <span class="time-ago">3 days ago</span>
+                </div>
+            </div>
+            <div class="idea-image-container">
+                <img src="https://thefabhome.com/wp-content/uploads/2021/06/18_Ways-to-Organize-with-Cardboard-Boxes.jpg" 
+                alt="Cardboard Desk Organizers" class="idea-image">
+            </div>
+            <p class="idea-description">Create stylish desk organizers from cardboard boxes. Paint and decorate to match your style.</p>
+            <div class="idea-actions">
+                <button class="action-btn">Try This Idea</button>
+                <span class="comments">41 Comments</span>
+            </div>
+        </div>
+
+        <!-- Sample Post 4: Tin Can Wind Chimes -->
+        <div class="idea-card">
+            <div class="idea-header">
+                <h3>Tin Can Wind Chimes</h3>
+                <div class="idea-meta">
+                    <span class="author">David</span>
+                    <span class="time-ago">5 days ago</span>
+                </div>
+            </div>
+            <div class="idea-image-container">
+                <img src="https://www.pictureboxblue.com/wp-content/uploads/2019/04/Tin-can-wind-chime-songbird-sq-s.jpg" 
+                alt="Tin Can Wind Chimes" class="idea-image">
+            </div>
+            <p class="idea-description">Musical wind chimes made from recycled tin cans. Paint them in bright colors for a cheerful garden addition.</p>
+            <div class="idea-actions">
+                <button class="action-btn">Try This Idea</button>
+                <span class="comments">19 Comments</span>
+            </div>
+        </div>
+
+        <!-- Sample Post 5: Bottle Cap Mosaic -->
+        <div class="idea-card">
+            <div class="idea-header">
+                <h3>Bottle Cap Mosaic</h3>
+                <div class="idea-meta">
+                    <span class="author">Anna</span>
+                    <span class="time-ago">2 weeks ago</span>
+                </div>
+            </div>
+            <div class="idea-image-container">
+                <img src="https://thumbs.dreamstime.com/b/house-garden-mosaic-decoration-made-colorful-plastic-bottle-cups-handmade-kids-craft-recycling-art-sunny-day-caps-178805975.jpg" 
+                alt="Bottle Cap Art Mosaic" class="idea-image">
+            </div>
+            <p class="idea-description">Colorful wall art created from collected bottle caps. Arrange them in patterns to create stunning mosaics.</p>
+            <div class="idea-actions">
+                <button class="action-btn">Try This Idea</button>
+                <span class="comments">52 Comments</span>
+            </div>
+        </div>
+        <!-- END OF SAMPLE POSTS -->
     <?php else: ?>
         <?php foreach ($ideas as $idea): ?>
         <div class="idea-card">
