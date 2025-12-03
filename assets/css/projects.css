@@ -2435,3 +2435,40 @@ textarea:focus {
 body.modal-open {
     overflow: hidden;
 }
+
+.empty-state-subtext {
+    font-size: 14px;
+    color: #666;
+    margin-top: 5px;
+    opacity: 0.8;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 50px 20px;
+    background: #f9f9f9;
+    border-radius: 12px;
+    margin: 20px auto;
+    max-width: 500px;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.empty-state i {
+    font-size: 64px;
+    color: #4CAF50;
+    margin-bottom: 20px;
+    display: block;
+}
+
+.empty-state p {
+    color: #333;
+    font-size: 18px;
+    margin: 0;
+}
+
+.empty-state.active {
+    opacity: 1;
+    transform: translateY(0);
+}
