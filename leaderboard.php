@@ -17,6 +17,7 @@ $query = "
         first_name, 
         points 
     FROM users 
+    WHERE points > 0
     ORDER BY points DESC 
     LIMIT 10
 ";

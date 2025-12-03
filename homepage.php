@@ -342,7 +342,7 @@ while ($row = $result->fetch_assoc()) $projects[] = $row;
 
 // Fetch leaderboard
 $leaders = [];
-$result = $conn->query("SELECT user_id, first_name, points FROM users ORDER BY points DESC LIMIT 10");
+$result = $conn->query("SELECT user_id, first_name, points FROM users WHERE points > 0 ORDER BY points DESC LIMIT 10");
 while ($row = $result->fetch_assoc()) $leaders[] = $row;
 
 /* Helper to render nested comments remains the same if you have it earlier.
