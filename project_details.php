@@ -50,14 +50,21 @@ try {
     $has_materials = count($materials) > 0;
     if ($has_materials) {
         $all_materials_obtained = true;
-        foreach ($materials as $material) {
+        foreach ($materials as &$material) { // Use reference to modify array
+            // Ensure we have the correct quantity field
             $acquired = isset($material['acquired_quantity']) ? (int)$material['acquired_quantity'] : 0;
-            $needed = isset($material['needed_quantity']) ? (int)$material['needed_quantity'] : (int)$material['quantity'];
+            // Use 'quantity' field instead of 'needed_quantity' if that's what your database has
+            $needed = isset($material['quantity']) ? (int)$material['quantity'] : 0;
+            
+            // Add the calculated needed quantity to the material array
+            $material['calculated_needed'] = $needed;
+            $material['calculated_acquired'] = $acquired;
+            
             if ($acquired < $needed) {
                 $all_materials_obtained = false;
-                break;
             }
         }
+        unset($material); // Break the reference
     }
 
     // Check if project has at least one image attachment
@@ -193,7 +200,7 @@ try {
             }
         }
 
-        // Add material
+        // Add material - FIXED VERSION
         elseif (isset($_POST['add_material'])) {
             $material_name = trim($_POST['material_name']);
             $quantity = (int)$_POST['quantity'];
@@ -204,11 +211,13 @@ try {
                 $error_message = "Quantity must be at least 1.";
             } else {
                 try {
+                    // FIXED: Corrected the SQL query and parameter binding
                     $add_stmt = $conn->prepare("
                         INSERT INTO project_materials (project_id, material_name, quantity, acquired_quantity, status) 
                         VALUES (?, ?, ?, 0, 'needed')
                     ");
-                    $add_stmt->bind_param("isii", $project_id, $material_name, $quantity, $quantity);
+                    // Only 4 parameters needed: project_id, material_name, quantity
+                    $add_stmt->bind_param("isi", $project_id, $material_name, $quantity);
                     $add_stmt->execute();
                     
                     $new_material_id = $add_stmt->insert_id;
@@ -232,6 +241,7 @@ try {
                     }
                 } catch (Exception $e) {
                     $error_message = "Failed to add material: " . $e->getMessage();
+                    error_log("Material add error: " . $e->getMessage()); // Add error logging
                     if ($is_ajax) {
                         echo json_encode(['status' => 'error', 'message' => $error_message]);
                         exit();
@@ -397,17 +407,24 @@ try {
                 }
             }
         }
-        
+
         // Share project
         elseif (isset($_POST['share_project'])) {
             $is_public = isset($_POST['is_public']) ? 1 : 0;
-            $share_description = trim($_POST['share_description'] ?? '');
             
             try {
-                // Update project visibility
-                $share_stmt = $conn->prepare("UPDATE projects SET is_public = ?, share_description = ? WHERE project_id = ? AND user_id = ?");
-                $share_stmt->bind_param("isii", $is_public, $share_description, $project_id, $_SESSION['user_id']);
-                $share_stmt->execute();
+                // Update project visibility in projects table (optional, but good to have)
+                try {
+                    // Check if is_public column exists in projects table
+                    $check_column = $conn->query("SHOW COLUMNS FROM projects LIKE 'is_public'");
+                    if ($check_column->num_rows > 0) {
+                        $update_project_stmt = $conn->prepare("UPDATE projects SET is_public = ? WHERE project_id = ? AND user_id = ?");
+                        $update_project_stmt->bind_param("iii", $is_public, $project_id, $_SESSION['user_id']);
+                        $update_project_stmt->execute();
+                    }
+                } catch (Exception $e) {
+                    // Ignore if column doesn't exist
+                }
                 
                 // Mark stage 3 as completed
                 $stage_stmt = $conn->prepare("
@@ -418,15 +435,94 @@ try {
                 $stage_stmt->bind_param("i", $project_id);
                 $stage_stmt->execute();
                 
+                // If sharing to community, save to recycled_ideas table
                 if ($is_public) {
-                    $success_message = "Project shared with the community!";
+                    $final_image_id = isset($_POST['final_image_id']) ? (int)$_POST['final_image_id'] : 0;
+                    
+                    // Get project details
+                    $project_query = $conn->prepare("
+                        SELECT p.project_name, p.description, u.first_name, u.last_name 
+                        FROM projects p 
+                        JOIN users u ON p.user_id = u.user_id 
+                        WHERE p.project_id = ? AND p.user_id = ?
+                    ");
+                    $project_query->bind_param("ii", $project_id, $_SESSION['user_id']);
+                    $project_query->execute();
+                    $project_data = $project_query->get_result()->fetch_assoc();
+                    
+                    if ($project_data) {
+                        // Get final project image path if exists
+                        $image_path = '';
+                        if ($final_image_id > 0) {
+                            $image_query = $conn->prepare("SELECT image_path FROM project_images WHERE image_id = ? AND project_id = ?");
+                            $image_query->bind_param("ii", $final_image_id, $project_id);
+                            $image_query->execute();
+                            $image_result = $image_query->get_result()->fetch_assoc();
+                            if ($image_result) {
+                                $image_path = $image_result['image_path'];
+                            }
+                        }
+                        
+                        // Prepare author name
+                        $author_name = $project_data['first_name'] . ' ' . $project_data['last_name'];
+                        
+                        // Check if this project is already in recycled_ideas
+                        $check_idea_stmt = $conn->prepare("SELECT idea_id FROM recycled_ideas WHERE project_id = ?");
+                        $check_idea_stmt->bind_param("i", $project_id);
+                        $check_idea_stmt->execute();
+                        $existing_idea = $check_idea_stmt->get_result()->fetch_assoc();
+                        
+                        if ($existing_idea) {
+                            // Update existing entry
+                            $update_idea_stmt = $conn->prepare("
+                                UPDATE recycled_ideas 
+                                SET title = ?, description = ?, author = ?, image_path = ?, posted_at = NOW() 
+                                WHERE project_id = ?
+                            ");
+                            // Correct parameter binding: "ssssi" (3 strings, 1 string, 1 integer)
+                            $update_idea_stmt->bind_param(
+                                "ssssi", 
+                                $project_data['project_name'],
+                                $project_data['description'],
+                                $author_name,
+                                $image_path,
+                                $project_id
+                            );
+                            $update_idea_stmt->execute();
+                        } else {
+                            // Insert new entry
+                            $insert_idea_stmt = $conn->prepare("
+                                INSERT INTO recycled_ideas (project_id, title, description, author, image_path, posted_at) 
+                                VALUES (?, ?, ?, ?, ?, NOW())
+                            ");
+                            // Correct parameter binding: "issss" (1 integer, 3 strings, 1 string)
+                            $insert_idea_stmt->bind_param(
+                                "issss", 
+                                $project_id,
+                                $project_data['project_name'],
+                                $project_data['description'],
+                                $author_name,
+                                $image_path
+                            );
+                            $insert_idea_stmt->execute();
+                        }
+                        
+                        $success_message = "Project shared to Recycled Ideas feed!";
+                    }
                 } else {
+                    // If keeping private, remove from recycled_ideas if exists
+                    $delete_idea_stmt = $conn->prepare("DELETE FROM recycled_ideas WHERE project_id = ?");
+                    $delete_idea_stmt->bind_param("i", $project_id);
+                    $delete_idea_stmt->execute();
+                    
                     $success_message = "Project kept private.";
                 }
-                header("Location: project_details.php?id=$project_id");
+                
+                header("Location: project_details.php?id=$project_id&success=shared");
                 exit();
             } catch (Exception $e) {
                 $error_message = "Failed to update project: " . $e->getMessage();
+                error_log("Share project error: " . $e->getMessage());
             }
         }
     }
@@ -641,9 +737,9 @@ try {
                                     <?php else: ?>
                                         <ul class="materials-list">
                                             <?php foreach ($materials as $material): 
-                                                // Calculate acquired quantity (default to 0 if not set)
-                                                $acquired = isset($material['acquired_quantity']) ? (int)$material['acquired_quantity'] : 0;
-                                                $needed = isset($material['needed_quantity']) ? (int)$material['needed_quantity'] : (int)$material['quantity'];
+                                                // Use the calculated values
+                                                $acquired = $material['calculated_acquired'] ?? 0;
+                                                $needed = $material['calculated_needed'] ?? 0;
                                                 $quantity_class = 'quantity-display';
                                                 $is_completed = $acquired >= $needed;
                                                 
@@ -698,13 +794,26 @@ try {
                                         </ul>
                                     <?php endif; ?>
 
-                                    <!-- ADD THIS SECTION FOR PROJECT IMAGES -->
-                                    <div class="project-images-section" style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
-                                        <h4 class="content-title">Project Images</h4>
-                                        <div id="projectImagesContainer" class="images-container">
-                                            <?php
-                                            // Display existing project images
-                                            if ($has_project_images && $conn) {
+                                    <!-- ADD THIS NEW SECTION: Project Images Button (Only show when all materials are obtained) -->
+                                    <?php if ($has_materials && $all_materials_obtained && !in_array(1, $completed_stages) && $current_stage == 1): ?>
+                                    <div class="project-images-prompt" style="margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 8px; border: 1px dashed #ddd;">
+                                        <h4 class="content-title" style="margin-top: 0;">
+                                            <i class="fas fa-camera"></i> Ready for Project Images
+                                        </h4>
+                                        <p style="margin-bottom: 15px; color: #666;">
+                                            All materials have been obtained! Now you can upload project images to document your work.
+                                            Upload at least one project image before proceeding to the next stage.
+                                        </p>
+                                        <button type="button" class="btn primary" onclick="openProjectImageUploadModal()">
+                                            <i class="fas fa-camera"></i> Upload Project Images
+                                        </button>
+                                        
+                                        <!-- Display existing project images if any -->
+                                        <?php if ($has_project_images): ?>
+                                        <div style="margin-top: 15px;">
+                                            <p><strong>Already uploaded images:</strong></p>
+                                            <div id="projectImagesContainer" class="images-container" style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px;">
+                                                <?php
                                                 try {
                                                     $images_query = $conn->prepare("SELECT * FROM project_images WHERE project_id = ? ORDER BY uploaded_at DESC");
                                                     $images_query->bind_param("i", $project_id);
@@ -712,23 +821,20 @@ try {
                                                     $project_images = $images_query->get_result()->fetch_all(MYSQLI_ASSOC);
                                                     
                                                     foreach ($project_images as $image) {
-                                                        echo '<div class="image-preview">';
-                                                        echo '<img src="' . htmlspecialchars($image['image_path']) . '" alt="Project Image">';
-                                                        echo '<button class="remove-image-btn" data-image-id="' . $image['image_id'] . '" onclick="removeProjectImage(' . $image['image_id'] . ')">&times;</button>';
+                                                        echo '<div class="image-preview" style="width: 100px; height: 100px; position: relative;">';
+                                                        echo '<img src="' . htmlspecialchars($image['image_path']) . '" alt="Project Image" style="width: 100%; height: 100%; object-fit: cover; border-radius: 4px;">';
+                                                        echo '<button class="remove-image-btn" data-image-id="' . $image['image_id'] . '" onclick="removeProjectImage(' . $image['image_id'] . ')" style="position: absolute; top: -5px; right: -5px; background: red; color: white; border: none; border-radius: 50%; width: 20px; height: 20px; cursor: pointer;">&times;</button>';
                                                         echo '</div>';
                                                     }
                                                 } catch (Exception $e) {
-                                                    echo '<div class="empty-state">Error loading images</div>';
+                                                    echo '<div class="empty-state small">Error loading images</div>';
                                                 }
-                                            } else {
-                                                echo '<div class="empty-state">No project images yet. Upload at least one image to proceed.</div>';
-                                            }
-                                            ?>
+                                                ?>
+                                            </div>
                                         </div>
-                                        <button type="button" class="btn primary" onclick="openProjectImageUploadModal()" style="margin-top: 15px;">
-                                            <i class="fas fa-camera"></i> Upload Project Images
-                                        </button>
+                                        <?php endif; ?>
                                     </div>
+                                    <?php endif; ?>
 
                                     <div class="stage-actions">
                                         <button class="btn primary" onclick="openAddMaterialModal()" 
@@ -738,6 +844,7 @@ try {
                                         <?php if (!in_array(1, $completed_stages) && $current_stage == 1): ?>
                                             <?php
                                             // Check if all requirements are met for preparation phase
+                                            // Only require project images IF all materials are obtained
                                             $preparation_ready = $has_materials && $all_materials_obtained && $has_project_images;
                                             ?>
                                             <button class="btn secondary proceed-btn <?= $preparation_ready ? 'enabled' : '' ?>" 
@@ -756,7 +863,12 @@ try {
                                                 </div>
                                                 <div class="<?= $has_project_images ? 'requirement-met' : 'requirement-not-met' ?>">
                                                     <i class="fas <?= $has_project_images ? 'fa-check-circle' : 'fa-times-circle' ?>"></i>
-                                                    At least one project image attached
+                                                    At least one project image uploaded
+                                                    <?php if (!$has_project_images && $all_materials_obtained): ?>
+                                                        <div style="margin-top: 5px; font-size: 12px; color: #666;">
+                                                            Click "Upload Project Images" button above
+                                                        </div>
+                                                    <?php endif; ?>
                                                 </div>
                                             </div>
                                         <?php endif; ?>
@@ -1004,13 +1116,70 @@ try {
                                 
                                 <div class="stage-content">
                                     <form id="shareForm" method="POST">
+                                        <!-- Project Description Display -->
                                         <div class="form-group">
-                                            <label for="share_description">Project Description (for sharing)</label>
-                                            <textarea id="share_description" name="share_description" 
-                                                    placeholder="Describe your project for the community..."
-                                                    <?= !in_array(2, $completed_stages) ? 'disabled' : '' ?>>
-                                                <?= htmlspecialchars($project['share_description'] ?? '') ?>
-                                            </textarea>
+                                            <label>Project Description</label>
+                                            <div class="share-description-display">
+                                                <?= nl2br(htmlspecialchars($project['description'])) ?>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Final Project Image Section -->
+                                        <div class="form-group">
+                                            <label>Final Project Image *</label>
+                                            <div id="finalProjectImageContainer" class="final-image-container">
+                                                <?php
+                                                // Check if a final image has been uploaded
+                                                $has_final_image = false;
+                                                $final_image_path = '';
+                                                $final_image_id = '';
+                                                
+                                                if ($conn) {
+                                                    try {
+                                                        $final_image_check = $conn->prepare("
+                                                            SELECT image_path, image_id 
+                                                            FROM project_images 
+                                                            WHERE project_id = ? AND is_final_image = 1
+                                                        ");
+                                                        $final_image_check->bind_param("i", $project_id);
+                                                        $final_image_check->execute();
+                                                        $final_image_result = $final_image_check->get_result()->fetch_assoc();
+                                                        
+                                                        if ($final_image_result) {
+                                                            $has_final_image = true;
+                                                            $final_image_path = $final_image_result['image_path'];
+                                                            $final_image_id = $final_image_result['image_id'];
+                                                            
+                                                            // Show uploaded final image
+                                                            echo '<div class="final-image-preview">';
+                                                            echo '<img src="' . htmlspecialchars($final_image_path) . '" alt="Final Project">';
+                                                            echo '<button type="button" class="remove-final-image-btn" onclick="removeFinalProjectImage()">&times;</button>';
+                                                            echo '</div>';
+                                                        } else {
+                                                            // No final image yet - show upload area
+                                                            echo '<div class="final-image-upload-area" id="finalImageUploadArea">';
+                                                            echo '<div class="upload-icon"><i class="fas fa-camera fa-2x"></i></div>';
+                                                            echo '<div class="upload-text">Click to upload final project image</div>';
+                                                            echo '<div class="upload-hint">* Required for sharing to community</div>';
+                                                            echo '</div>';
+                                                        }
+                                                    } catch (Exception $e) {
+                                                        // Show upload area on error
+                                                        echo '<div class="final-image-upload-area" id="finalImageUploadArea">';
+                                                        echo '<div class="upload-icon"><i class="fas fa-camera fa-2x"></i></div>';
+                                                        echo '<div class="upload-text">Click to upload final project image</div>';
+                                                        echo '<div class="upload-hint">* Required for sharing to community</div>';
+                                                        echo '</div>';
+                                                    }
+                                                }
+                                                ?>
+                                            </div>
+                                            
+                                            <div class="image-upload-actions" style="margin-top: 10px;">
+                                                <button type="button" class="btn primary" onclick="openFinalImageUploadModal()">
+                                                    <i class="fas fa-camera"></i> Upload Final Image
+                                                </button>
+                                            </div>
                                         </div>
                                         
                                         <div class="share-options">
@@ -1030,6 +1199,7 @@ try {
                                         
                                         <input type="hidden" name="is_public" id="is_public" value="<?= $project['is_public'] ?? 0 ?>">
                                         
+                                        <!-- Materials Summary -->
                                         <div class="materials-summary">
                                             <div class="summary-title">Materials Used</div>
                                             <ul class="summary-list">
@@ -1041,23 +1211,30 @@ try {
                                                 <?php endforeach; ?>
                                             </ul>
                                         </div>
+                                        
+                                        <!-- Final Image ID for sharing -->
+                                        <input type="hidden" name="final_image_id" id="final_image_id" value="<?= $final_image_id ?>">
                                     </form>
                                 </div>
                                 
                                 <div class="stage-actions">
                                     <?php if (in_array(2, $completed_stages)): ?>
-                                    <?php if (!in_array(3, $completed_stages)): ?>
-                                    <button type="button" class="btn secondary" onclick="submitShareForm('private')">
-                                        Keep Private
-                                    </button>
-                                    <button type="button" class="btn primary" onclick="submitShareForm('public')">
-                                        Share to Community
-                                    </button>
-                                    <?php endif; ?>
+                                        <?php if (!in_array(3, $completed_stages)): ?>
+                                            <!-- Only show buttons when stage is not completed -->
+                                            <button type="button" class="btn secondary" onclick="submitShareForm('private')">
+                                                Keep Private
+                                            </button>
+                                            <button type="button" class="btn primary" onclick="submitShareForm('public')">
+                                                Share to Community
+                                            </button>
+                                        <?php else: ?>
+                                            <!-- When stage is completed, show nothing in stage-actions -->
+                                            <div style="height: 40px;"></div> <!-- Spacer to maintain layout -->
+                                        <?php endif; ?>
                                     <?php else: ?>
-                                    <div class="locked-message">
-                                        <i class="fas fa-lock"></i> Complete the Construction stage to unlock Sharing
-                                    </div>
+                                        <div class="locked-message">
+                                            <i class="fas fa-lock"></i> Complete the Construction stage to unlock Sharing
+                                        </div>
                                     <?php endif; ?>
                                 </div>
                             </div>
@@ -1244,6 +1421,34 @@ try {
             </div>
         </div>
     </div>
+
+    <!-- Final Project Image Upload Modal -->
+<div class="modal" id="finalImageModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title">Upload Final Project Image</h3>
+            <button class="close-modal" onclick="closeFinalImageModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="finalImageForm" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label for="finalProjectImage">Select final project image</label>
+                    <input type="file" id="finalProjectImage" name="final_project_image" accept="image/*" required>
+                    <small class="form-hint">This will be the main image displayed when sharing your project.</small>
+                </div>
+                <div id="finalImagePreview" class="final-image-preview-large"></div>
+                <input type="hidden" name="project_id" value="<?= $project_id ?>">
+                <input type="hidden" name="is_final_image" value="1">
+                <div class="modal-actions">
+                    <button type="button" class="action-btn" onclick="closeFinalImageModal()">Cancel</button>
+                    <button type="button" class="action-btn check-btn" onclick="uploadFinalProjectImage()">
+                        <i class="fas fa-upload"></i> Upload Final Image
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 
         <!-- Custom Confirmation Modal -->
     <div class="confirmation-modal" id="confirmationModal">
@@ -1883,33 +2088,40 @@ try {
         }
 
         function submitShareForm(option) {
-        // Check if construction stage is completed
-        if (!<?= in_array(2, $completed_stages) ? 'true' : 'false' ?>) {
-            showToast('Please complete the construction stage first.', 'error');
-            return;
-        }
-        
-        selectShareOption(option);
-        
-        const message = option === 'public' 
-            ? 'Are you sure you want to share this project with the community?' 
-            : 'Are you sure you want to keep this project private?';
-        
-        showConfirmation(
-            message,
-            'share_project',
-            function() {
-                const form = document.getElementById('shareForm');
-                const actionInput = document.createElement('input');
-                actionInput.type = 'hidden';
-                actionInput.name = 'share_project';
-                actionInput.value = '1';
-                form.appendChild(actionInput);
-                
-                form.submit();
+            // Check if construction stage is completed
+            if (!<?= in_array(2, $completed_stages) ? 'true' : 'false' ?>) {
+                showToast('Please complete the construction stage first.', 'error');
+                return;
             }
-        );
-    }
+            
+            // Check if final image is uploaded for public sharing
+            if (option === 'public' && !document.getElementById('final_image_id').value) {
+                showToast('Please upload a final project image before sharing.', 'error');
+                openFinalImageUploadModal();
+                return;
+            }
+            
+            selectShareOption(option);
+            
+            const message = option === 'public' 
+                ? 'Are you sure you want to share this project with the community?' 
+                : 'Are you sure you want to keep this project private?';
+            
+            showConfirmation(
+                message,
+                'share_project',
+                function() {
+                    const form = document.getElementById('shareForm');
+                    const actionInput = document.createElement('input');
+                    actionInput.type = 'hidden';
+                    actionInput.name = 'share_project';
+                    actionInput.value = '1';
+                    form.appendChild(actionInput);
+                    
+                    form.submit();
+                }
+            );
+        }
         
         // Feedback Modal functionality
         document.addEventListener("DOMContentLoaded", function () {
@@ -3092,6 +3304,247 @@ document.getElementById('addStepForm')?.addEventListener('submit', function(e) {
     document.body.appendChild(form);
     form.submit();
 });
+
+// Final Project Image Functions
+function openFinalImageUploadModal() {
+    document.getElementById('finalImageModal').classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeFinalImageModal() {
+    document.getElementById('finalImageModal').classList.remove('active');
+    document.body.style.overflow = '';
+    document.getElementById('finalImageForm').reset();
+    document.getElementById('finalImagePreview').innerHTML = '';
+}
+
+// Click on upload area to open modal
+document.addEventListener('DOMContentLoaded', function() {
+    const uploadArea = document.getElementById('finalImageUploadArea');
+    if (uploadArea) {
+        uploadArea.addEventListener('click', function() {
+            openFinalImageUploadModal();
+        });
+    }
+});
+
+// Preview final image in modal
+document.getElementById('finalProjectImage')?.addEventListener('change', function(e) {
+    const file = this.files[0];
+    const previewContainer = document.getElementById('finalImagePreview');
+    previewContainer.innerHTML = '';
+    
+    if (file && file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const img = document.createElement('img');
+            img.src = e.target.result;
+            img.className = 'final-image-preview-large';
+            previewContainer.appendChild(img);
+        }
+        reader.readAsDataURL(file);
+    }
+});
+
+// Upload final project image
+function uploadFinalProjectImage() {
+    const formElement = document.getElementById('finalImageForm');
+    const file = document.getElementById('finalProjectImage').files[0];
+    
+    if (!file) {
+        showToast('Please select an image to upload', 'error');
+        return;
+    }
+    
+    // Validate file
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+        showToast(`"${file.name}" is not a valid image type`, 'error');
+        return;
+    }
+    
+    if (file.size > 5 * 1024 * 1024) {
+        showToast(`"${file.name}" exceeds 5MB limit`, 'error');
+        return;
+    }
+    
+    const formData = new FormData(formElement);
+    const uploadBtn = document.querySelector('#finalImageModal .check-btn');
+    const originalText = uploadBtn.innerHTML;
+    
+    uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading...';
+    uploadBtn.disabled = true;
+    
+    fetch('upload_final_image.php', {
+        method: 'POST',
+        body: formData,
+        credentials: 'same-origin'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            showToast('Final image uploaded successfully!');
+            
+            // Update the display with new image
+            updateFinalImageDisplay(data.image_path, data.image_id);
+            
+            // Close modal after delay
+            setTimeout(() => {
+                closeFinalImageModal();
+            }, 1500);
+        } else {
+            showToast(data.message || 'Upload failed', 'error');
+            uploadBtn.innerHTML = originalText;
+            uploadBtn.disabled = false;
+        }
+    })
+    .catch(error => {
+        console.error('Upload error:', error);
+        showToast('Failed to upload image. Please try again.', 'error');
+        uploadBtn.innerHTML = originalText;
+        uploadBtn.disabled = false;
+    });
+}
+
+// Update final image display
+function updateFinalImageDisplay(imagePath, imageId) {
+    const container = document.getElementById('finalProjectImageContainer');
+    
+    container.innerHTML = `
+        <div class="final-image-preview">
+            <img src="${imagePath}" alt="Final Project">
+            <button type="button" class="remove-final-image-btn" onclick="removeFinalProjectImage()">&times;</button>
+        </div>
+    `;
+    
+    // Store the final image ID for sharing
+    document.getElementById('final_image_id').value = imageId;
+}
+
+// Remove final project image
+function removeFinalProjectImage() {
+    if (confirm('Are you sure you want to remove the final project image?')) {
+        fetch('remove_final_image.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: 'project_id=' + <?= $project_id ?>
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                showToast('Final image removed successfully!');
+                
+                // Update display back to upload area
+                const container = document.getElementById('finalProjectImageContainer');
+                container.innerHTML = `
+                    <div class="final-image-upload-area" id="finalImageUploadArea">
+                        <div class="upload-icon"><i class="fas fa-camera fa-2x"></i></div>
+                        <div class="upload-text">Click to upload final project image</div>
+                        <div class="upload-hint">* Required for sharing to community</div>
+                    </div>
+                `;
+                
+                // Re-add click event to new upload area
+                const uploadArea = document.getElementById('finalImageUploadArea');
+                if (uploadArea) {
+                    uploadArea.addEventListener('click', function() {
+                        openFinalImageUploadModal();
+                    });
+                }
+                
+                // Clear the final image ID
+                document.getElementById('final_image_id').value = '';
+            } else {
+                showToast(data.message || 'Error removing image', 'error');
+            }
+        })
+        .catch(error => {
+            showToast('Failed to remove image', 'error');
+        });
+    }
+}
+
+// Update submitShareForm to check for final image
+function submitShareForm(option) {
+    // Check if construction stage is completed
+    if (!<?= in_array(2, $completed_stages) ? 'true' : 'false' ?>) {
+        showToast('Please complete the construction stage first.', 'error');
+        return;
+    }
+    
+    // Check if final image is uploaded for public sharing
+    if (option === 'public') {
+        const finalImageId = document.getElementById('final_image_id').value;
+        const hasFinalImage = finalImageId && finalImageId !== '';
+        
+        if (!hasFinalImage) {
+            showToast('Please upload a final project image before sharing to the community.', 'error');
+            openFinalImageUploadModal();
+            return;
+        }
+    }
+    
+    selectShareOption(option);
+    
+    const message = option === 'public' 
+        ? 'Are you sure you want to share this project with the community? It will be visible in the Recycled Ideas feed.' 
+        : 'Are you sure you want to keep this project private? It will only be visible in your profile.';
+    
+    showConfirmation(
+        message,
+        'share_project',
+        function() {
+            const form = document.getElementById('shareForm');
+            const actionInput = document.createElement('input');
+            actionInput.type = 'hidden';
+            actionInput.name = 'share_project';
+            actionInput.value = '1';
+            form.appendChild(actionInput);
+            
+            form.submit();
+        }
+    );
+}
+
+// Function to check if all materials are obtained and show project images section
+function checkMaterialsCompletion() {
+    const materialItems = document.querySelectorAll('.material-item');
+    let allCompleted = true;
+    
+    materialItems.forEach(item => {
+        const quantitySpan = item.querySelector('.quantity-display');
+        if (quantitySpan) {
+            const text = quantitySpan.textContent;
+            const parts = text.split('/');
+            if (parts.length === 2) {
+                const acquired = parseInt(parts[0]);
+                const needed = parseInt(parts[1]);
+                if (acquired < needed) {
+                    allCompleted = false;
+                }
+            }
+        }
+    });
+    
+    // Show/hide project images prompt based on completion
+    const projectImagesPrompt = document.querySelector('.project-images-prompt');
+    if (projectImagesPrompt) {
+        projectImagesPrompt.style.display = allCompleted ? 'block' : 'none';
+    }
+    
+    return allCompleted;
+}
+
+// Call this function whenever material quantities are updated
+// Add this to your updateMaterialDisplay function:
+function updateMaterialDisplay(materialId, acquiredQuantity) {
+    // ... existing code ...
+    
+    // Check if all materials are now complete
+    setTimeout(checkMaterialsCompletion, 100);
+}
 
     </script>
 </body>

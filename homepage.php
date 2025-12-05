@@ -827,8 +827,38 @@ function render_comments($comments, $donation_id, $parent_id = NULL) {
 
 <!-- Recycled Ideas Tab Content -->
 <div id="recycled-ideas" class="tab-content" style="display:none;">
-    <?php if (count($ideas) === 0): ?>
-        <!-- START OF SAMPLE POSTS -->
+    <?php
+    // Query real shared projects from recycled_ideas table
+    try {
+        $conn = getDBConnection();
+        
+        $recycled_ideas_query = "
+            SELECT 
+                idea_id,
+                title,
+                description,
+                author,
+                image_path,
+                posted_at
+            FROM recycled_ideas 
+            ORDER BY posted_at DESC
+            LIMIT 10
+        ";
+        
+        $result = $conn->query($recycled_ideas_query);
+        $recycled_ideas = $result->fetch_all(MYSQLI_ASSOC);
+        
+    } catch (Exception $e) {
+        $recycled_ideas = [];
+        error_log("Error fetching recycled ideas: " . $e->getMessage());
+    }
+    
+    // Fallback to sample data if no real ideas exist yet
+    $display_ideas = !empty($recycled_ideas) ? $recycled_ideas : [];
+    ?>
+    
+    <?php if (empty($display_ideas)): ?>
+        <!-- START OF SAMPLE POSTS (Only shown when no real ideas exist) -->
         <!-- Sample Post 1: Plastic Planters -->
         <div class="idea-card">
             <div class="idea-header">
@@ -844,7 +874,7 @@ function render_comments($comments, $donation_id, $parent_id = NULL) {
             </div>
             <p class="idea-description">Cute recycled plant base using plastic bottles. Perfect for small herbs and succulents!</p>
             <div class="idea-actions">
-                <button class="action-btn">Try This Idea</button>
+                <button class="action-btn" onclick="tryThisIdea('Plastic Planters')">Try This Idea</button>
                 <span class="comments">34 Comments</span>
             </div>
         </div>
@@ -864,7 +894,7 @@ function render_comments($comments, $donation_id, $parent_id = NULL) {
             </div>
             <p class="idea-description">Transform old glass jars into beautiful outdoor lanterns with LED lights.</p>
             <div class="idea-actions">
-                <button class="action-btn">Try This Idea</button>
+                <button class="action-btn" onclick="tryThisIdea('Glass Jar Lanterns')">Try This Idea</button>
                 <span class="comments">27 Comments</span>
             </div>
         </div>
@@ -884,7 +914,7 @@ function render_comments($comments, $donation_id, $parent_id = NULL) {
             </div>
             <p class="idea-description">Create stylish desk organizers from cardboard boxes. Paint and decorate to match your style.</p>
             <div class="idea-actions">
-                <button class="action-btn">Try This Idea</button>
+                <button class="action-btn" onclick="tryThisIdea('Cardboard Organizers')">Try This Idea</button>
                 <span class="comments">41 Comments</span>
             </div>
         </div>
@@ -904,7 +934,7 @@ function render_comments($comments, $donation_id, $parent_id = NULL) {
             </div>
             <p class="idea-description">Musical wind chimes made from recycled tin cans. Paint them in bright colors for a cheerful garden addition.</p>
             <div class="idea-actions">
-                <button class="action-btn">Try This Idea</button>
+                <button class="action-btn" onclick="tryThisIdea('Tin Can Wind Chimes')">Try This Idea</button>
                 <span class="comments">19 Comments</span>
             </div>
         </div>
@@ -924,29 +954,67 @@ function render_comments($comments, $donation_id, $parent_id = NULL) {
             </div>
             <p class="idea-description">Colorful wall art created from collected bottle caps. Arrange them in patterns to create stunning mosaics.</p>
             <div class="idea-actions">
-                <button class="action-btn">Try This Idea</button>
+                <button class="action-btn" onclick="tryThisIdea('Bottle Cap Mosaic')">Try This Idea</button>
                 <span class="comments">52 Comments</span>
             </div>
         </div>
         <!-- END OF SAMPLE POSTS -->
     <?php else: ?>
-        <?php foreach ($ideas as $idea): ?>
+        <!-- Display real recycled ideas from database -->
+        <?php foreach ($display_ideas as $idea): ?>
         <div class="idea-card">
             <div class="idea-header">
                 <h3><?= htmlspecialchars($idea['title']) ?></h3>
                 <div class="idea-meta">
                     <span class="author"><?= htmlspecialchars($idea['author']) ?></span>
-                    <span class="time-ago"><?= htmlspecialchars(date('M d, Y', strtotime($idea['posted_at']))) ?></span>
+                    <span class="time-ago">
+                        <?php 
+                        if ($idea['posted_at']) {
+                            // Calculate time ago
+                            $posted_time = strtotime($idea['posted_at']);
+                            $current_time = time();
+                            $time_diff = $current_time - $posted_time;
+                            
+                            if ($time_diff < 60) {
+                                echo 'Just now';
+                            } elseif ($time_diff < 3600) {
+                                echo floor($time_diff / 60) . ' minutes ago';
+                            } elseif ($time_diff < 86400) {
+                                echo floor($time_diff / 3600) . ' hours ago';
+                            } elseif ($time_diff < 604800) {
+                                echo floor($time_diff / 86400) . ' days ago';
+                            } elseif ($time_diff < 2592000) {
+                                echo floor($time_diff / 604800) . ' weeks ago';
+                            } else {
+                                echo date('M d, Y', $posted_time);
+                            }
+                        } else {
+                            echo 'Recently';
+                        }
+                        ?>
+                    </span>
                 </div>
             </div>
             <?php if (!empty($idea['image_path'])): ?>
             <div class="idea-image-container">
-                <img src="<?= htmlspecialchars($idea['image_path']) ?>" alt="<?= htmlspecialchars($idea['title']) ?>" class="idea-image">
+                <img src="<?= htmlspecialchars($idea['image_path']) ?>" 
+                     alt="<?= htmlspecialchars($idea['title']) ?>" 
+                     class="idea-image"
+                     onerror="this.src='assets/img/default-project-image.jpg'">
             </div>
             <?php endif; ?>
-            <p class="idea-description"><?= htmlspecialchars($idea['description']) ?></p>
+            <p class="idea-description">
+                <?php 
+                $description = htmlspecialchars($idea['description']);
+                if (strlen($description) > 150) {
+                    echo substr($description, 0, 150) . '...';
+                } else {
+                    echo $description;
+                }
+                ?>
+            </p>
             <div class="idea-actions">
-                <button class="action-btn">Try This Idea</button>
+                <button class="action-btn" onclick="tryThisIdea('<?= addslashes($idea['title']) ?>')">Try This Idea</button>
                 <span class="comments">0 Comments</span>
             </div>
         </div>
@@ -2006,6 +2074,39 @@ document.addEventListener("DOMContentLoaded", function() {
     });
   }
 });
+
+// JavaScript function to handle "Try This Idea" button
+function tryThisIdea(ideaTitle) {
+    // Check if user is logged in
+    <?php if (isset($_SESSION['logged_in']) && $_SESSION['logged_in']): ?>
+        // Ask user if they want to create a new project based on this idea
+        if (confirm('Would you like to create a new project inspired by "' + ideaTitle + '"?')) {
+            // Create a new project with this title as inspiration
+            window.location.href = 'create_project.php?inspiration=' + encodeURIComponent(ideaTitle);
+        }
+    <?php else: ?>
+        // User not logged in - prompt to login
+        if (confirm('You need to be logged in to try this idea. Go to login page?')) {
+            window.location.href = 'login.php?redirect=' + encodeURIComponent(window.location.href);
+        }
+    <?php endif; ?>
+}
+
+// If you want to link to the original project (when project_id is available)
+function tryThisProject(projectId) {
+    <?php if (isset($_SESSION['logged_in']) && $_SESSION['logged_in']): ?>
+        // Ask user if they want to create a copy of this project
+        if (confirm('Would you like to create your own version of this project?')) {
+            // Redirect to create project page with template ID
+            window.location.href = 'create_project.php?template=' + projectId;
+        }
+    <?php else: ?>
+        // User not logged in - prompt to login
+        if (confirm('You need to be logged in to try this idea. Go to login page?')) {
+            window.location.href = 'login.php?redirect=' + encodeURIComponent(window.location.href);
+        }
+    <?php endif; ?>
+}
 
 </script>
 
