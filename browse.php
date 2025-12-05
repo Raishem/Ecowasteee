@@ -23,6 +23,27 @@
     $user_result = $user_query->get_result();
     $user_data = $user_result->fetch_assoc();
 
+    // Check for return URL parameter
+    $return_url = isset($_GET['return_url']) ? urldecode($_GET['return_url']) : '';
+    $search_query = isset($_GET['search']) ? trim($_GET['search']) : '';
+    $search_type = isset($_GET['type']) ? $_GET['type'] : 'all';
+    $source = isset($_GET['source']) ? $_GET['source'] : '';
+    $material_id = isset($_GET['material_id']) ? (int)$_GET['material_id'] : 0;
+
+    // Validate return URL to prevent open redirect vulnerability
+    $allowed_domains = ['localhost', 'yourdomain.com']; // Add your actual domain
+    $is_valid_return_url = false;
+
+    if ($return_url) {
+        $parsed_url = parse_url($return_url);
+        if (isset($parsed_url['host'])) {
+            $is_valid_return_url = in_array($parsed_url['host'], $allowed_domains);
+        } else {
+            // Relative URL - allow it
+            $is_valid_return_url = true;
+        }
+    }
+
     // --- Fetch user's projects (for request popup dropdown) --- //
     $user_projects = [];
     $proj_stmt = $conn->prepare("SELECT project_id, project_name FROM projects WHERE user_id = ?");
@@ -265,6 +286,26 @@ $donations = $result->fetch_all(MYSQLI_ASSOC);
             </aside>
             
             <main class="main-content">
+                <!-- In browse.php, add this near the top of your content area -->
+                <div class="page-header">
+                    <?php if ($source === 'project' && $is_valid_return_url && $return_url): ?>
+                        <div class="back-to-project" style="margin-bottom: 15px;">
+                            <a href="<?= htmlspecialchars($return_url) ?>" class="back-link">
+                                <i class="fas fa-arrow-left"></i> Back to Project
+                            </a>
+                            <?php if ($search_query): ?>
+                                <div class="search-context" style="margin-top: 5px; font-size: 14px; color: #666;">
+                                    Searching for donations of: <strong><?= htmlspecialchars($search_query) ?></strong>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                    <?php elseif ($source === 'project' && $search_query): ?>
+                        <div class="search-context" style="margin-bottom: 15px; padding: 10px; background: #f0f7ff; border-radius: 6px;">
+                            <i class="fas fa-search" style="margin-right: 8px;"></i>
+                            Searching for donations of: <strong><?= htmlspecialchars($search_query) ?></strong>
+                        </div>
+                    <?php endif; ?>
+                </div>
 
             <!-- Success/Error Messages -->
         <?php if (isset($_SESSION['password_success'])): ?>
