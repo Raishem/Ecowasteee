@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Nov 30, 2025 at 01:03 PM
+-- Generation Time: Dec 05, 2025 at 12:51 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -175,7 +175,9 @@ INSERT INTO `donations` (`donation_id`, `donor_id`, `item_name`, `category`, `su
 (83, 8, 'Newspapers (Paper)', 'Paper', 'Newspapers', 6, 4, 'Available', '2025-10-18 15:17:48', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '[\"assets\\/uploads\\/68f33f1c738ae_limpopomirror-avz-20240306.jpeg\"]', '4 unused newspapers'),
 (85, 4, 'Aluminum Cans (Metal)', 'Metal', 'Aluminum Cans', 1, 4, 'Available', '2025-10-26 23:55:39', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '[\"assets\\/uploads\\/68fe447b14179_12_oz_cans_2_2.png\"]', 'four'),
 (93, 12, 'Aluminum Cans (Metal)', 'Metal', 'Aluminum Cans', 3, 3, 'Available', '2025-11-20 11:11:00', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '[\"assets\\/uploads\\/691e86c4e3163_12oz-Brite-2.jpg\"]', '3 clean aluminum cans'),
-(103, 18, 'Plastic Bags (Plastic)', 'Plastic', 'Plastic Bags', 3, 3, 'Available', '2025-11-25 01:10:55', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '[\"assets\\/uploads\\/6924919f575d7_1520092420335.jpg\"]', '3 clean plastic bags');
+(103, 18, 'Plastic Bags (Plastic)', 'Plastic', 'Plastic Bags', 2, 3, 'Available', '2025-11-25 01:10:55', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '[\"assets\\/uploads\\/6924919f575d7_1520092420335.jpg\"]', '3 clean plastic bags'),
+(104, 19, 'Newspapers (Paper)', 'Paper', 'Newspapers', 2, 3, 'Completed', '2025-12-02 15:55:18', NULL, NULL, '2025-12-04 00:00:00', NULL, NULL, NULL, NULL, NULL, '[\"assets\\/uploads\\/692e9b667d08e_limpopomirror-avz-20240306.jpeg\"]', '3 unused newspapers'),
+(106, 21, 'Cardboard (Paper)', 'Paper', 'Cardboard', 3, 3, 'Available', '2025-12-04 15:53:29', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '[\"assets\\/uploads\\/69313df9989df_IMG_7102.jpg\",\"assets\\/uploads\\/69313df99951f_IMG_703.jpg\"]', '3 Clean unused cardboards.');
 
 -- --------------------------------------------------------
 
@@ -210,7 +212,9 @@ INSERT INTO `donation_requests` (`request_id`, `donation_id`, `user_id`, `quanti
 (20, 81, 4, 2, '', 'Medium', '2025-10-17 17:27:13', NULL, NULL, 'Pending', 14, 'approved', NULL, NULL, NULL, NULL),
 (30, 51, 8, 4, '', 'Medium', '2025-10-18 08:12:07', NULL, NULL, 'Pending', 4, 'pending', NULL, NULL, NULL, NULL),
 (37, 85, 8, 3, '', 'Medium', '2025-11-12 17:14:50', NULL, NULL, 'Pending', 4, 'pending', NULL, NULL, NULL, NULL),
-(38, 51, 18, 3, '', 'Medium', '2025-11-26 18:08:24', '2025-11-29', '2025-11-30', 'Delivered', 21, 'approved', '2025-11-29', '2025-11-30', '2025-12-02', '2025-11-30');
+(38, 51, 18, 3, '', 'Medium', '2025-11-26 18:08:24', '2025-11-29', '2025-11-30', 'Delivered', 21, 'approved', '2025-11-29', '2025-11-30', '2025-12-02', '2025-11-30'),
+(39, 103, 19, 2, '', 'Low', '2025-12-02 07:57:21', NULL, NULL, 'Pending', 22, 'approved', NULL, NULL, NULL, NULL),
+(40, 104, 21, 2, '', 'Low', '2025-12-04 08:01:28', '2025-12-04', '2025-12-04', 'Delivered', 23, 'approved', '2025-12-04', '2025-12-04', '2025-12-05', '2025-12-04');
 
 -- --------------------------------------------------------
 
@@ -298,7 +302,17 @@ CREATE TABLE `material_photos` (
 --
 
 INSERT INTO `material_photos` (`id`, `material_id`, `project_id`, `photo_path`, `photo_type`, `uploaded_by`, `uploaded_at`) VALUES
-(1, 17, 20, 'assets/uploads/materials/mat_6927010357723.jpg', 'after', 4, '2025-11-26 21:30:43');
+(1, 17, 20, 'assets/uploads/materials/mat_6927010357723.jpg', 'after', 4, '2025-11-26 21:30:43'),
+(7, 72, 16, 'assets/uploads/materials/mat_692dccff8988b.png', 'before', 4, '2025-12-02 01:14:39'),
+(9, 73, 16, 'assets/uploads/materials/mat_692dd82045431.png', 'before', 4, '2025-12-02 02:02:08'),
+(10, 74, 16, 'assets/uploads/materials/mat_692dd83f7d3c3.png', 'before', 4, '2025-12-02 02:02:39'),
+(11, 6, 2, 'assets/uploads/materials/mat_692ddf756d820.png', 'before', 4, '2025-12-02 02:33:25'),
+(13, 76, 6, 'assets/uploads/materials/mat_692e65ac3113d.png', 'before', 4, '2025-12-02 12:06:04'),
+(14, 77, 1, 'assets/uploads/materials/mat_692e706a544dd.png', 'before', 4, '2025-12-02 12:51:54'),
+(15, 75, 2, 'assets/uploads/materials/mat_692e72344ecca.png', 'before', 4, '2025-12-02 12:59:32'),
+(16, 79, 8, 'assets/uploads/materials/mat_692f12232813b.png', 'before', 4, '2025-12-03 00:21:55'),
+(17, 78, 22, 'assets/uploads/materials/mat_693147eab1dda.jpg', 'before', 19, '2025-12-04 16:35:54'),
+(18, 81, 22, 'assets/uploads/materials/mat_693153ee68583.jpg', 'before', 19, '2025-12-04 17:27:10');
 
 -- --------------------------------------------------------
 
@@ -392,17 +406,39 @@ CREATE TABLE `projects` (
 
 INSERT INTO `projects` (`project_id`, `user_id`, `project_name`, `description`, `created_at`, `status`, `completed_at`) VALUES
 (1, 4, 'Pencil Holder', 'Cute Pencil Holder', '2025-09-01 01:10:22', 'In Progress', NULL),
-(2, 4, 'Plastic Holder', 'Nice Plastic Holder', '2025-09-03 15:32:57', 'Completed', NULL),
 (4, 8, 'Plastic Vase', '', '2025-09-20 10:11:04', 'In Progress', NULL),
-(6, 4, 'Plastic Vase', '', '2025-09-20 10:17:05', 'In Progress', NULL),
+(6, 4, 'Newspaper Flower', 'Cute Newspaper flower', '2025-09-20 10:17:05', 'In Progress', NULL),
 (8, 4, 'Plastic Vase', '', '2025-09-20 10:21:24', 'In Progress', NULL),
-(10, 4, 'Plastic Vase', '', '2025-09-20 10:21:26', 'In Progress', NULL),
-(12, 4, 'Basket', '', '2025-09-20 10:23:40', 'In Progress', NULL),
-(14, 4, 'Basket', '', '2025-09-20 10:24:05', 'In Progress', NULL),
-(16, 4, 'Fruit Basket', '', '2025-09-20 10:24:36', 'In Progress', NULL),
-(19, 4, 'Basket', '', '2025-09-20 10:29:33', 'Completed', '2025-09-20 11:34:12'),
+(14, 4, 'Basket', 'yuttttttttttttttttttttttttttttrar', '2025-09-20 10:24:05', 'In Progress', NULL),
 (20, 4, 'Plastic Lights', 'CuteightsfffffffffffffffffddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddXCXCDC', '2025-10-07 19:48:50', 'In Progress', NULL),
-(21, 18, 'Plastic Lantern', 'Very unique plastic lantern for christmas', '2025-11-27 02:07:15', 'In Progress', NULL);
+(21, 18, 'Plastic Lantern', 'Very unique plastic lantern for christmas', '2025-11-27 02:07:15', 'In Progress', NULL),
+(22, 19, 'Plastic Lantern', 'Cute plastic lantern', '2025-12-02 15:56:58', 'In Progress', NULL),
+(23, 21, 'Newspaper Star Lantern', 'Recycled Star Lantern for Christmas!', '2025-12-04 16:00:15', 'In Progress', NULL),
+(24, 4, 'foreal', 'ffforeal', '2025-12-04 20:00:21', 'In Progress', NULL);
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `project_images`
+--
+
+CREATE TABLE `project_images` (
+  `image_id` int(11) NOT NULL,
+  `project_id` int(11) NOT NULL,
+  `image_path` varchar(255) NOT NULL,
+  `uploaded_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `is_final_image` tinyint(1) DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `project_images`
+--
+
+INSERT INTO `project_images` (`image_id`, `project_id`, `image_path`, `uploaded_at`, `is_final_image`) VALUES
+(3, 14, 'uploads/project_images/14/6931e9d8b3768_1764878808.jpg', '2025-12-04 20:06:48', 0),
+(4, 14, 'uploads/project_final_images/final_6932a3de517897.52590104_1764926430.jpg', '2025-12-05 09:20:30', 1),
+(6, 6, 'uploads/project_images/6/6932c3646159d_1764934500_0.jpeg', '2025-12-05 11:35:00', 0),
+(7, 6, 'uploads/project_final_images/final_6932c4015b4233.72797426_1764934657.jpg', '2025-12-05 11:37:37', 1);
 
 -- --------------------------------------------------------
 
@@ -417,24 +453,26 @@ CREATE TABLE `project_materials` (
   `quantity` int(11) DEFAULT NULL,
   `status` enum('needed','requested','donated','received','completed') NOT NULL DEFAULT 'needed',
   `unit` varchar(64) DEFAULT NULL,
-  `created_at` datetime DEFAULT current_timestamp()
+  `created_at` datetime DEFAULT current_timestamp(),
+  `original_quantity` int(11) DEFAULT NULL,
+  `acquired_quantity` int(11) DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `project_materials`
 --
 
-INSERT INTO `project_materials` (`material_id`, `project_id`, `material_name`, `quantity`, `status`, `unit`, `created_at`) VALUES
-(1, 1, 'Cardboard', 2, 'needed', '', '2025-11-29 21:05:49'),
-(2, 1, 'Hot Glue', 1, 'needed', '', '2025-11-29 21:05:49'),
-(3, 1, 'Scissors', 1, 'needed', '', '2025-11-29 21:05:49'),
-(4, 1, 'Stickers', 1, 'needed', '', '2025-11-29 21:05:49'),
-(5, 1, 'Colored Papers', 10, 'needed', '', '2025-11-29 21:05:49'),
-(6, 2, 'Plastic', 2, 'needed', '', '2025-11-29 21:05:49'),
-(7, 2, 'color papers', 5, 'needed', '', '2025-11-29 21:05:49'),
-(17, 20, 'Plastic Cups', 12, 'completed', '', '2025-11-29 21:05:49'),
-(18, 21, 'Plastic', 12, 'needed', '', '2025-11-29 21:05:49'),
-(19, 19, 'Plastic', 4, 'needed', 'pcs', '2025-11-29 21:11:31');
+INSERT INTO `project_materials` (`material_id`, `project_id`, `material_name`, `quantity`, `status`, `unit`, `created_at`, `original_quantity`, `acquired_quantity`) VALUES
+(18, 21, 'Plastic', 12, 'needed', '', '2025-11-29 21:05:49', NULL, 0),
+(77, 1, 'Plastic Containers', 0, '', '', '2025-12-02 12:51:41', 10, 0),
+(78, 22, 'Plastic Bags', 0, '', NULL, '2025-12-02 15:56:58', NULL, 0),
+(79, 8, 'Cardboard', 0, '', '', '2025-12-03 00:21:47', 3, 0),
+(80, 23, 'Newspaper', 2, 'needed', NULL, '2025-12-04 16:00:15', NULL, 0),
+(81, 22, 'Cardboard', 0, '', '', '2025-12-04 17:26:59', NULL, 0),
+(82, 24, 'plastic', 1, 'needed', NULL, '2025-12-04 20:49:26', NULL, 0),
+(83, 20, 'plastic', 1, 'needed', NULL, '2025-12-04 23:05:09', NULL, 0),
+(84, 14, 'Cardboard', 10, 'needed', NULL, '2025-12-05 00:12:20', NULL, 10),
+(95, 6, 'Newspapers', 12, 'needed', NULL, '2025-12-05 19:11:33', NULL, 12);
 
 -- --------------------------------------------------------
 
@@ -478,6 +516,22 @@ CREATE TABLE `project_stages` (
   `completed_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Dumping data for table `project_stages`
+--
+
+INSERT INTO `project_stages` (`stage_id`, `project_id`, `stage_number`, `stage_name`, `description`, `is_completed`, `completed_at`) VALUES
+(0, 24, 1, '', NULL, 1, '2025-12-04 20:49:42'),
+(0, 24, 2, '', NULL, 1, '2025-12-04 20:59:47'),
+(0, 20, 1, '', NULL, 1, '2025-12-04 23:05:14'),
+(0, 14, 1, '', NULL, 1, '2025-12-05 04:12:46'),
+(0, 14, 2, '', NULL, 1, '2025-12-05 14:09:27'),
+(0, 14, 3, '', NULL, 1, '2025-12-05 17:45:43'),
+(0, 14, 3, '', NULL, 1, '2025-12-05 17:47:22'),
+(0, 6, 1, '', NULL, 1, '2025-12-05 19:35:06'),
+(0, 6, 2, '', NULL, 1, '2025-12-05 19:36:20'),
+(0, 6, 3, '', NULL, 1, '2025-12-05 19:38:26');
+
 -- --------------------------------------------------------
 
 --
@@ -495,6 +549,38 @@ CREATE TABLE `project_steps` (
   `is_done` tinyint(1) DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Dumping data for table `project_steps`
+--
+
+INSERT INTO `project_steps` (`step_id`, `project_id`, `step_number`, `title`, `instructions`, `created_at`, `updated_at`, `is_done`) VALUES
+(1, 14, 1, 'Step 1: Assemble', 'Description for: Step 1: Assemble', '2025-12-05 04:13:50', '2025-12-05 13:38:58', 0),
+(2, 24, 1, 'Step 1: Assemble', '', '2025-12-04 20:59:40', '2025-12-05 12:58:57', 0),
+(4, 14, 2, 'Step 2: Design', 'Design the items', '2025-12-05 13:57:06', '2025-12-05 13:57:06', 0),
+(5, 6, 1, 'Step 1: Assemble it', 'Assemble the newspapers', '2025-12-05 19:35:41', '2025-12-05 19:35:41', 0);
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `project_step_images`
+--
+
+CREATE TABLE `project_step_images` (
+  `step_image_id` int(11) NOT NULL,
+  `step_id` int(11) NOT NULL,
+  `image_path` varchar(255) NOT NULL,
+  `uploaded_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `project_step_images`
+--
+
+INSERT INTO `project_step_images` (`step_image_id`, `step_id`, `image_path`, `uploaded_at`) VALUES
+(10, 1, 'uploads/step_images/1/69327025926a6_1764913189.jpg', '2025-12-05 05:39:49'),
+(11, 4, 'uploads/step_images/4/6932746dc8287_1764914285.jpg', '2025-12-05 05:58:05'),
+(12, 5, 'uploads/step_images/5/6932c39850a10_1764934552.jpeg', '2025-12-05 11:35:52');
+
 -- --------------------------------------------------------
 
 --
@@ -506,8 +592,18 @@ CREATE TABLE `recycled_ideas` (
   `title` varchar(255) NOT NULL,
   `description` text DEFAULT NULL,
   `author` varchar(255) DEFAULT NULL,
-  `posted_at` datetime DEFAULT current_timestamp()
+  `posted_at` datetime DEFAULT current_timestamp(),
+  `project_id` int(11) DEFAULT NULL,
+  `image_path` varchar(500) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `recycled_ideas`
+--
+
+INSERT INTO `recycled_ideas` (`idea_id`, `title`, `description`, `author`, `posted_at`, `project_id`, `image_path`) VALUES
+(1, 'Basket', 'yuttttttttttttttttttttttttttttrar', 'Hanner Kaminari', '2025-12-05 17:47:22', 14, 'uploads/project_final_images/final_6932a3de517897.52590104_1764926430.jpg'),
+(2, 'Newspaper Flower', 'Cute Newspaper flower', 'Hanner Kaminari', '2025-12-05 19:38:26', 6, 'uploads/project_final_images/final_6932c4015b4233.72797426_1764934657.jpg');
 
 -- --------------------------------------------------------
 
@@ -692,7 +788,9 @@ INSERT INTO `users` (`user_id`, `google_id`, `email`, `password_hash`, `first_na
 (7, NULL, 'codm@gmail.com', '$2y$10$OYMA8TVpxb/qhVG/x.6FzO2QA7TgZnUC1s.Zz5RbJVXUDDlaF879m', 'Call', 'Of Duty', 'Mobile', NULL, '911', 'Shipment', 'Airport', '707', '2025-09-08 07:33:57', 0, NULL, 0, NULL, NULL, 0, NULL),
 (8, NULL, 'kenshi@gmail.com', '$2y$10$eHLM/BqI93YEX3tzxPM7suluiQIE9SbZyh0scX9ESeBaNbAozVsjW', 'Princess Kenshi', 'Pizarras', 'Quitor', NULL, '09876543210', 'Sitio San Vicente, Lahug', 'Cebu City', '6000', '2025-09-18 05:58:58', 40, NULL, 0, NULL, NULL, 0, NULL),
 (12, '115113529960597644353', 'princesskenshiquitor73@gmail.com', '', 'Haruka', NULL, 'Kirisaki', 'https://lh3.googleusercontent.com/a/ACg8ocI2WpMMDtQgI0J_d9r65N9q4JDxSPvK5bK8zTTgxv8dDd3hmZ6lRA=s96-c', '', '', '', '', '2025-11-20 03:10:22', 20, NULL, 0, '83f1013355a593136a7749a8f3477341189776362365cf7efb4e6bc458092e6c', '2025-12-20 11:10:22', 0, NULL),
-(18, '117191164987494583420', 'princesskenshi73@gmail.com', '', 'Princess', NULL, 'Kenshi P. Quitor', 'https://lh3.googleusercontent.com/a/ACg8ocIfS8m9yhq0xNduBtx17FlFzBgfG-o1SzKuJlQGCSXIlF20vJUe=s96-c', '', '', '', '', '2025-11-24 17:10:11', 40, NULL, 0, '9911d6adb9a7e540d86b02a432d6b9a73ec18e587cbcea211fbcd1c5858afa9b', '2025-12-30 01:29:29', 0, NULL);
+(18, '117191164987494583420', 'princesskenshi73@gmail.com', '', 'Princess', NULL, 'Kenshi P. Quitor', 'https://lh3.googleusercontent.com/a/ACg8ocIfS8m9yhq0xNduBtx17FlFzBgfG-o1SzKuJlQGCSXIlF20vJUe=s96-c', '', '', '', '', '2025-11-24 17:10:11', 40, NULL, 0, NULL, NULL, 0, NULL),
+(19, NULL, 'shemjohn@gmail.com', '$2y$10$3l7DpxtNUmwgsnDiGXWPeeX8AooPxRoS.EIUqrqvjqWY9gjPFvIGG', 'Shem John', 'B.', 'Juevesano', NULL, '09876543212', 'Sitio Sereas San Miguel, Lorega', 'Cebu City', '6000', '2025-12-02 07:53:52', 20, NULL, 0, NULL, NULL, 0, NULL),
+(21, NULL, 'lucashunter@gmail.com', '$2y$10$HTNJy7lPwfm1vqmwlvcAGuPjpdfu66QCw0fJWoQ.aHTrhGq7/Hn2C', 'Lucas', 'L.', 'Hunter', NULL, '09876123452', 'Sitio San Vicente, Lahug', 'Cebu City', '6000', '2025-12-04 07:51:31', 20, NULL, 0, NULL, NULL, 0, NULL);
 
 -- --------------------------------------------------------
 
@@ -777,7 +875,20 @@ INSERT INTO `user_activities` (`id`, `user_id`, `activity_type`, `description`, 
 (63, 18, 'badge', 'Earned badge: Donation Starter', 20, '2025-11-26 09:51:36', NULL, 1, 0),
 (64, 18, 'badge', 'Earned badge: EcoWaste Beginner', 10, '2025-11-26 10:03:57', NULL, 1, 0),
 (65, 18, 'badge', 'Earned badge: Rising Donor', 10, '2025-11-26 10:03:57', NULL, 1, 0),
-(66, 18, 'badge', 'Earned badge: Donation Starter', 20, '2025-11-26 10:03:57', NULL, 1, 0);
+(66, 18, 'badge', 'Earned badge: Donation Starter', 20, '2025-11-26 10:03:57', NULL, 1, 0),
+(67, 19, 'donation', 'You donated 3 Newspapers (Paper)', 15, '2025-12-02 07:55:18', NULL, 1, 0),
+(68, 19, 'badge', 'Earned badge: EcoWaste Beginner', 10, '2025-12-02 07:55:28', NULL, 1, 0),
+(69, 19, 'badge', 'Earned badge: Rising Donor', 10, '2025-12-02 07:55:28', NULL, 1, 0),
+(70, 19, 'badge', 'Earned badge: Donation Starter', 20, '2025-12-02 07:55:28', NULL, 1, 0),
+(71, 20, 'donation', 'You donated 12 Cardboard (Paper)', 60, '2025-12-04 07:41:15', NULL, 1, 0),
+(72, 20, 'badge', 'Earned badge: Donation Hero', 75, '2025-12-04 07:41:54', NULL, 1, 0),
+(73, 20, 'badge', 'Earned badge: EcoWaste Beginner', 10, '2025-12-04 07:41:54', NULL, 1, 0),
+(74, 20, 'badge', 'Earned badge: Rising Donor', 10, '2025-12-04 07:41:54', NULL, 1, 0),
+(75, 20, 'badge', 'Earned badge: Donation Starter', 20, '2025-12-04 07:41:54', NULL, 1, 0),
+(76, 21, 'donation', 'You donated 3 Cardboard (Paper)', 15, '2025-12-04 07:53:29', NULL, 1, 0),
+(77, 21, 'badge', 'Earned badge: EcoWaste Beginner', 10, '2025-12-04 07:54:17', NULL, 1, 0),
+(78, 21, 'badge', 'Earned badge: Rising Donor', 10, '2025-12-04 07:54:17', NULL, 1, 0),
+(79, 21, 'badge', 'Earned badge: Donation Starter', 20, '2025-12-04 07:54:17', NULL, 1, 0);
 
 -- --------------------------------------------------------
 
@@ -842,7 +953,17 @@ INSERT INTO `user_badges` (`id`, `user_id`, `badge_id`, `earned_date`) VALUES
 (50, 8, 9, '2025-11-24 18:09:16'),
 (57, 18, 6, '2025-11-26 10:03:57'),
 (58, 18, 7, '2025-11-26 10:03:57'),
-(59, 18, 9, '2025-11-26 10:03:57');
+(59, 18, 9, '2025-11-26 10:03:57'),
+(60, 19, 6, '2025-12-02 07:55:28'),
+(61, 19, 7, '2025-12-02 07:55:28'),
+(62, 19, 9, '2025-12-02 07:55:28'),
+(63, 20, 3, '2025-12-04 07:41:54'),
+(64, 20, 6, '2025-12-04 07:41:54'),
+(65, 20, 7, '2025-12-04 07:41:54'),
+(66, 20, 9, '2025-12-04 07:41:54'),
+(67, 21, 6, '2025-12-04 07:54:17'),
+(68, 21, 7, '2025-12-04 07:54:17'),
+(69, 21, 9, '2025-12-04 07:54:17');
 
 -- --------------------------------------------------------
 
@@ -872,10 +993,12 @@ CREATE TABLE `user_stats` (
 --
 
 INSERT INTO `user_stats` (`stat_id`, `user_id`, `projects_completed`, `achievements_earned`, `badges_earned`, `items_donated`, `items_recycled`, `plastic_recycled`, `paper_recycled`, `glass_recycled`, `metal_recycled`, `points`, `projects_created`, `total_points`) VALUES
-(1, 4, 1, 9, 12, 862, 1, 0, 0, 0, 0, 0, 0, 810),
+(1, 4, 1, 9, 12, 862, 1, 0, 0, 0, 0, 0, 6, 810),
 (3, 8, 0, 1, 5, 123, 0, 0, 0, 0, 0, 0, 0, 40),
 (6, 12, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0),
-(18, 18, 0, 2, 3, 3, 0, 0, 0, 0, 0, 0, 1, 40);
+(18, 18, 0, 2, 3, 3, 0, 0, 0, 0, 0, 0, 1, 40),
+(19, 19, 0, 1, 3, 3, 0, 0, 0, 0, 0, 0, 0, 20),
+(21, 21, 0, 1, 3, 3, 0, 0, 0, 0, 0, 0, 0, 20);
 
 -- --------------------------------------------------------
 
@@ -913,7 +1036,7 @@ INSERT INTO `user_tasks` (`task_id`, `user_id`, `title`, `description`, `status`
 (21, 4, 'Community Helper', 'Complete 25 donations', 'In Progress', '200 EcoPoints', '0/25', 0, 25, 'donations', '', 'points', '200', 1, 1),
 (22, 4, 'Charity Champion', 'Complete 30 donations', 'In Progress', '250 EcoPoints', '0/30', 0, 30, 'donations', '', 'points', '250', 1, 1),
 (23, 4, 'Eco Beginner', 'Start your first recycling project', 'Completed', '20 EcoPoints', '1/1', 1, 1, 'projects_created', '', 'points', '20', 1, 1),
-(24, 4, 'Eco Builder', 'Create 10 recycling projects', 'In Progress', '50 EcoPoints', '9/10', 9, 10, 'projects_created', '', 'points', '50', 0, 1),
+(24, 4, 'Eco Builder', 'Create 10 recycling projects', 'In Progress', '50 EcoPoints', '4/10', 4, 10, 'projects_created', '', 'points', '50', 0, 1),
 (25, 4, 'Nature Keeper', 'Create 15 recycling projects', 'In Progress', '100 EcoPoints', '0/15', 0, 15, 'projects_created', '', 'points', '100', 0, 0),
 (26, 4, 'Conservation Expert', 'Create 20 recycling projects', 'In Progress', '150 EcoPoints', '0/20', 0, 20, 'projects_created', '', 'points', '150', 0, 0),
 (27, 4, 'Zero Waste Hero', 'Create 25 recycling projects', 'In Progress', '200 EcoPoints', '0/25', 0, 25, 'projects_created', '', 'points', '200', 0, 0),
@@ -977,7 +1100,43 @@ INSERT INTO `user_tasks` (`task_id`, `user_id`, `title`, `description`, `status`
 (302, 18, 'Eco Elite', 'Complete 15 recycling projects', 'In Progress', '100 EcoPoints', '0/15', 0, 15, 'projects_completed', '', 'points', '100', 0, 0),
 (303, 18, 'Eco Pro', 'Complete 20 recycling projects', 'In Progress', '150 EcoPoints', '0/20', 0, 20, 'projects_completed', '', 'points', '150', 0, 0),
 (304, 18, 'Eco Master', 'Complete 25 recycling projects', 'In Progress', '200 EcoPoints', '0/25', 0, 25, 'projects_completed', '', 'points', '200', 0, 0),
-(305, 18, 'Eco Legend', 'Complete 30 recycling projects', 'In Progress', '250 EcoPoints', '0/30', 0, 30, 'projects_completed', '', 'points', '250', 0, 0);
+(305, 18, 'Eco Legend', 'Complete 30 recycling projects', 'In Progress', '250 EcoPoints', '0/30', 0, 30, 'projects_completed', '', 'points', '250', 0, 0),
+(306, 19, 'Rising Donor', 'Complete your first donation', 'Completed', '20 EcoPoints', '1/1', 1, 1, 'donations', '', 'points', '20', 1, 1),
+(307, 19, 'Helpful Friend', 'Complete 10 donations', 'In Progress', '50 EcoPoints', '0/10', 0, 10, 'donations', '', 'points', '50', 0, 1),
+(308, 19, 'Care Giver', 'Complete 15 donations', 'In Progress', '100 EcoPoints', '0/15', 0, 15, 'donations', '', 'points', '100', 0, 0),
+(309, 19, 'Generous Giver', 'Complete 20 donations', 'In Progress', '150 EcoPoints', '0/20', 0, 20, 'donations', '', 'points', '150', 0, 0),
+(310, 19, 'Community Helper', 'Complete 25 donations', 'In Progress', '200 EcoPoints', '0/25', 0, 25, 'donations', '', 'points', '200', 0, 0),
+(311, 19, 'Charity Champion', 'Complete 30 donations', 'In Progress', '250 EcoPoints', '0/30', 0, 30, 'donations', '', 'points', '250', 0, 0),
+(312, 19, 'Eco Beginner', 'Start your first recycling project', 'In Progress', '20 EcoPoints', '0/1', 0, 1, 'projects_created', '', 'points', '20', 0, 1),
+(313, 19, 'Eco Builder', 'Create 10 recycling projects', 'In Progress', '50 EcoPoints', '0/10', 0, 10, 'projects_created', '', 'points', '50', 0, 0),
+(314, 19, 'Nature Keeper', 'Create 15 recycling projects', 'In Progress', '100 EcoPoints', '0/15', 0, 15, 'projects_created', '', 'points', '100', 0, 0),
+(315, 19, 'Conservation Expert', 'Create 20 recycling projects', 'In Progress', '150 EcoPoints', '0/20', 0, 20, 'projects_created', '', 'points', '150', 0, 0),
+(316, 19, 'Zero Waste Hero', 'Create 25 recycling projects', 'In Progress', '200 EcoPoints', '0/25', 0, 25, 'projects_created', '', 'points', '200', 0, 0),
+(317, 19, 'Earth Saver', 'Create 30 recycling projects', 'In Progress', '250 EcoPoints', '0/30', 0, 30, 'projects_created', '', 'points', '250', 0, 0),
+(318, 19, 'Eco Star', 'Complete a recycling project', 'In Progress', '20 EcoPoints', '0/1', 0, 1, 'projects_completed', '', 'points', '20', 0, 1),
+(319, 19, 'Eco Warrior', 'Complete 10 recycling projects', 'In Progress', '50 EcoPoints', '0/10', 0, 10, 'projects_completed', '', 'points', '50', 0, 0),
+(320, 19, 'Eco Elite', 'Complete 15 recycling projects', 'In Progress', '100 EcoPoints', '0/15', 0, 15, 'projects_completed', '', 'points', '100', 0, 0),
+(321, 19, 'Eco Pro', 'Complete 20 recycling projects', 'In Progress', '150 EcoPoints', '0/20', 0, 20, 'projects_completed', '', 'points', '150', 0, 0),
+(322, 19, 'Eco Master', 'Complete 25 recycling projects', 'In Progress', '200 EcoPoints', '0/25', 0, 25, 'projects_completed', '', 'points', '200', 0, 0),
+(323, 19, 'Eco Legend', 'Complete 30 recycling projects', 'In Progress', '250 EcoPoints', '0/30', 0, 30, 'projects_completed', '', 'points', '250', 0, 0),
+(342, 21, 'Rising Donor', 'Complete your first donation', 'Completed', '20 EcoPoints', '1/1', 1, 1, 'donations', '', 'points', '20', 1, 1),
+(343, 21, 'Helpful Friend', 'Complete 10 donations', 'In Progress', '50 EcoPoints', '0/10', 0, 10, 'donations', '', 'points', '50', 0, 1),
+(344, 21, 'Care Giver', 'Complete 15 donations', 'In Progress', '100 EcoPoints', '0/15', 0, 15, 'donations', '', 'points', '100', 0, 0),
+(345, 21, 'Generous Giver', 'Complete 20 donations', 'In Progress', '150 EcoPoints', '0/20', 0, 20, 'donations', '', 'points', '150', 0, 0),
+(346, 21, 'Community Helper', 'Complete 25 donations', 'In Progress', '200 EcoPoints', '0/25', 0, 25, 'donations', '', 'points', '200', 0, 0),
+(347, 21, 'Charity Champion', 'Complete 30 donations', 'In Progress', '250 EcoPoints', '0/30', 0, 30, 'donations', '', 'points', '250', 0, 0),
+(348, 21, 'Eco Beginner', 'Start your first recycling project', 'In Progress', '20 EcoPoints', '0/1', 0, 1, 'projects_created', '', 'points', '20', 0, 1),
+(349, 21, 'Eco Builder', 'Create 10 recycling projects', 'In Progress', '50 EcoPoints', '0/10', 0, 10, 'projects_created', '', 'points', '50', 0, 0),
+(350, 21, 'Nature Keeper', 'Create 15 recycling projects', 'In Progress', '100 EcoPoints', '0/15', 0, 15, 'projects_created', '', 'points', '100', 0, 0),
+(351, 21, 'Conservation Expert', 'Create 20 recycling projects', 'In Progress', '150 EcoPoints', '0/20', 0, 20, 'projects_created', '', 'points', '150', 0, 0),
+(352, 21, 'Zero Waste Hero', 'Create 25 recycling projects', 'In Progress', '200 EcoPoints', '0/25', 0, 25, 'projects_created', '', 'points', '200', 0, 0),
+(353, 21, 'Earth Saver', 'Create 30 recycling projects', 'In Progress', '250 EcoPoints', '0/30', 0, 30, 'projects_created', '', 'points', '250', 0, 0),
+(354, 21, 'Eco Star', 'Complete a recycling project', 'In Progress', '20 EcoPoints', '0/1', 0, 1, 'projects_completed', '', 'points', '20', 0, 1),
+(355, 21, 'Eco Warrior', 'Complete 10 recycling projects', 'In Progress', '50 EcoPoints', '0/10', 0, 10, 'projects_completed', '', 'points', '50', 0, 0),
+(356, 21, 'Eco Elite', 'Complete 15 recycling projects', 'In Progress', '100 EcoPoints', '0/15', 0, 15, 'projects_completed', '', 'points', '100', 0, 0),
+(357, 21, 'Eco Pro', 'Complete 20 recycling projects', 'In Progress', '150 EcoPoints', '0/20', 0, 20, 'projects_completed', '', 'points', '150', 0, 0),
+(358, 21, 'Eco Master', 'Complete 25 recycling projects', 'In Progress', '200 EcoPoints', '0/25', 0, 25, 'projects_completed', '', 'points', '200', 0, 0),
+(359, 21, 'Eco Legend', 'Complete 30 recycling projects', 'In Progress', '250 EcoPoints', '0/30', 0, 30, 'projects_completed', '', 'points', '250', 0, 0);
 
 --
 -- Indexes for dumped tables
@@ -1054,6 +1213,13 @@ ALTER TABLE `projects`
   ADD KEY `user_id` (`user_id`);
 
 --
+-- Indexes for table `project_images`
+--
+ALTER TABLE `project_images`
+  ADD PRIMARY KEY (`image_id`),
+  ADD KEY `idx_final_image` (`project_id`,`is_final_image`);
+
+--
 -- Indexes for table `project_materials`
 --
 ALTER TABLE `project_materials`
@@ -1061,10 +1227,24 @@ ALTER TABLE `project_materials`
   ADD KEY `project_id` (`project_id`);
 
 --
+-- Indexes for table `project_steps`
+--
+ALTER TABLE `project_steps`
+  ADD PRIMARY KEY (`step_id`);
+
+--
+-- Indexes for table `project_step_images`
+--
+ALTER TABLE `project_step_images`
+  ADD PRIMARY KEY (`step_image_id`),
+  ADD KEY `step_id` (`step_id`);
+
+--
 -- Indexes for table `recycled_ideas`
 --
 ALTER TABLE `recycled_ideas`
-  ADD PRIMARY KEY (`idea_id`);
+  ADD PRIMARY KEY (`idea_id`),
+  ADD KEY `idx_project_id` (`project_id`);
 
 --
 -- Indexes for table `shared_activities`
@@ -1131,13 +1311,13 @@ ALTER TABLE `comments`
 -- AUTO_INCREMENT for table `donations`
 --
 ALTER TABLE `donations`
-  MODIFY `donation_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=104;
+  MODIFY `donation_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=107;
 
 --
 -- AUTO_INCREMENT for table `donation_requests`
 --
 ALTER TABLE `donation_requests`
-  MODIFY `request_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=39;
+  MODIFY `request_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=41;
 
 --
 -- AUTO_INCREMENT for table `feedback`
@@ -1155,7 +1335,7 @@ ALTER TABLE `material_allocations`
 -- AUTO_INCREMENT for table `material_photos`
 --
 ALTER TABLE `material_photos`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=19;
 
 --
 -- AUTO_INCREMENT for table `notifications`
@@ -1173,19 +1353,37 @@ ALTER TABLE `password_resets`
 -- AUTO_INCREMENT for table `projects`
 --
 ALTER TABLE `projects`
-  MODIFY `project_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=22;
+  MODIFY `project_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=25;
+
+--
+-- AUTO_INCREMENT for table `project_images`
+--
+ALTER TABLE `project_images`
+  MODIFY `image_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
 
 --
 -- AUTO_INCREMENT for table `project_materials`
 --
 ALTER TABLE `project_materials`
-  MODIFY `material_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=20;
+  MODIFY `material_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=96;
+
+--
+-- AUTO_INCREMENT for table `project_steps`
+--
+ALTER TABLE `project_steps`
+  MODIFY `step_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+
+--
+-- AUTO_INCREMENT for table `project_step_images`
+--
+ALTER TABLE `project_step_images`
+  MODIFY `step_image_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
 
 --
 -- AUTO_INCREMENT for table `recycled_ideas`
 --
 ALTER TABLE `recycled_ideas`
-  MODIFY `idea_id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `idea_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT for table `shared_activities`
@@ -1203,31 +1401,31 @@ ALTER TABLE `shared_materials`
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `user_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=19;
+  MODIFY `user_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=22;
 
 --
 -- AUTO_INCREMENT for table `user_activities`
 --
 ALTER TABLE `user_activities`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=67;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=80;
 
 --
 -- AUTO_INCREMENT for table `user_badges`
 --
 ALTER TABLE `user_badges`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=60;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=70;
 
 --
 -- AUTO_INCREMENT for table `user_stats`
 --
 ALTER TABLE `user_stats`
-  MODIFY `stat_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=19;
+  MODIFY `stat_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=22;
 
 --
 -- AUTO_INCREMENT for table `user_tasks`
 --
 ALTER TABLE `user_tasks`
-  MODIFY `task_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=306;
+  MODIFY `task_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=360;
 
 --
 -- Constraints for dumped tables
@@ -1276,6 +1474,12 @@ ALTER TABLE `password_resets`
 --
 ALTER TABLE `projects`
   ADD CONSTRAINT `projects_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`);
+
+--
+-- Constraints for table `project_images`
+--
+ALTER TABLE `project_images`
+  ADD CONSTRAINT `project_images_ibfk_1` FOREIGN KEY (`project_id`) REFERENCES `projects` (`project_id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `project_materials`
