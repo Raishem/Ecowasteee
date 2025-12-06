@@ -3,5 +3,10 @@
         "phpmailer/phpmailer": "*",
         "google/apiclient": "2.15",
         "guzzlehttp/guzzle": "7.7"
+    },
+    "config": {
+        "platform": {
+            "php": "8.0.28"
+        }
     }
 }
