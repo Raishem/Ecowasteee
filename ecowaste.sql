@@ -757,7 +757,7 @@ CREATE TABLE `users` (
   `user_id` int(11) NOT NULL,
   `google_id` varchar(255) DEFAULT NULL,
   `email` varchar(100) NOT NULL,
-  `password_hash` varchar(255) NOT NULL,
+  `password_hash` varchar(255) DEFAULT NULL,
   `first_name` varchar(50) NOT NULL,
   `middle_name` varchar(50) DEFAULT NULL,
   `last_name` varchar(50) NOT NULL,

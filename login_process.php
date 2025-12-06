@@ -45,6 +45,13 @@ try {
     $user = $result->fetch_assoc();
     error_log("User found: " . print_r($user, true));
 
+    // Check if user has a password set (not a Google-only account)
+    if (empty($user['password_hash'])) {
+        $_SESSION['login_error'] = 'This account uses Google Sign-In. Please click "Continue with Google" to log in.';
+        header('Location: login.php');
+        exit();
+    }
+
     // Verify password
     if (!password_verify($password, $user['password_hash'])) {
         $_SESSION['login_error'] = 'Invalid email or password';
